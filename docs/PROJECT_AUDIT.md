@@ -93,3 +93,11 @@ Validation covers multipart files, unsupported/spoofed media, size limits, rejec
 The Use current location and Select on map buttons were placeholders. They now support one explicit device reading or interactive map selection, editable location names, confirmation and existing post persistence. Saved points outside the catalog reopen correctly. Permission failures leave manual selection available, and stale device callbacks are ignored after cancellation, another selection or an account change. Discovery keeps its existing rounding and behavior.
 
 Validation: 60 focused frontend tests passed across location, discovery, post location and post editing; typecheck, lint and production build passed. Browser QA verified native GPS and denial, map click and pin dragging, exact API persistence, mobile layout and canceled/reopened selections. Browser map tiles were mocked locally for automated checks.
+
+## Direct chat tools and calls follow-up
+
+Added persistent gallery photos and recorded voice messages with preview/cancel/send, shared pins, forwarding, private pending reports, and sender-only unsend. Tombstones retain history pagination, and delayed polling cannot restore an unsent attachment. Forwarded messages are independent copies. These actions apply to direct conversations; club chats keep their existing behavior. Report review tooling remains unfinished.
+
+One-to-one voice/video calls now use authenticated WebRTC signaling with participant checks, transactional busy-user checks, recipient-only answer, expiration, mute, camera toggles, and device cleanup. An initial audio call negotiates optional video so either participant can turn their camera on later. Incoming calls require the application to be open. Production connections across restrictive or different networks require a configured TURN relay, shared with the existing live feature.
+
+Validation includes frontend account-switch and stale-response regression tests, backend chat privacy/ownership and call signaling checks, and two isolated browser accounts using recorded audio and real WebRTC media tracks. This verifies browser signaling and playback; it does not substitute for physical-device testing on different carrier networks.

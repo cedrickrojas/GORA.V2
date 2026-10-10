@@ -43,6 +43,7 @@ export const useChatStore = defineStore('chat', () => {
   const error = ref<string | null>(null);
   const cursors = ref<Record<string, string | null>>({});
   const reacting = ref<Record<string, boolean>>({});
+  const pins = ref<Record<string, ChatMessage[]>>({});
 
   function reset(): void {
     generation++;
@@ -54,6 +55,7 @@ export const useChatStore = defineStore('chat', () => {
     requestRecipients.value = {};
     cursors.value = {};
     reacting.value = {};
+    pins.value = {};
     isLoaded.value = false;
     loading.value = false;
     error.value = null;
@@ -145,7 +147,9 @@ export const useChatStore = defineStore('chat', () => {
     const current = new Map(getMessages(id).map((message) => [message.id, message]));
     const merged = incoming.map((message) => {
       const previous = current.get(message.id);
-      return previous && (preserveReactions || reacting.value[message.id])
+      if (previous?.updatedAt && message.updatedAt && Date.parse(previous.updatedAt) > Date.parse(message.updatedAt))
+        return previous;
+      return previous && !message.unsent && (preserveReactions || reacting.value[message.id])
         ? { ...message, reactions: previous.reactions }
         : message;
     });
@@ -153,6 +157,13 @@ export const useChatStore = defineStore('chat', () => {
     messages.value[id] = [...byId.values()].sort(
       (a, b) => Date.parse(a.sentAt) - Date.parse(b.sentAt) || a.id.localeCompare(b.id),
     );
+    const latest = messages.value[id].at(-1);
+    const conversation = getConversation(id);
+    if (latest && conversation && Date.parse(conversation.lastMessageAt) <= Date.parse(latest.sentAt)) {
+      conversation.lastMessage = latest.body;
+      conversation.lastMessageAt = latest.sentAt;
+      conversation.lastMessageSenderId = latest.senderId;
+    }
   }
 
   async function loadThread(id: string, older = false): Promise<string | null> {
@@ -219,7 +230,11 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
-  async function reactToMessage(id: string, messageId: string, emoji: MessageReactionEmoji | null): Promise<string | null> {
+  async function reactToMessage(
+    id: string,
+    messageId: string,
+    emoji: MessageReactionEmoji | null,
+  ): Promise<string | null> {
     if (!auth.accessToken) return 'Log in to react to a message.';
     if (reacting.value[messageId]) return null;
     const version = generation;
@@ -238,6 +253,83 @@ export const useChatStore = defineStore('chat', () => {
         delete reacting.value[messageId];
         reactionRevision++;
       }
+    }
+  }
+
+  async function loadPins(id: string): Promise<void> {
+    const isCurrent = captureSession(auth);
+    try {
+      pins.value[id] = await authorized((token) => directApi.getPins(token, id));
+    } catch {
+      if (isCurrent()) pins.value[id] = [];
+    }
+  }
+
+  async function messageMutation(
+    id: string,
+    messageId: string,
+    call: (token: string) => Promise<ChatMessage>,
+  ): Promise<string | null> {
+    if (reacting.value[messageId]) return 'Please wait for the current action.';
+    const isCurrent = captureSession(auth);
+    reacting.value[messageId] = true;
+    reactionRevision++;
+    try {
+      const message = await authorized(call);
+      rememberMessages(message.conversationId, [message]);
+      const current = getConversation(message.conversationId);
+      if (
+        current &&
+        (current.lastMessageAt === message.sentAt || Date.parse(current.lastMessageAt) < Date.parse(message.sentAt))
+      ) {
+        current.lastMessage = message.body;
+        current.lastMessageAt = message.sentAt;
+        current.lastMessageSenderId = message.senderId;
+      }
+      void loadPins(id);
+      return null;
+    } catch (caught) {
+      return describeContentError(caught);
+    } finally {
+      if (isCurrent()) {
+        delete reacting.value[messageId];
+        reactionRevision++;
+      }
+    }
+  }
+
+  async function sendAttachment(id: string, data: string): Promise<string | null> {
+    try {
+      const message = await authorized((token) => directApi.sendAttachment(token, id, data));
+      rememberMessages(id, [message]);
+      const conversation = getConversation(id);
+      if (conversation) {
+        conversation.lastMessage = message.body;
+        conversation.lastMessageAt = message.sentAt;
+        conversation.lastMessageSenderId = message.senderId;
+      }
+      return null;
+    } catch (caught) {
+      return describeContentError(caught);
+    }
+  }
+  const unsendMessage = (id: string, messageId: string) =>
+    messageMutation(id, messageId, (token) => directApi.unsendMessage(token, id, messageId));
+  const pinMessage = (id: string, messageId: string, pinned: boolean) =>
+    messageMutation(id, messageId, (token) => directApi.pinMessage(token, id, messageId, pinned));
+  const forwardMessage = (id: string, messageId: string, destinationId: string) =>
+    messageMutation(id, messageId, (token) => directApi.forwardMessage(token, id, messageId, destinationId));
+  async function reportMessage(
+    id: string,
+    messageId: string,
+    reason: string,
+    description: string,
+  ): Promise<string | null> {
+    try {
+      await authorized((token) => directApi.reportMessage(token, id, messageId, reason, description));
+      return null;
+    } catch (caught) {
+      return describeContentError(caught);
     }
   }
 
@@ -456,6 +548,13 @@ export const useChatStore = defineStore('chat', () => {
     error,
     cursors,
     reacting,
+    pins,
+    loadPins,
+    sendAttachment,
+    unsendMessage,
+    pinMessage,
+    forwardMessage,
+    reportMessage,
     sortedConversations,
     unreadCount,
     badgeCount,

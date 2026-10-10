@@ -2,6 +2,24 @@
   <ion-page ref="pageRef" :style="{ bottom: `${keyboardInset}px` }">
     <SubPageHeader :title="partner?.displayName ?? 'Chat'" back-href="/chat">
       <template v-if="partner" #end>
+        <button
+          v-if="!isRequest && auth.accessToken"
+          type="button"
+          class="thread__call"
+          aria-label="Start voice call"
+          @click="calls.start(conversationId, 'AUDIO')"
+        >
+          <ion-icon :icon="callOutline" />
+        </button>
+        <button
+          v-if="!isRequest && auth.accessToken"
+          type="button"
+          class="thread__call"
+          aria-label="Start video call"
+          @click="calls.start(conversationId, 'VIDEO')"
+        >
+          <ion-icon :icon="videocamOutline" />
+        </button>
         <router-link
           :to="`/profile/${partner.username}`"
           class="thread__profile"
@@ -19,6 +37,16 @@
       </p>
       <template v-else>
         <p v-if="isRequest" class="thread__notice" role="note">{{ requestNotice }}</p>
+        <details v-if="chatStore.pins[conversationId]?.length" class="thread__pins">
+          <summary>📌 Pinned messages ({{ chatStore.pins[conversationId].length }})</summary>
+          <div v-for="pin in chatStore.pins[conversationId]" :key="pin.id">
+            <strong>{{ pin.sender?.displayName }}</strong>
+            <p>{{ pin.body }}</p>
+            <img v-if="pin.attachment?.kind === 'image'" :src="pin.attachment.url" alt="Pinned photo" />
+            <audio v-if="pin.attachment?.kind === 'audio'" :src="pin.attachment.url" controls preload="metadata" />
+            <button type="button" @click="messageAction(pin.id, 'pin')">Unpin</button>
+          </div>
+        </details>
         <button
           v-if="!isRequest && chatStore.cursors[conversationId]"
           type="button"
@@ -32,15 +60,18 @@
           <li
             v-for="message in bubbles"
             :key="message.id"
+            :data-message-id="message.id"
             class="thread__message"
             :class="{ 'thread__message--mine': message.mine }"
           >
             <MessageBubble
               v-bind="message"
               :now="now"
-              :can-react="!isRequest && !!auth.accessToken"
+              :can-react="!isRequest && !!auth.accessToken && !message.unsent"
+              :can-manage="!isRequest && !!auth.accessToken && !message.unsent"
               :busy="chatStore.reacting[message.id]"
               @react="reactToMessage(message.id, $event)"
+              @action="messageAction(message.id, $event)"
             />
           </li>
         </ol>
@@ -55,15 +86,31 @@
         :sending="sending"
         @send="sendDraft"
         @focus="scrollToLatest"
-      />
+        ><template v-if="!isRequest && auth.accessToken" #tools
+          ><ChatAttachmentTools :disabled="sending || !currentUserId" :send="sendFile" /></template
+      ></ChatComposer>
     </ion-footer>
+    <MessageActionModal :message="actionMessage" :mode="actionMode" @close="actionMessage = null" />
   </ion-page>
 </template>
 
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { IonContent, IonFooter, IonPage, onIonViewDidLeave, onIonViewWillEnter } from '@ionic/vue';
+import {
+  IonContent,
+  IonFooter,
+  IonPage,
+  IonIcon,
+  alertController,
+  onIonViewDidLeave,
+  onIonViewWillEnter,
+} from '@ionic/vue';
+import { callOutline, videocamOutline } from 'ionicons/icons';
+import ChatAttachmentTools from '@/components/chat/ChatAttachmentTools.vue';
+import MessageActionModal from '@/components/chat/MessageActionModal.vue';
+import { useDirectCallStore } from '@/stores/direct-call';
+import { preparePostPhoto } from '@/utils/post-photos';
 import ChatComposer from '@/components/chat/ChatComposer.vue';
 import MessageBubble from '@/components/chat/MessageBubble.vue';
 import UserAvatar from '@/components/common/UserAvatar.vue';
@@ -74,7 +121,7 @@ import { useChatStore } from '@/stores/chat';
 import { useSessionStore } from '@/stores/session';
 import { useAuthStore } from '@/stores/auth';
 import { captureSession } from '@/stores/authorized';
-import type { MessageReaction, MessageReactionEmoji, MessageRequestResult } from '@/types/chat';
+import type { MessageReaction, MessageReactionEmoji, MessageRequestResult, ChatMessage } from '@/types/chat';
 import { showNotice } from '@/utils/notice';
 
 interface Bubble {
@@ -84,6 +131,10 @@ interface Bubble {
   mine: boolean;
   senderName: string;
   reactions?: MessageReaction[];
+  attachment?: ChatMessage['attachment'];
+  unsent?: boolean;
+  pinned?: boolean;
+  forwarded?: boolean;
 }
 
 const route = useRoute();
@@ -91,13 +142,18 @@ const router = useRouter();
 const chatStore = useChatStore();
 const sessionStore = useSessionStore();
 const auth = useAuthStore();
+const calls = useDirectCallStore();
+const actionMessage = ref<ChatMessage | null>(null);
+const actionMode = ref<'forward' | 'report'>('forward');
 const now = useNow();
 const draft = ref('');
 const sending = ref(false);
 const fetching = ref(false);
 const contentRef = ref<InstanceType<typeof IonContent> | null>(null);
 const pageRef = ref<InstanceType<typeof IonPage> | null>(null);
-const { keyboardInset } = useChatKeyboard(pageRef, () => { void scrollToLatest(); });
+const { keyboardInset } = useChatKeyboard(pageRef, () => {
+  void scrollToLatest();
+});
 
 /** Set on /chat/request/:userId (someone who isn't a friend). Ionic keeps one page per URL. */
 const requestUserId = String(route.params.userId ?? '');
@@ -133,6 +189,10 @@ const bubbles = computed<Bubble[]>(() => {
     body: message.body,
     sentAt: message.sentAt,
     reactions: message.reactions,
+    attachment: message.attachment,
+    unsent: message.unsent,
+    pinned: message.pinned,
+    forwarded: message.forwarded,
     mine: message.senderId === currentUserId.value,
     senderName:
       message.sender?.displayName ??
@@ -214,6 +274,60 @@ async function reactToMessage(messageId: string, emoji: MessageReactionEmoji | n
   if (isCurrent() && error) void showNotice(error);
 }
 
+async function sendFile(file: File): Promise<string | null> {
+  if (sending.value || isRequest) return 'Please wait for the current message.';
+  const isCurrent = captureSession(auth);
+  sending.value = true;
+  try {
+    const data = file.type.startsWith('image/')
+      ? await preparePostPhoto(file)
+      : await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(String(reader.result));
+          reader.onerror = () => reject(new Error('Could not open the voice message.'));
+          reader.readAsDataURL(file);
+        });
+    if (!isCurrent()) return 'The account changed. Try again.';
+    const error = await chatStore.sendAttachment(conversationId, data);
+    if (!error && isCurrent()) void scrollToLatest();
+    return error;
+  } catch (caught) {
+    return caught instanceof Error ? caught.message : 'Could not send this attachment.';
+  } finally {
+    if (isCurrent()) sending.value = false;
+  }
+}
+
+async function messageAction(messageId: string, action: 'unsend' | 'forward' | 'pin' | 'report'): Promise<void> {
+  const message =
+    chatStore.getMessages(conversationId).find((m) => m.id === messageId) ??
+    chatStore.pins[conversationId]?.find((m) => m.id === messageId);
+  if (!message || message.unsent) return;
+  const isCurrent = captureSession(auth);
+  if (action === 'forward' || action === 'report') {
+    actionMode.value = action;
+    actionMessage.value = message;
+    return;
+  }
+  if (action === 'unsend') {
+    const alert = await alertController.create({
+      header: 'Unsend for everyone?',
+      message: 'This message and its attachment will be removed for everyone in this chat.',
+      buttons: [
+        { text: 'Cancel', role: 'cancel' },
+        { text: 'Unsend', role: 'destructive' },
+      ],
+    });
+    await alert.present();
+    if ((await alert.onDidDismiss()).role !== 'destructive' || !isCurrent()) return;
+  }
+  const error =
+    action === 'pin'
+      ? await chatStore.pinMessage(conversationId, messageId, !message.pinned)
+      : await chatStore.unsendMessage(conversationId, messageId);
+  if (isCurrent() && error) void showNotice(error);
+}
+
 watch(
   () => bubbles.value.at(-1)?.id,
   (value) => {
@@ -239,7 +353,10 @@ async function refreshThread(): Promise<void> {
       if (!isCurrent()) return;
       const accepted = chatStore.findDirectWith(requestUserId);
       if (accepted) await router.replace(`/chat/${accepted.id}`);
-    } else await chatStore.loadThread(conversationId);
+    } else {
+      await chatStore.loadThread(conversationId);
+      if (isCurrent()) await chatStore.loadPins(conversationId);
+    }
   } finally {
     if (isCurrent()) fetching.value = false;
   }
@@ -262,6 +379,7 @@ watch(
     draft.value = '';
     sending.value = false;
     fetching.value = false;
+    actionMessage.value = null;
   },
 );
 let poll: ReturnType<typeof setInterval> | undefined;
@@ -287,6 +405,47 @@ onIonViewWillEnter(() => {
   border-radius: 50%;
   color: inherit;
   text-decoration: none;
+}
+.thread__call {
+  border: 0;
+  background: transparent;
+  color: var(--ion-color-primary);
+  padding: 8px;
+  display: grid;
+  place-items: center;
+  font-size: 22px;
+  cursor: pointer;
+}
+.thread__pins {
+  margin: 12px 16px;
+  padding: 12px;
+  border-radius: 12px;
+  background: var(--gora-surface);
+  font-size: 0.85rem;
+}
+.thread__pins summary {
+  cursor: pointer;
+  color: var(--ion-color-primary);
+}
+.thread__pins > div {
+  padding-top: 12px;
+  border-top: 1px solid var(--gora-line);
+  margin-top: 12px;
+}
+.thread__pins img {
+  display: block;
+  max-width: 220px;
+  max-height: 160px;
+}
+.thread__pins audio {
+  max-width: 100%;
+}
+.thread__pins button {
+  border: 0;
+  background: transparent;
+  color: var(--ion-color-primary);
+  cursor: pointer;
+  padding: 8px;
 }
 
 .thread {

@@ -15,12 +15,78 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { ClubChatMessagesQueryDto } from '../clubs/dto/club-chat.dto';
 import type { CurrentUser as Viewer } from '../users/user.types';
 import { DirectChatService } from './direct-chat.service';
-import { ReactToMessageDto, SendDirectMessageDto } from './direct-chat.dto';
+import {
+  ReactToMessageDto,
+  SendDirectMessageDto,
+  AttachMessageDto,
+  ForwardMessageDto,
+  PinMessageDto,
+  ReportMessageDto,
+} from './direct-chat.dto';
 
 @Controller('chat')
 @UseGuards(JwtAuthGuard)
 export class DirectChatController {
   constructor(private readonly chat: DirectChatService) {}
+
+  @Post('direct/:id/attachments')
+  attach(
+    @CurrentUser() viewer: Viewer,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: AttachMessageDto,
+  ) {
+    return this.chat.attach(viewer.id, id, dto.data);
+  }
+
+  @Get('direct/:id/pins')
+  pins(@CurrentUser() viewer: Viewer, @Param('id', ParseUUIDPipe) id: string) {
+    return this.chat.pins(viewer.id, id);
+  }
+
+  @Delete('direct/:id/messages/:messageId')
+  unsend(
+    @CurrentUser() viewer: Viewer,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('messageId', ParseUUIDPipe) messageId: string,
+  ) {
+    return this.chat.unsend(viewer.id, id, messageId);
+  }
+
+  @Put('direct/:id/messages/:messageId/pin')
+  pin(
+    @CurrentUser() viewer: Viewer,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('messageId', ParseUUIDPipe) messageId: string,
+    @Body() dto: PinMessageDto,
+  ) {
+    return this.chat.pin(viewer.id, id, messageId, dto.pinned);
+  }
+
+  @Post('direct/:id/messages/:messageId/forward')
+  forward(
+    @CurrentUser() viewer: Viewer,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('messageId', ParseUUIDPipe) messageId: string,
+    @Body() dto: ForwardMessageDto,
+  ) {
+    return this.chat.forward(viewer.id, id, messageId, dto.conversationId);
+  }
+
+  @Post('direct/:id/messages/:messageId/report')
+  report(
+    @CurrentUser() viewer: Viewer,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('messageId', ParseUUIDPipe) messageId: string,
+    @Body() dto: ReportMessageDto,
+  ) {
+    return this.chat.report(
+      viewer.id,
+      id,
+      messageId,
+      dto.reason,
+      dto.description,
+    );
+  }
 
   @Get('direct')
   list(@CurrentUser() viewer: Viewer) {

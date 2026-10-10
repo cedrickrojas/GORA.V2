@@ -1,5 +1,6 @@
 <template>
   <form class="chat-composer" @submit.prevent="submit">
+    <slot name="tools" />
     <textarea
       ref="input"
       :value="modelValue"
@@ -31,14 +32,17 @@ import { nextTick, onMounted, ref, watch } from 'vue';
 import { IonIcon } from '@ionic/vue';
 import { send as sendIcon } from 'ionicons/icons';
 
-const props = withDefaults(defineProps<{
-  modelValue: string;
-  placeholder?: string;
-  label?: string;
-  maxLength?: number;
-  disabled?: boolean;
-  sending?: boolean;
-}>(), { placeholder: 'Type a message...', label: 'Message', maxLength: 1000 });
+const props = withDefaults(
+  defineProps<{
+    modelValue: string;
+    placeholder?: string;
+    label?: string;
+    maxLength?: number;
+    disabled?: boolean;
+    sending?: boolean;
+  }>(),
+  { placeholder: 'Type a message...', label: 'Message', maxLength: 1000 },
+);
 const emit = defineEmits<{
   'update:modelValue': [value: string];
   send: [];
@@ -69,7 +73,12 @@ function onKeydown(event: KeyboardEvent): void {
     submit();
   }
 }
-watch(() => props.modelValue, () => { void nextTick(resize); });
+watch(
+  () => props.modelValue,
+  () => {
+    void nextTick(resize);
+  },
+);
 onMounted(resize);
 </script>
 
@@ -82,7 +91,8 @@ onMounted(resize);
   max-width: var(--gora-column, 680px);
   box-sizing: border-box;
   margin: 0 auto;
-  padding: 10px max(12px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
+  padding: 10px max(12px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom))
+    max(12px, env(safe-area-inset-left));
   background: var(--ion-background-color);
 }
 .chat-composer__input {
@@ -103,7 +113,10 @@ onMounted(resize);
   line-height: 22px;
   overscroll-behavior: contain;
 }
-.chat-composer__input:focus { border-color: var(--ion-color-primary); outline: none; }
+.chat-composer__input:focus {
+  border-color: var(--ion-color-primary);
+  outline: none;
+}
 .chat-composer__send {
   display: flex;
   width: 44px;
@@ -118,5 +131,8 @@ onMounted(resize);
   cursor: pointer;
   font-size: 20px;
 }
-.chat-composer__send:disabled { cursor: default; opacity: 0.4; }
+.chat-composer__send:disabled {
+  cursor: default;
+  opacity: 0.4;
+}
 </style>

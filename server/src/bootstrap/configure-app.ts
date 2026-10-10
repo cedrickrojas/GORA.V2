@@ -13,6 +13,7 @@ export function configureApp(app: INestApplication): void {
   // retain Nest's default JSON limit. Photos and their post save atomically.
   app.use(`/${API_GLOBAL_PREFIX}/posts`, json({ limit: '4mb' }));
   app.use(`/${API_GLOBAL_PREFIX}/profiles/me/cover`, json({ limit: '400kb' }));
+  app.use(`/${API_GLOBAL_PREFIX}/chat/direct`, json({ limit: '2mb' }));
   // Nest detects jsonParser by name, including the scoped parser above, so
   // explicitly register the default parser for auth and the other API routes.
   app.use(json());

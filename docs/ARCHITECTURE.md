@@ -407,7 +407,7 @@ Every club chat request checks, in order: the user (JWT), that the club exists (
 
 ## Planned modules
 
-These server modules are the intended boundaries for later phases. They are not created yet.
+These were the initial module boundaries. Implemented features are described above and in the README; the following list is retained as the original roadmap.
 
 `friends`, `comments`, `likes`, `notifications`, `chat`, `live`, `maps`, `uploads`, `reports`, `admin`.
 
@@ -441,3 +441,13 @@ Each one should be added behind its own module when that phase starts, with conf
 - Browser geolocation requires localhost or HTTPS plus the user's permission. Street tiles require a network connection. No reverse geocoder, background tracking or location history is added.
 - Automated browser checks intercept tile requests with local test responses. Native GPS/permission overrides, map clicks, pin dragging, mobile sizing, exact saved post coordinates and canceled/reopened state were verified without downloading tiles from the public service.
 - References: [Leaflet source/API](https://leafletjs.com/reference.html), [OpenStreetMap tile usage policy](https://operations.osmfoundation.org/policies/tiles/).
+
+### Direct chat media, message actions, and calls
+
+`DirectChatModule` serves participant-only attachments, shared pins, forwarding, reports, unsend, and one-to-one call signaling. The JWT supplies every sender/reporter/caller identity; blocks and inactive users deny access. Message attachment bytes are stored in PostgreSQL, never in Vercel's filesystem or list responses. Signed 12-hour URLs are scoped to the message, conversation, and viewer, and reads recheck current access. The chat JSON parser is scoped to 2 MB; photo validation shares the post image decoder, and voice uploads validate supported audio containers with a 1 MiB limit.
+
+Unsend leaves a dated tombstone for stable history cursors and clears attachment bytes, reactions, and pins. Forward creates an independent copy in another conversation the forwarding user belongs to. Pending reports are private database records; moderation tooling remains separate work. Browser caches discard old message snapshots by updatedAt and clear on account changes.
+
+`DirectCallService` stores offer/answer SDP and ICE candidates behind participant authentication. Starting a call locks the two user identities in a transaction before checking busy state, preventing simultaneous calls from separate tabs/conversations. Ringing expires after 45 seconds; each active participant must refresh its heartbeat within 60 seconds. Terminal transitions clear SDP and candidates. WebRTC transports audio/video directly; API polling transports signaling only. The browser negotiates a video transceiver even for initial audio calls so either participant can enable their camera later. Account changes, hang-up, and page exit stop microphone/camera tracks.
+
+Calls reuse the authenticated live ICE configuration and optional TURN credentials. HTTPS, browser media permission, an open application, and suitable network connectivity are required. TURN must be configured for reliable cross-network calling. There is no background push calling, recording of live calls, or call history screen. Migrations: `20261010170000_chat_message_tools` and `20261010171000_direct_calls`.

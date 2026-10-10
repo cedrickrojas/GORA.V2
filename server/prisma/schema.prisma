@@ -29,6 +29,8 @@ model User {
   coverPhotoData          Bytes?
   coverPhotoType          String?
   coverPhotoRevision      String?                   @db.Uuid
+  callsStarted            DirectCall[]              @relation("CallCaller")
+  callsReceived           DirectCall[]              @relation("CallCallee")
   ownedClubs              Club[]                    @relation("ClubOwner")
   clubFollows             ClubFollow[]
   receivedClubInvites     ClubInvite[]              @relation("ClubInviteInvitee")
@@ -709,6 +711,7 @@ model Conversation {
   participants   ConversationParticipant[]
   messages       Message[]
   messageRequest MessageRequest?
+  calls          DirectCall[]
 
   @@index([type, updatedAt])
 }
@@ -741,9 +744,38 @@ model Message {
   notifications  Notification[]
   reports        Report[]
   reactions      MessageReaction[]
+  attachmentData Bytes?
+  attachmentType String?
+  pinnedAt       DateTime?
+  isForwarded    Boolean        @default(false)
 
   @@index([conversationId, createdAt])
   @@index([senderId])
+}
+
+model DirectCall {
+  id               String       @id @default(uuid()) @db.Uuid
+  conversationId   String       @db.Uuid
+  callerId         String       @db.Uuid
+  calleeId         String       @db.Uuid
+  mode             String
+  status           String       @default("RINGING")
+  offer            String
+  answer           String?
+  callerCandidates String[]     @default([])
+  calleeCandidates String[]     @default([])
+  callerSeenAt     DateTime     @default(now())
+  calleeSeenAt     DateTime?
+  createdAt        DateTime     @default(now())
+  answeredAt       DateTime?
+  endedAt          DateTime?
+  conversation     Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  caller           User         @relation("CallCaller", fields: [callerId], references: [id], onDelete: Cascade)
+  callee           User         @relation("CallCallee", fields: [calleeId], references: [id], onDelete: Cascade)
+
+  @@index([calleeId, status])
+  @@index([callerId, status])
+  @@unique([conversationId], map: "DirectCall_one_active", where: raw("(status IN ('RINGING', 'ACTIVE'))"))
 }
 
 model MessageReaction {

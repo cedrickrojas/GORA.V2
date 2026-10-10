@@ -29,6 +29,11 @@ export interface ChatMessage {
   /** ISO 8601 timestamp. */
   sentAt: string;
   reactions?: MessageReaction[];
+  attachment?: { kind: 'image' | 'audio'; url: string } | null;
+  unsent?: boolean;
+  pinned?: boolean;
+  forwarded?: boolean;
+  updatedAt?: string;
 }
 
 export interface ConversationSummary {

@@ -1,5 +1,6 @@
 <template>
   <ion-page>
+    <DirectCallOverlay />
     <ion-tabs>
       <DesktopTopNav slot="top" />
       <ion-router-outlet />
@@ -33,7 +34,9 @@
         <ion-tab-button tab="chat" href="/chat">
           <ion-icon :icon="chatbubblesOutline" aria-hidden="true" />
           <ion-label>Chat</ion-label>
-          <ion-badge v-if="chatStore.badgeCount > 0">{{ chatStore.badgeCount > 9 ? '9+' : chatStore.badgeCount }}</ion-badge>
+          <ion-badge v-if="chatStore.badgeCount > 0">{{
+            chatStore.badgeCount > 9 ? '9+' : chatStore.badgeCount
+          }}</ion-badge>
         </ion-tab-button>
         <ion-tab-button tab="profile" href="/profile">
           <ion-icon :icon="personCircleOutline" aria-hidden="true" />
@@ -47,16 +50,7 @@
 <script setup lang="ts">
 import { computed, onMounted, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import {
-  IonBadge,
-  IonIcon,
-  IonLabel,
-  IonPage,
-  IonRouterOutlet,
-  IonTabBar,
-  IonTabButton,
-  IonTabs,
-} from '@ionic/vue';
+import { IonBadge, IonIcon, IonLabel, IonPage, IonRouterOutlet, IonTabBar, IonTabButton, IonTabs } from '@ionic/vue';
 import {
   add,
   chatbubblesOutline,
@@ -69,6 +63,7 @@ import {
 import DesktopContacts from '@/components/layout/DesktopContacts.vue';
 import DesktopShortcuts from '@/components/layout/DesktopShortcuts.vue';
 import DesktopTopNav from '@/components/layout/DesktopTopNav.vue';
+import DirectCallOverlay from '@/components/chat/DirectCallOverlay.vue';
 import { useCreateMenu } from '@/composables/useCreateMenu';
 import { useAuthStore } from '@/stores/auth';
 import { useChatStore } from '@/stores/chat';
@@ -86,7 +81,9 @@ const clubChatStore = useClubChatStore();
 
 const showSidebars = computed(() => SIDEBAR_PATHS.includes(route.path));
 // Conversation pages keep the composer directly above the keyboard.
-const isMessageThread = computed(() => ['chat-thread', 'chat-request', 'club-chat', 'post-details'].includes(String(route.name)));
+const isMessageThread = computed(() =>
+  ['chat-thread', 'chat-request', 'club-chat', 'post-details'].includes(String(route.name)),
+);
 
 // An API call that got 401 (expired or revoked token) ends the session; return to Log In
 // and come back to this page afterwards.
