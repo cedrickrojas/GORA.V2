@@ -14,6 +14,8 @@ Run `npx prisma generate` and `npx prisma migrate deploy` from `server/` for mig
 
 ## Deployment
 
+For relay installation, Vercel variables, TLS, and verification, follow the [TURN setup guide](turn-setup.md). The same relay configuration serves direct voice/video calls and Go Live.
+
 - Camera/microphone access requires HTTPS or localhost. Accessing Vite through a plain HTTP LAN IP does not provide a secure camera context. Remote devices also need a reachable API URL in `mobile/.env` and the matching API CORS origin.
 - Media flows directly from the host to each viewer. This implementation supports small broadcasts of up to **10 viewers**; host upload bandwidth and device capacity determine practical quality. It does not provide a recording, replay, live comments, or an SFU/CDN for large audiences. Discovery returns the latest 50 live streams.
 - `LIVE_STUN_URLS` is a comma-separated list, defaulting to `stun:stun.l.google.com:19302`. Set an empty value for LAN-only development without external ICE servers.
