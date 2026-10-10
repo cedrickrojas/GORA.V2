@@ -96,6 +96,50 @@ afterEach(() => {
 });
 
 describe('direct chat identity', () => {
+  test('reactions use the authenticated account and can be removed', async () => {
+    const calls = fakeApi();
+    const chat = useChatStore();
+    await chat.loadThread(CHAT);
+    vi.mocked(fetch).mockResolvedValueOnce(json({ ...incoming, reactions: [{ emoji: '❤️', count: 1, reacted: true }] }));
+    expect(await chat.reactToMessage(CHAT, incoming.id, '❤️')).toBeNull();
+    expect(chat.getMessages(CHAT)[0].reactions).toEqual([{ emoji: '❤️', count: 1, reacted: true }]);
+    expect(vi.mocked(fetch).mock.calls.at(-1)?.[1]).toMatchObject({ method: 'PUT', body: JSON.stringify({ emoji: '❤️' }) });
+    vi.mocked(fetch).mockResolvedValueOnce(json({ ...incoming, reactions: [] }));
+    expect(await chat.reactToMessage(CHAT, incoming.id, null)).toBeNull();
+    expect(chat.getMessages(CHAT)[0].reactions).toEqual([]);
+    expect(vi.mocked(fetch).mock.calls.at(-1)?.[1]).toMatchObject({ method: 'DELETE' });
+    expect(calls.every((call) => call.token === BOB)).toBe(true);
+  });
+
+  test('a stale polling response cannot overwrite a reaction that just finished', async () => {
+    fakeApi();
+    const chat = useChatStore();
+    await chat.loadThread(CHAT);
+    let resolvePage!: (value: Response) => void;
+    const pending = new Promise<Response>((resolve) => { resolvePage = resolve; });
+    vi.mocked(fetch).mockResolvedValueOnce(json(conversation())).mockReturnValueOnce(pending);
+    const polling = chat.loadThread(CHAT);
+    vi.mocked(fetch).mockResolvedValueOnce(json({ ...incoming, reactions: [{ emoji: '😂', count: 1, reacted: true }] }));
+    await chat.reactToMessage(CHAT, incoming.id, '😂');
+    resolvePage(json({ messages: [{ ...incoming, reactions: [] }], nextCursor: null }));
+    await polling;
+    expect(chat.getMessages(CHAT)[0].reactions?.[0].emoji).toBe('😂');
+  });
+
+  test('late reactions cannot restore a previous account message cache', async () => {
+    fakeApi();
+    const chat = useChatStore();
+    await chat.loadThread(CHAT);
+    let resolveReaction!: (value: Response) => void;
+    vi.mocked(fetch).mockReturnValueOnce(new Promise<Response>((resolve) => { resolveReaction = resolve; }));
+    const reaction = chat.reactToMessage(CHAT, incoming.id, '👍');
+    signIn(ALICE);
+    resolveReaction(json({ ...incoming, reactions: [{ emoji: '👍', count: 1, reacted: true }] }));
+    await reaction;
+    expect(chat.getMessages(CHAT)).toEqual([]);
+    expect(chat.reacting).toEqual({});
+  });
+
   test('receivers see the real sender in the inbox and message data', async () => {
     fakeApi();
     const chat = useChatStore();

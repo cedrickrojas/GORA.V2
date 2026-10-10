@@ -1,6 +1,14 @@
 import { Transform } from 'class-transformer';
-import { IsNotEmpty, IsString, MaxLength } from 'class-validator';
+import { IsIn, IsNotEmpty, IsString, MaxLength } from 'class-validator';
 import { trim } from '../common/validation/transforms';
+import { MESSAGE_REACTION_EMOJIS } from './message-reactions';
+
+export class ReactToMessageDto {
+  @IsIn(MESSAGE_REACTION_EMOJIS, {
+    message: 'Choose one of the supported reactions.',
+  })
+  emoji!: (typeof MESSAGE_REACTION_EMOJIS)[number];
+}
 
 export class SendDirectMessageDto {
   @Transform(trim)

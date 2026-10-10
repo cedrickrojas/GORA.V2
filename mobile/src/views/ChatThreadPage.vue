@@ -1,5 +1,5 @@
 <template>
-  <ion-page>
+  <ion-page ref="pageRef" :style="{ bottom: `${keyboardInset}px` }">
     <SubPageHeader :title="partner?.displayName ?? 'Chat'" back-href="/chat">
       <template v-if="partner" #end>
         <router-link
@@ -12,7 +12,7 @@
       </template>
     </SubPageHeader>
 
-    <ion-content ref="contentRef" :fullscreen="true">
+    <ion-content ref="contentRef">
       <p v-if="chatStore.error" class="thread__missing" role="alert">{{ chatStore.error }}</p>
       <p v-if="!partner" class="thread__missing">
         {{ fetching ? 'Loading conversation…' : 'This conversation is not available.' }}
@@ -32,37 +32,30 @@
           <li
             v-for="message in bubbles"
             :key="message.id"
-            class="bubble"
-            :class="message.mine ? 'bubble--mine' : 'bubble--theirs'"
+            class="thread__message"
+            :class="{ 'thread__message--mine': message.mine }"
           >
-            <strong class="bubble__sender">{{ message.senderName }}</strong>
-            <p>{{ message.body }}</p>
-            <time :datetime="message.sentAt">{{ formatTimeAgo(Date.parse(message.sentAt), now) }}</time>
+            <MessageBubble
+              v-bind="message"
+              :now="now"
+              :can-react="!isRequest && !!auth.accessToken"
+              :busy="chatStore.reacting[message.id]"
+              @react="reactToMessage(message.id, $event)"
+            />
           </li>
         </ol>
       </template>
     </ion-content>
 
-    <ion-footer v-if="partner" class="ion-no-border">
-      <form class="composer" @submit.prevent="sendDraft">
-        <input
-          v-model="draft"
-          class="composer__input"
-          type="text"
-          :placeholder="composerPlaceholder"
-          :disabled="requestSent || sending"
-          maxlength="1000"
-          aria-label="Message"
-        />
-        <button
-          type="submit"
-          class="composer__send"
-          :disabled="requestSent || sending || !currentUserId || !draft.trim()"
-          aria-label="Send"
-        >
-          <ion-icon :icon="sendIcon" aria-hidden="true" />
-        </button>
-      </form>
+    <ion-footer v-if="partner" class="ion-no-border thread__footer">
+      <ChatComposer
+        v-model="draft"
+        :placeholder="composerPlaceholder"
+        :disabled="requestSent || !currentUserId"
+        :sending="sending"
+        @send="sendDraft"
+        @focus="scrollToLatest"
+      />
     </ion-footer>
   </ion-page>
 </template>
@@ -70,18 +63,19 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { IonContent, IonFooter, IonIcon, IonPage, onIonViewDidLeave, onIonViewWillEnter } from '@ionic/vue';
-import { send as sendIcon } from 'ionicons/icons';
+import { IonContent, IonFooter, IonPage, onIonViewDidLeave, onIonViewWillEnter } from '@ionic/vue';
+import ChatComposer from '@/components/chat/ChatComposer.vue';
+import MessageBubble from '@/components/chat/MessageBubble.vue';
 import UserAvatar from '@/components/common/UserAvatar.vue';
 import SubPageHeader from '@/components/layout/SubPageHeader.vue';
 import { useNow } from '@/composables/useNow';
+import { useChatKeyboard } from '@/composables/useChatKeyboard';
 import { useChatStore } from '@/stores/chat';
 import { useSessionStore } from '@/stores/session';
 import { useAuthStore } from '@/stores/auth';
 import { captureSession } from '@/stores/authorized';
-import type { MessageRequestResult } from '@/types/chat';
+import type { MessageReaction, MessageReactionEmoji, MessageRequestResult } from '@/types/chat';
 import { showNotice } from '@/utils/notice';
-import { formatTimeAgo } from '@/utils/time';
 
 interface Bubble {
   id: string;
@@ -89,6 +83,7 @@ interface Bubble {
   sentAt: string;
   mine: boolean;
   senderName: string;
+  reactions?: MessageReaction[];
 }
 
 const route = useRoute();
@@ -101,6 +96,8 @@ const draft = ref('');
 const sending = ref(false);
 const fetching = ref(false);
 const contentRef = ref<InstanceType<typeof IonContent> | null>(null);
+const pageRef = ref<InstanceType<typeof IonPage> | null>(null);
+const { keyboardInset } = useChatKeyboard(pageRef, () => { void scrollToLatest(); });
 
 /** Set on /chat/request/:userId (someone who isn't a friend). Ionic keeps one page per URL. */
 const requestUserId = String(route.params.userId ?? '');
@@ -135,6 +132,7 @@ const bubbles = computed<Bubble[]>(() => {
     id: message.id,
     body: message.body,
     sentAt: message.sentAt,
+    reactions: message.reactions,
     mine: message.senderId === currentUserId.value,
     senderName:
       message.sender?.displayName ??
@@ -160,7 +158,7 @@ async function scrollToLatest(): Promise<void> {
   await contentRef.value?.$el.scrollToBottom(200);
 }
 
-async function sendRequest(): Promise<void> {
+async function sendRequest(body: string): Promise<void> {
   const isCurrent = captureSession(auth);
   const recipient = partner.value;
 
@@ -168,7 +166,7 @@ async function sendRequest(): Promise<void> {
     return;
   }
 
-  const result = await chatStore.sendMessageRequest(recipient, draft.value, Date.now());
+  const result = await chatStore.sendMessageRequest(recipient, body, Date.now());
   if (!isCurrent()) return;
   const notices: Record<Exclude<MessageRequestResult, 'SENT'>, string> = {
     ALREADY_SENT: `Message request already sent to ${recipient.displayName}.`,
@@ -182,30 +180,38 @@ async function sendRequest(): Promise<void> {
     return;
   }
 
-  draft.value = '';
+  if (draft.value === body) draft.value = '';
   void scrollToLatest();
 }
 
 async function sendDraft(): Promise<void> {
   if (sending.value || !currentUserId.value || requestSent.value || !draft.value.trim()) return;
   const isCurrent = captureSession(auth);
+  const body = draft.value;
   sending.value = true;
   try {
     if (isRequest) {
-      await sendRequest();
+      await sendRequest(body);
       return;
     }
-    const error = await chatStore.sendMessage(conversationId, draft.value, Date.now());
+    const error = await chatStore.sendMessage(conversationId, body, Date.now());
     if (!isCurrent()) return;
     if (error) {
       void showNotice(error);
       return;
     }
-    draft.value = '';
+    if (draft.value === body) draft.value = '';
     void scrollToLatest();
   } finally {
     if (isCurrent()) sending.value = false;
   }
+}
+
+async function reactToMessage(messageId: string, emoji: MessageReactionEmoji | null): Promise<void> {
+  if (isRequest) return;
+  const isCurrent = captureSession(auth);
+  const error = await chatStore.reactToMessage(conversationId, messageId, emoji);
+  if (isCurrent() && error) void showNotice(error);
 }
 
 watch(
@@ -309,22 +315,10 @@ onIonViewWillEnter(() => {
   text-align: center;
 }
 
-.bubble {
-  max-width: 78%;
-  padding: 9px 12px;
-  border-radius: 16px;
-}
-
-.bubble p {
-  margin: 0;
-  font-size: 0.9rem;
-  line-height: 1.35;
-}
-
-.bubble__sender {
-  display: block;
-  margin-bottom: 4px;
-  font-size: 0.72rem;
+.thread__message {
+  max-width: calc(100% - 44px);
+  align-self: flex-start;
+  min-width: 0;
 }
 .thread__older {
   display: block;
@@ -337,67 +331,13 @@ onIonViewWillEnter(() => {
   cursor: pointer;
 }
 
-.bubble time {
-  display: block;
-  margin-top: 3px;
-  font-size: 0.66rem;
-  opacity: 0.7;
-}
-
-.bubble--theirs {
-  align-self: flex-start;
-  border-bottom-left-radius: 4px;
-  background: var(--gora-surface);
-}
-
-.bubble--mine {
+.thread__message--mine {
   align-self: flex-end;
-  border-bottom-right-radius: 4px;
-  background: var(--ion-color-primary);
-  color: var(--ion-color-primary-contrast);
 }
 
-.composer {
-  display: flex;
-  gap: 8px;
-  padding: 8px 12px 12px;
-  background: var(--ion-background-color);
-}
-
-.composer__input {
-  min-width: 0;
-  flex: 1;
-  padding: 10px 14px;
-  border: 1px solid var(--gora-line);
-  border-radius: 999px;
-  outline: none;
-  background: var(--gora-surface);
-  color: var(--ion-text-color);
-  font: inherit;
-  font-size: 0.9rem;
-}
-
-.composer__input:focus {
-  border-color: var(--ion-color-primary);
-}
-
-.composer__send {
-  display: flex;
-  width: 42px;
-  height: 42px;
+.thread__footer {
   flex-shrink: 0;
-  align-items: center;
-  justify-content: center;
-  border: 0;
-  border-radius: 50%;
-  background: var(--ion-color-primary);
-  color: var(--ion-color-primary-contrast);
-  cursor: pointer;
-  font-size: 18px;
-}
-
-.composer__send:disabled {
-  cursor: default;
-  opacity: 0.4;
+  border-top: 1px solid var(--gora-line);
+  background: var(--ion-background-color);
 }
 </style>

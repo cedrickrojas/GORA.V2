@@ -4,6 +4,21 @@ import type { UserSummary } from './user';
 /** Group chats exist only as a club's official chat (CLUB); users never create them. */
 export type ConversationType = 'DIRECT' | 'GAME' | 'CLUB';
 
+export const MESSAGE_REACTIONS = [
+  { emoji: '👍', label: 'Like' },
+  { emoji: '❤️', label: 'Love' },
+  { emoji: '😂', label: 'Haha' },
+  { emoji: '😮', label: 'Wow' },
+  { emoji: '😢', label: 'Sad' },
+  { emoji: '😡', label: 'Angry' },
+] as const;
+export type MessageReactionEmoji = (typeof MESSAGE_REACTIONS)[number]['emoji'];
+export interface MessageReaction {
+  emoji: MessageReactionEmoji;
+  count: number;
+  reacted: boolean;
+}
+
 export interface ChatMessage {
   id: string;
   conversationId: string;
@@ -13,6 +28,7 @@ export interface ChatMessage {
   body: string;
   /** ISO 8601 timestamp. */
   sentAt: string;
+  reactions?: MessageReaction[];
 }
 
 export interface ConversationSummary {

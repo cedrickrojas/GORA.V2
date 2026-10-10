@@ -1,4 +1,4 @@
-import type { ChatMessage, ConversationSummary, MessageRequest, OutgoingMessageRequest } from '@/types/chat';
+import type { ChatMessage, ConversationSummary, MessageReactionEmoji, MessageRequest, OutgoingMessageRequest } from '@/types/chat';
 import type { UserSummary } from '@/types/user';
 import { apiRequest } from './api-client';
 
@@ -23,6 +23,12 @@ export const getDirectMessages = (token: string, id: string, before?: string) =>
   });
 export const sendDirectMessage = (token: string, id: string, body: string) =>
   apiRequest<ChatMessage>(`${thread(id)}/messages`, { token, method: 'POST', body: { body } });
+export const reactToDirectMessage = (token: string, id: string, messageId: string, emoji: MessageReactionEmoji | null) =>
+  apiRequest<ChatMessage>(`${thread(id)}/messages/${encodeURIComponent(messageId)}/reaction`, {
+    token,
+    method: emoji === null ? 'DELETE' : 'PUT',
+    ...(emoji === null ? {} : { body: { emoji } }),
+  });
 export const readDirectChat = (token: string, id: string) => apiRequest(`${thread(id)}/read`, { token, method: 'PUT' });
 export const getDirectRecipient = (token: string, id: string) =>
   apiRequest<UserSummary>(`/chat/recipients/${encodeURIComponent(id)}`, { token });

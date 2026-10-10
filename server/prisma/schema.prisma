@@ -41,6 +41,7 @@ model User {
   hostedLiveStreams       LiveStream[]
   liveViews               LiveViewer[]
   sentMessages            Message[]
+  messageReactions        MessageReaction[]
   receivedMessageRequests MessageRequest[]          @relation("MessageRequestReceiver")
   sentMessageRequests     MessageRequest[]          @relation("MessageRequestSender")
   actorNotifications      Notification[]            @relation("NotificationActor")
@@ -734,9 +735,23 @@ model Message {
   sender         User           @relation(fields: [senderId], references: [id])
   notifications  Notification[]
   reports        Report[]
+  reactions      MessageReaction[]
 
   @@index([conversationId, createdAt])
   @@index([senderId])
+}
+
+model MessageReaction {
+  messageId String   @db.Uuid
+  userId    String   @db.Uuid
+  emoji     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([messageId, userId])
+  @@index([userId])
 }
 
 model MessageRequest {

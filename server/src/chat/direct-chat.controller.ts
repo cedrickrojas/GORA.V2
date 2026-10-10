@@ -15,7 +15,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { ClubChatMessagesQueryDto } from '../clubs/dto/club-chat.dto';
 import type { CurrentUser as Viewer } from '../users/user.types';
 import { DirectChatService } from './direct-chat.service';
-import { SendDirectMessageDto } from './direct-chat.dto';
+import { ReactToMessageDto, SendDirectMessageDto } from './direct-chat.dto';
 
 @Controller('chat')
 @UseGuards(JwtAuthGuard)
@@ -61,6 +61,25 @@ export class DirectChatController {
   @Put('direct/:id/read')
   read(@CurrentUser() viewer: Viewer, @Param('id', ParseUUIDPipe) id: string) {
     return this.chat.read(viewer.id, id);
+  }
+
+  @Put('direct/:id/messages/:messageId/reaction')
+  react(
+    @CurrentUser() viewer: Viewer,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('messageId', ParseUUIDPipe) messageId: string,
+    @Body() dto: ReactToMessageDto,
+  ) {
+    return this.chat.react(viewer.id, id, messageId, dto.emoji);
+  }
+
+  @Delete('direct/:id/messages/:messageId/reaction')
+  removeReaction(
+    @CurrentUser() viewer: Viewer,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('messageId', ParseUUIDPipe) messageId: string,
+  ) {
+    return this.chat.react(viewer.id, id, messageId, null);
   }
 
   @Get('requests')

@@ -1,5 +1,5 @@
 <template>
-  <ion-page>
+  <ion-page ref="pageRef" :style="{ bottom: `${keyboardInset}px` }">
     <ion-header class="ion-no-border">
       <ion-toolbar class="club-chat__toolbar">
         <ion-buttons slot="start">
@@ -25,7 +25,7 @@
       </div>
     </ion-header>
 
-    <ion-content ref="contentRef" :fullscreen="true">
+    <ion-content ref="contentRef">
       <p v-if="state.status === 'loading'" class="club-chat__state">Loading the club chat…</p>
 
       <div v-else-if="state.status !== 'open'" class="club-chat__blocked">
@@ -73,20 +73,15 @@
       </template>
     </ion-content>
 
-    <ion-footer v-if="state.status === 'open' && chat?.permissions.canSend" class="ion-no-border">
-      <form class="club-chat__composer" @submit.prevent="sendDraft">
-        <input
-          v-model="draft"
-          class="club-chat__input"
-          type="text"
-          placeholder="Type a message..."
-          aria-label="Message the club"
-          :maxlength="CLUB_CHAT_MESSAGE_MAX_LENGTH"
-        />
-        <button type="submit" class="club-chat__send" :disabled="!draft.trim() || sending" aria-label="Send">
-          <ion-icon :icon="sendIcon" aria-hidden="true" />
-        </button>
-      </form>
+    <ion-footer v-if="state.status === 'open' && chat?.permissions.canSend" class="ion-no-border club-chat__footer">
+      <ChatComposer
+        v-model="draft"
+        label="Message the club"
+        :max-length="CLUB_CHAT_MESSAGE_MAX_LENGTH"
+        :sending="sending"
+        @send="sendDraft"
+        @focus="scrollToLatest(0)"
+      />
     </ion-footer>
   </ion-page>
 </template>
@@ -106,10 +101,12 @@ import {
   IonToolbar,
   onIonViewWillEnter,
 } from '@ionic/vue';
-import { lockClosedOutline, send as sendIcon, shieldCheckmarkOutline } from 'ionicons/icons';
+import { lockClosedOutline, shieldCheckmarkOutline } from 'ionicons/icons';
+import ChatComposer from '@/components/chat/ChatComposer.vue';
 import ClubAvatar from '@/components/clubs/ClubAvatar.vue';
 import UserAvatar from '@/components/common/UserAvatar.vue';
 import { useNow } from '@/composables/useNow';
+import { useChatKeyboard } from '@/composables/useChatKeyboard';
 import { type ClubChatOpenResult, useClubChatStore } from '@/stores/club-chat';
 import { useClubsStore } from '@/stores/clubs';
 import { CLUB_CHAT_MESSAGE_MAX_LENGTH, CLUB_CHAT_MISSING_MESSAGE } from '@/utils/club-chat';
@@ -128,6 +125,8 @@ const state = ref<ClubChatOpenResult | { status: 'loading' }>({ status: 'loading
 const draft = ref('');
 const sending = ref(false);
 const contentRef = ref<InstanceType<typeof IonContent> | null>(null);
+const pageRef = ref<InstanceType<typeof IonPage> | null>(null);
+const { keyboardInset } = useChatKeyboard(pageRef, () => { void scrollToLatest(0); });
 
 const chat = computed(() => (state.value.status === 'open' ? clubChatStore.getChat(clubId) : undefined));
 const messages = computed(() => clubChatStore.getMessages(clubId));
@@ -200,11 +199,12 @@ async function sendDraft(): Promise<void> {
   }
 
   sending.value = true;
-  const result = await clubChatStore.send(clubId, draft.value);
+  const body = draft.value;
+  const result = await clubChatStore.send(clubId, body);
   sending.value = false;
 
   if (result.ok) {
-    draft.value = '';
+    if (draft.value === body) draft.value = '';
     void scrollToLatest();
     return;
   }
@@ -402,48 +402,9 @@ onIonViewWillEnter(() => {
   font-size: 0.64rem;
 }
 
-.club-chat__composer {
-  display: flex;
-  gap: 8px;
-  padding: 8px 12px 12px;
+.club-chat__footer {
+  flex-shrink: 0;
   border-top: 1px solid var(--gora-line);
   background: var(--ion-background-color);
-}
-
-.club-chat__input {
-  min-width: 0;
-  flex: 1;
-  padding: 10px 14px;
-  border: 1px solid var(--gora-line);
-  border-radius: 999px;
-  outline: none;
-  background: var(--gora-surface);
-  color: var(--ion-text-color);
-  font: inherit;
-  font-size: 0.9rem;
-}
-
-.club-chat__input:focus {
-  border-color: var(--ion-color-primary);
-}
-
-.club-chat__send {
-  display: flex;
-  width: 42px;
-  height: 42px;
-  flex-shrink: 0;
-  align-items: center;
-  justify-content: center;
-  border: 0;
-  border-radius: 50%;
-  background: var(--ion-color-primary);
-  color: var(--ion-color-primary-contrast);
-  cursor: pointer;
-  font-size: 18px;
-}
-
-.club-chat__send:disabled {
-  cursor: default;
-  opacity: 0.4;
 }
 </style>

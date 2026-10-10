@@ -30,6 +30,7 @@ interface Message {
   senderId: string;
   sender: Person;
   body: string;
+  reactions: { emoji: string; count: number; reacted: boolean }[];
 }
 
 describe('Direct chat sender identity and account isolation (e2e)', () => {
@@ -289,13 +290,79 @@ describe('Direct chat sender identity and account isolation (e2e)', () => {
     expect(otherView.id).toBe(accepted.id);
   });
 
+  it('persists one reaction per account, groups counts, and changes or removes only the viewer reaction', async () => {
+    const message = (await send(0, { body: 'React to this' }).expect(201))
+      .body as Message;
+    const path = `/api/v1/chat/direct/${chatId}/messages/${message.id}/reaction`;
+    await Promise.all(
+      Array.from({ length: 3 }, () =>
+        http().put(path).set(headers(0)).send({ emoji: '❤️' }).expect(200),
+      ),
+    );
+    const both = (
+      await http().put(path).set(headers(1)).send({ emoji: '❤️' }).expect(200)
+    ).body as Message;
+    expect(both.reactions).toEqual([{ emoji: '❤️', count: 2, reacted: true }]);
+    const changed = (
+      await http().put(path).set(headers(1)).send({ emoji: '😂' }).expect(200)
+    ).body as Message;
+    expect(changed.reactions).toEqual([
+      { emoji: '❤️', count: 1, reacted: false },
+      { emoji: '😂', count: 1, reacted: true },
+    ]);
+    const history = (
+      await http()
+        .get(`/api/v1/chat/direct/${chatId}/messages`)
+        .set(headers(0))
+        .expect(200)
+    ).body as { messages: Message[] };
+    expect(
+      history.messages.find((row) => row.id === message.id)?.reactions,
+    ).toEqual([
+      { emoji: '❤️', count: 1, reacted: true },
+      { emoji: '😂', count: 1, reacted: false },
+    ]);
+    await http().delete(path).set(headers(1)).expect(200);
+    const removed = (await http().delete(path).set(headers(1)).expect(200))
+      .body as Message;
+    expect(removed.reactions).toEqual([
+      { emoji: '❤️', count: 1, reacted: false },
+    ]);
+    await http().put(path).set(headers(0)).send({ emoji: '🔥' }).expect(400);
+    await http()
+      .put(path)
+      .set(headers(0))
+      .send({ emoji: '👍', userId: users[1].id })
+      .expect(400);
+    await http().put(path).set(headers(2)).send({ emoji: '👍' }).expect(404);
+    await http().delete(path).set(headers(2)).expect(404);
+    await http().put(path).send({ emoji: '👍' }).expect(401);
+    await http()
+      .put(`/api/v1/chat/direct/${chatId}/messages/${randomUUID()}/reaction`)
+      .set(headers(0))
+      .send({ emoji: '👍' })
+      .expect(404);
+    await prisma.message.update({
+      where: { id: message.id },
+      data: { deletedAt: new Date() },
+    });
+    await http().put(path).set(headers(0)).send({ emoji: '👍' }).expect(404);
+  });
+
   it('hides blocked conversations and prevents sending in either direction', async () => {
+    const message = (await send(0, { body: 'Before blocking' }).expect(201))
+      .body as Message;
     await prisma.friendship.update({
       where: { pairKey: toPairKey(users[0].id, users[1].id) },
       data: { status: 'BLOCKED', blockedById: users[0].id },
     });
     for (const viewer of [0, 1]) {
       await send(viewer, { body: 'Blocked' }).expect(404);
+      await http()
+        .put(`/api/v1/chat/direct/${chatId}/messages/${message.id}/reaction`)
+        .set(headers(viewer))
+        .send({ emoji: '👍' })
+        .expect(404);
       await http()
         .get(`/api/v1/chat/direct/${chatId}/messages`)
         .set(headers(viewer))

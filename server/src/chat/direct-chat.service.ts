@@ -13,6 +13,7 @@ import { RelationshipService } from '../social/relationship.service';
 import { toPairKey } from '../social/relationship';
 import { formatDisplayName } from '../users/display-name';
 import { AUTHOR_SELECT } from '../users/user.types';
+import { MESSAGE_REACTION_EMOJIS } from './message-reactions';
 
 const MESSAGE_SELECT = {
   id: true,
@@ -21,6 +22,7 @@ const MESSAGE_SELECT = {
   content: true,
   createdAt: true,
   sender: { select: AUTHOR_SELECT },
+  reactions: { select: { emoji: true, userId: true } },
 } satisfies Prisma.MessageSelect;
 const CONVERSATION_SELECT = {
   id: true,
@@ -46,13 +48,27 @@ const person = (user: Person) => ({
   displayName: formatDisplayName(user),
   avatarUrl: user.profileImageUrl,
 });
-const messageView = (row: MessageRow) => ({
+const messageView = (row: MessageRow, viewerId: string) => ({
   id: row.id,
   conversationId: row.conversationId,
   senderId: row.senderId,
   sender: person(row.sender),
   body: row.content,
   sentAt: row.createdAt,
+  reactions: MESSAGE_REACTION_EMOJIS.flatMap((emoji) => {
+    const reactions = row.reactions.filter(
+      (reaction) => reaction.emoji === emoji,
+    );
+    return reactions.length
+      ? [
+          {
+            emoji,
+            count: reactions.length,
+            reacted: reactions.some((reaction) => reaction.userId === viewerId),
+          },
+        ]
+      : [];
+  }),
 });
 
 /** Every response is built for its authenticated viewer; sender identity is never accepted from the client. */
@@ -156,7 +172,7 @@ export class DirectChatService {
       await this.markRead(viewerId, conversationId, readThrough);
     const page = rows.slice(0, take);
     return {
-      messages: page.reverse().map(messageView),
+      messages: page.reverse().map((row) => messageView(row, viewerId)),
       nextCursor: rows.length > take ? rows[take - 1].id : null,
     };
   }
@@ -179,7 +195,39 @@ export class DirectChatService {
       });
       return message;
     });
-    return messageView(row);
+    return messageView(row, viewerId);
+  }
+
+  async react(
+    viewerId: string,
+    conversationId: string,
+    messageId: string,
+    emoji: (typeof MESSAGE_REACTION_EMOJIS)[number] | null,
+  ) {
+    await this.requireConversation(viewerId, conversationId);
+    const message = await this.prisma.message.findFirst({
+      where: { id: messageId, conversationId, deletedAt: null },
+      select: { id: true },
+    });
+    if (!message) throw new NotFoundException('Message not found.');
+
+    if (emoji === null) {
+      await this.prisma.messageReaction.deleteMany({
+        where: { messageId, userId: viewerId },
+      });
+    } else {
+      // One reaction per account and message, including concurrent retries.
+      await this.prisma.messageReaction.upsert({
+        where: { messageId_userId: { messageId, userId: viewerId } },
+        create: { messageId, userId: viewerId, emoji },
+        update: { emoji },
+      });
+    }
+    const row = await this.prisma.message.findUniqueOrThrow({
+      where: { id: messageId },
+      select: MESSAGE_SELECT,
+    });
+    return messageView(row, viewerId);
   }
 
   async read(viewerId: string, conversationId: string) {

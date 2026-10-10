@@ -7,6 +7,7 @@ import type {
   ConversationSummary,
   MessageRequest,
   MessageRequestResult,
+  MessageReactionEmoji,
   OutgoingMessageRequest,
 } from '@/types/chat';
 import type { UserSummary } from '@/types/user';
@@ -30,6 +31,7 @@ export const useChatStore = defineStore('chat', () => {
   const authorized = createAuthorizedCall(auth);
   let generation = 0;
   let cacheRevision = 0;
+  let reactionRevision = 0;
   const conversations = ref<ConversationSummary[]>([]);
   const messages = ref<Record<string, ChatMessage[]>>({});
   const requests = ref<MessageRequest[]>([]);
@@ -40,15 +42,18 @@ export const useChatStore = defineStore('chat', () => {
   const loading = ref(false);
   const error = ref<string | null>(null);
   const cursors = ref<Record<string, string | null>>({});
+  const reacting = ref<Record<string, boolean>>({});
 
   function reset(): void {
     generation++;
+    reactionRevision++;
     conversations.value = [];
     messages.value = {};
     requests.value = [];
     outgoingRequests.value = [];
     requestRecipients.value = {};
     cursors.value = {};
+    reacting.value = {};
     isLoaded.value = false;
     loading.value = false;
     error.value = null;
@@ -136,8 +141,15 @@ export const useChatStore = defineStore('chat', () => {
     conversations.value = [latest, ...conversations.value.filter((candidate) => candidate.id !== chat.id)];
   }
 
-  function rememberMessages(id: string, incoming: ChatMessage[]): void {
-    const byId = new Map([...getMessages(id), ...incoming].map((message) => [message.id, message]));
+  function rememberMessages(id: string, incoming: ChatMessage[], preserveReactions = false): void {
+    const current = new Map(getMessages(id).map((message) => [message.id, message]));
+    const merged = incoming.map((message) => {
+      const previous = current.get(message.id);
+      return previous && (preserveReactions || reacting.value[message.id])
+        ? { ...message, reactions: previous.reactions }
+        : message;
+    });
+    const byId = new Map([...current.values(), ...merged].map((message) => [message.id, message]));
     messages.value[id] = [...byId.values()].sort(
       (a, b) => Date.parse(a.sentAt) - Date.parse(b.sentAt) || a.id.localeCompare(b.id),
     );
@@ -151,6 +163,7 @@ export const useChatStore = defineStore('chat', () => {
     }
     const isCurrent = captureSession(auth);
     const version = generation;
+    const reactionsAtStart = reactionRevision;
     error.value = null;
     try {
       const before = older ? cursors.value[id] : undefined;
@@ -160,7 +173,7 @@ export const useChatStore = defineStore('chat', () => {
       );
       if (version !== generation) return null;
       rememberConversation({ ...chat, unreadCount: older ? chat.unreadCount : 0 });
-      rememberMessages(id, page.messages);
+      rememberMessages(id, page.messages, reactionsAtStart !== reactionRevision);
       if (older || cursors.value[id] === undefined) cursors.value[id] = page.nextCursor;
       return null;
     } catch (caught) {
@@ -203,6 +216,28 @@ export const useChatStore = defineStore('chat', () => {
 
     if (conversation) {
       conversation.unreadCount = 0;
+    }
+  }
+
+  async function reactToMessage(id: string, messageId: string, emoji: MessageReactionEmoji | null): Promise<string | null> {
+    if (!auth.accessToken) return 'Log in to react to a message.';
+    if (reacting.value[messageId]) return null;
+    const version = generation;
+    reacting.value[messageId] = true;
+    reactionRevision++;
+    try {
+      const updated = await authorized((token) => directApi.reactToDirectMessage(token, id, messageId, emoji));
+      if (version !== generation) return null;
+      const message = getMessages(id).find((candidate) => candidate.id === messageId);
+      if (message) message.reactions = updated.reactions ?? [];
+      return null;
+    } catch (caught) {
+      return version === generation ? describeContentError(caught) : null;
+    } finally {
+      if (version === generation) {
+        delete reacting.value[messageId];
+        reactionRevision++;
+      }
     }
   }
 
@@ -420,6 +455,7 @@ export const useChatStore = defineStore('chat', () => {
     loading,
     error,
     cursors,
+    reacting,
     sortedConversations,
     unreadCount,
     badgeCount,
@@ -431,6 +467,7 @@ export const useChatStore = defineStore('chat', () => {
     getMessages,
     markRead,
     sendMessage,
+    reactToMessage,
     acceptRequest,
     deleteRequest,
     findDirectWith,
