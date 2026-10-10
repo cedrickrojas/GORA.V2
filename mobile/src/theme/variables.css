@@ -1,0 +1,108 @@
+@font-face {
+  font-family: 'Gora Condensed';
+  src: url('/fonts/barlow-condensed-800-italic.woff2') format('woff2');
+  font-style: italic;
+  font-weight: 800;
+  font-display: swap;
+}
+
+:root {
+  color-scheme: dark;
+  --ion-font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+  --ion-background-color: #101113;
+  --ion-background-color-rgb: 16, 17, 19;
+  --ion-text-color: #f5f6f8;
+  --ion-text-color-rgb: 245, 246, 248;
+  --ion-color-primary: #ff6028;
+  --ion-color-primary-rgb: 255, 96, 40;
+  --ion-color-primary-contrast: #101113;
+  --ion-color-primary-contrast-rgb: 16, 17, 19;
+  --ion-color-primary-shade: #e05423;
+  --ion-color-primary-tint: #ff703e;
+
+  --ion-toolbar-background: #101113;
+  --ion-toolbar-color: #f5f6f8;
+  --ion-tab-bar-background: #151618;
+  --ion-tab-bar-border-color: rgba(245, 246, 248, 0.1);
+  --ion-tab-bar-color: #95a0ad;
+  --ion-tab-bar-color-selected: #ff6028;
+  --ion-item-background: #1c1d21;
+  --ion-backdrop-color: #000;
+
+  --gora-surface: #1c1d21;
+  --gora-surface-raised: #242529;
+  --gora-surface-hover: #2c2d32;
+  --gora-muted: #aab3bf;
+  --gora-line: rgba(245, 246, 248, 0.12);
+  --gora-line-strong: rgba(245, 246, 248, 0.26);
+  --gora-ring-spent: rgba(245, 246, 248, 0.12);
+  --gora-accent-soft: rgba(255, 96, 40, 0.1);
+  --gora-accent-line: rgba(255, 96, 40, 0.35);
+  --gora-radius-card: 10px;
+  --gora-radius-control: 6px;
+  --gora-shadow: 0 4px 16px rgba(0, 0, 0, 0.16);
+  --gora-motion: 160ms ease;
+}
+
+body {
+  -webkit-font-smoothing: antialiased;
+}
+
+ion-button {
+  --border-radius: var(--gora-radius-control);
+  --box-shadow: none;
+  font-weight: 750;
+  letter-spacing: 0.02em;
+}
+
+ion-modal {
+  --border-radius: var(--gora-radius-card);
+}
+
+:where(button, a, summary, input, select, textarea):focus-visible {
+  outline: 2px solid var(--ion-color-primary);
+  outline-offset: 3px;
+}
+
+:where(button, a) {
+  transition:
+    color var(--gora-motion),
+    background-color var(--gora-motion),
+    border-color var(--gora-motion),
+    box-shadow var(--gora-motion);
+}
+
+@media (hover: hover) {
+  :where(button:not(:disabled), a):active {
+    filter: brightness(0.94);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :where(button, a, summary, input, select, textarea) {
+    transition: none;
+  }
+}
+
+ion-action-sheet.gora-sheet {
+  --background: var(--gora-surface);
+  --button-background-hover: var(--gora-accent-soft);
+  --button-background-selected: var(--gora-accent-soft);
+  --button-color: var(--ion-text-color);
+  --color: var(--gora-muted);
+}
+
+ion-action-sheet.gora-sheet .action-sheet-icon,
+ion-action-sheet.gora-sheet .action-sheet-selected {
+  color: var(--ion-color-primary);
+}
+
+ion-popover.gora-popover {
+  --background: var(--gora-surface);
+  --box-shadow: var(--gora-shadow);
+  --width: 260px;
+}
+
+ion-popover.gora-popover--filter {
+  --width: 300px;
+}

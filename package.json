@@ -1,0 +1,15 @@
+{
+  "name": "gora",
+  "version": "0.1.0",
+  "private": true,
+  "description": "GORA — a mobile-first sports social platform",
+  "scripts": {
+    "mobile": "npm run dev --prefix mobile",
+    "mobile:build": "npm run build --prefix mobile",
+    "mobile:typecheck": "npm run typecheck --prefix mobile",
+    "server": "npm run start:dev --prefix server",
+    "server:build": "npm run build --prefix server",
+    "server:typecheck": "npm run typecheck --prefix server",
+    "typecheck": "npm run typecheck --prefix mobile && npm run typecheck --prefix server"
+  }
+}

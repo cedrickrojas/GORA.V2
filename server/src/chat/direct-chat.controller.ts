@@ -1,0 +1,103 @@
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  ParseUUIDPipe,
+  Post,
+  Put,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { ClubChatMessagesQueryDto } from '../clubs/dto/club-chat.dto';
+import type { CurrentUser as Viewer } from '../users/user.types';
+import { DirectChatService } from './direct-chat.service';
+import { SendDirectMessageDto } from './direct-chat.dto';
+
+@Controller('chat')
+@UseGuards(JwtAuthGuard)
+export class DirectChatController {
+  constructor(private readonly chat: DirectChatService) {}
+
+  @Get('direct')
+  list(@CurrentUser() viewer: Viewer) {
+    return this.chat.list(viewer.id);
+  }
+
+  @Post('direct/:userId')
+  open(
+    @CurrentUser() viewer: Viewer,
+    @Param('userId', ParseUUIDPipe) userId: string,
+  ) {
+    return this.chat.open(viewer.id, userId);
+  }
+
+  @Get('direct/:id')
+  get(@CurrentUser() viewer: Viewer, @Param('id', ParseUUIDPipe) id: string) {
+    return this.chat.get(viewer.id, id);
+  }
+
+  @Get('direct/:id/messages')
+  messages(
+    @CurrentUser() viewer: Viewer,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query() query: ClubChatMessagesQueryDto,
+  ) {
+    return this.chat.messages(viewer.id, id, query);
+  }
+
+  @Post('direct/:id/messages')
+  send(
+    @CurrentUser() viewer: Viewer,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: SendDirectMessageDto,
+  ) {
+    return this.chat.send(viewer.id, id, dto.body);
+  }
+
+  @Put('direct/:id/read')
+  read(@CurrentUser() viewer: Viewer, @Param('id', ParseUUIDPipe) id: string) {
+    return this.chat.read(viewer.id, id);
+  }
+
+  @Get('requests')
+  requests(@CurrentUser() viewer: Viewer) {
+    return this.chat.requests(viewer.id);
+  }
+
+  @Get('recipients/:userId')
+  recipient(
+    @CurrentUser() viewer: Viewer,
+    @Param('userId', ParseUUIDPipe) userId: string,
+  ) {
+    return this.chat.recipient(viewer.id, userId);
+  }
+
+  @Post('requests/:userId')
+  request(
+    @CurrentUser() viewer: Viewer,
+    @Param('userId', ParseUUIDPipe) userId: string,
+    @Body() dto: SendDirectMessageDto,
+  ) {
+    return this.chat.request(viewer.id, userId, dto.body);
+  }
+
+  @Post('requests/:id/accept')
+  accept(
+    @CurrentUser() viewer: Viewer,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.chat.accept(viewer.id, id);
+  }
+
+  @Delete('requests/:id')
+  reject(
+    @CurrentUser() viewer: Viewer,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.chat.reject(viewer.id, id);
+  }
+}

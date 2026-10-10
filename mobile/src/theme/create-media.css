@@ -1,0 +1,114 @@
+/* Shared by Add Story and Upload Reel (scoped in each page). */
+.create-media {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 16px 40px;
+}
+
+.create-media__author {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.create-media__author-meta {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.create-media__muted {
+  margin: 0;
+  color: var(--gora-muted);
+  font-size: 0.78rem;
+}
+
+.create-media__label {
+  margin-top: 10px;
+  color: var(--gora-muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.create-media__types {
+  display: grid;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 14px;
+  background: var(--gora-surface);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.create-media__type {
+  padding: 9px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--gora-muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.84rem;
+  font-weight: 600;
+}
+
+.create-media__type--active {
+  background: var(--ion-color-primary);
+  color: var(--ion-color-primary-contrast);
+}
+
+.create-media__input {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid var(--gora-line-strong);
+  border-radius: 14px;
+  background: var(--gora-surface);
+  color: var(--ion-text-color);
+  font: inherit;
+  font-size: 0.92rem;
+}
+
+.create-media__textarea {
+  resize: vertical;
+}
+
+.create-media__preview {
+  width: 140px;
+  aspect-ratio: 9 / 16;
+  border-radius: 14px;
+  object-fit: cover;
+}
+
+.create-media__counter {
+  align-self: flex-end;
+  color: #7d8a93;
+  font-size: 0.7rem;
+}
+
+.create-media__error {
+  margin: 8px 0 0;
+  color: #ff7a7a;
+  font-size: 0.82rem;
+}
+
+.create-media__submit {
+  margin-top: 18px;
+  padding: 14px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--ion-color-primary);
+  color: var(--ion-color-primary-contrast);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 700;
+}
+
+.create-media__submit:disabled {
+  background: #1b2a37;
+  color: #7d8a93;
+  cursor: default;
+}
