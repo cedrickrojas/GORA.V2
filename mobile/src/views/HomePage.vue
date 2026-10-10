@@ -22,6 +22,7 @@
         @open="openStories"
         @add="router.push('/create/story')"
       />
+      <LiveRail :active="liveVisible" />
 
       <router-link to="/create/post" class="home__composer">
         <UserAvatar v-if="postsStore.me" :user="postsStore.me" :size="38" />
@@ -130,6 +131,7 @@ import FeedEntry from '@/components/feed/FeedEntry.vue';
 import AppHeader from '@/components/layout/AppHeader.vue';
 import StoryRail from '@/components/stories/StoryRail.vue';
 import StoryViewer from '@/components/stories/StoryViewer.vue';
+import LiveRail from '@/components/live/LiveRail.vue';
 import { useJoinGame } from '@/composables/useJoinGame';
 import { useNow } from '@/composables/useNow';
 import { usePostActions } from '@/composables/usePostActions';
@@ -146,6 +148,7 @@ import { getNearbyRadiusKm } from '@/utils/discover';
 import { buildHomeFeed } from '@/utils/feed';
 
 const router = useRouter();
+const liveVisible = ref(true);
 const session = useSessionStore();
 const storiesStore = useStoriesStore();
 const postsStore = usePostsStore();
@@ -221,13 +224,14 @@ function stopRefreshing(): void {
   refreshTimer = undefined;
 }
 onIonViewWillEnter(() => {
+  liveVisible.value = true;
   if (postsStore.isLoaded) void refreshFeed();
   stopRefreshing();
   refreshTimer = setInterval(() => {
     if (document.visibilityState === 'visible') void refreshFeed();
   }, 30_000);
 });
-onIonViewDidLeave(stopRefreshing);
+onIonViewDidLeave(() => { liveVisible.value = false; stopRefreshing(); });
 onUnmounted(stopRefreshing);
 
 onMounted(() => {

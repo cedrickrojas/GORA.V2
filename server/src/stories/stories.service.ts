@@ -1,6 +1,7 @@
 import {
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import type { Prisma } from '../generated/prisma/client';
@@ -11,7 +12,10 @@ import type {
   CreateStoryDto,
   UpdateStoryDto,
   UpdateStoryVisibilityDto,
+  UploadStoryDto,
 } from './dto/story.dto';
+import { StoryMediaStorage } from './story-media.storage';
+import type { MediaUploadFile } from '../common/media/private-media.storage';
 import type { DeletedStoryView, StoryView } from './story.types';
 import { visibleStoriesWhere } from './story-visibility';
 
@@ -50,10 +54,42 @@ type StoryRecord = Prisma.StoryGetPayload<{
 
 @Injectable()
 export class StoriesService {
+  private readonly logger = new Logger(StoriesService.name);
   constructor(
     private readonly prisma: PrismaService,
     private readonly audience: AudienceService,
+    private readonly media: StoryMediaStorage,
   ) {}
+
+  async upload(
+    authorId: string,
+    dto: UploadStoryDto,
+    file: MediaUploadFile | undefined,
+  ): Promise<StoryView> {
+    const mediaUrl = await this.media.save(file, dto.mediaType);
+    try {
+      return await this.create(authorId, { ...dto, mediaUrl });
+    } catch (error) {
+      await this.media.remove(mediaUrl).catch(() => undefined);
+      throw error;
+    }
+  }
+
+  /** Every file request rechecks current audience, blocks, expiration and deletion. */
+  async uploadedMedia(
+    viewerId: string,
+    storyId: string,
+  ): Promise<{ path: string; contentType: string }> {
+    const story = await this.prisma.story.findFirst({
+      where: {
+        AND: [{ id: storyId }, visibleStoriesWhere(viewerId, new Date())],
+      },
+      select: { mediaUrl: true },
+    });
+    if (!story || !this.media.isUpload(story.mediaUrl))
+      throw new NotFoundException(STORY_NOT_FOUND_MESSAGE);
+    return this.media.file(story.mediaUrl);
+  }
 
   async create(authorId: string, dto: CreateStoryDto): Promise<StoryView> {
     const viewerIds = await this.audience.resolve(
@@ -188,12 +224,17 @@ export class StoriesService {
 
   /** Delete story (author only): a soft delete; the row and its views stay in the database. */
   async remove(viewerId: string, storyId: string): Promise<DeletedStoryView> {
-    await this.findOwnStory(
+    const story = await this.findOwnStory(
       viewerId,
       storyId,
       'Only the author can delete this story.',
     );
     await this.updateOwn(viewerId, storyId, { deletedAt: new Date() });
+    await this.media
+      .remove(story.mediaUrl)
+      .catch((error: unknown) =>
+        this.logger.error('Could not remove deleted story media.', error),
+      );
 
     return { id: storyId, deleted: true };
   }
@@ -223,7 +264,11 @@ export class StoriesService {
       where: {
         AND: [{ id: storyId }, visibleStoriesWhere(viewerId, new Date())],
       },
-      select: { userId: true, _count: { select: { customViewers: true } } },
+      select: {
+        userId: true,
+        mediaUrl: true,
+        _count: { select: { customViewers: true } },
+      },
     });
 
     if (!story) {
@@ -242,7 +287,9 @@ export class StoriesService {
       id: story.id,
       author: story.user,
       mediaType: story.mediaType,
-      mediaUrl: story.mediaUrl,
+      mediaUrl: this.media.isUpload(story.mediaUrl)
+        ? this.media.playbackUrl(story.id, viewerId)
+        : story.mediaUrl,
       thumbnailUrl: story.thumbnailUrl,
       caption: story.caption,
       visibility: story.visibility,

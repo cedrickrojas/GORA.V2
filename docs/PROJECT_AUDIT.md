@@ -65,7 +65,7 @@ Browser checks cover real Add Friend → Accept → mutual Friends post visibili
 
 These are existing demo or placeholder features, not completed production services:
 
-- Following controls, notifications, comments/shares, live streaming, and uploads outside reels. Direct messages and message requests now use authenticated API records; post/reel likes are also persisted. Comments and shares still show their existing notices.
+- Following controls, notifications, comments/shares, and uploads outside stories/reels. Direct messages and message requests use authenticated API records; post/reel likes are persisted. Comments and shares still show their existing notices. Live broadcasting now uses WebRTC; production network and capacity limits are described in [Live streaming](features/live-streaming.md).
 - Some Home/Search/club game cards and recommendation surfaces still use sample games. Nearby GORA Games, real game details, My Games, requests, rosters, clubs, and official club chat use the API.
 - Activity and badge screens retain demo presentation. The schema/seeded badges alone do not implement an achievement engine.
 - Real profiles expose summary counts and paginated posts; the richer sample-profile sections are not fully backed by real profile list endpoints.
@@ -81,3 +81,15 @@ Passing these checks does not establish that every possible runtime or concurren
 The reported wrong sender name came from direct chats using shared demo conversations and the demo session user ID. The chat cache also survived account changes, so the next account could see a conversation built from the previous viewer's perspective. Direct chats now use PostgreSQL records through `DirectChatModule`; the server derives senders from the JWT and builds each conversation's partner for the current viewer. Message bubbles display their actual author, and inbox previews distinguish outgoing messages with "You:". Cached conversations, messages and requests clear on account changes; delayed responses cannot repopulate another account's chat.
 
 Message requests use the same account-specific API flow and preserve the original sender when accepted. Verification covers two-way messaging, recipient-specific inbox names, reload persistence, spoofed sender rejection, participant-only access, block privacy, concurrent opens/acceptance, and browser delivery while a chat is open. Message notifications remain outside this change.
+
+## Story upload follow-up
+
+Replaced Add Story's external photo/video URL form with a device file picker, preview, remove/change, progress and cancel controls. Uploads persist in private storage and reload through scoped media URLs with the existing story audience, blocks and expiration rules. Existing external URL API creation still works. Profile and post photo uploads remain outside this change.
+
+Validation covers multipart files, unsupported/spoofed media, size limits, rejected-audience cleanup, persistent photo/video reads, ranges, deleted/expired media, audience revocation, account switching and the existing Reel upload flow.
+
+## Post location picker follow-up
+
+The Use current location and Select on map buttons were placeholders. They now support one explicit device reading or interactive map selection, editable location names, confirmation and existing post persistence. Saved points outside the catalog reopen correctly. Permission failures leave manual selection available, and stale device callbacks are ignored after cancellation, another selection or an account change. Discovery keeps its existing rounding and behavior.
+
+Validation: 60 focused frontend tests passed across location, discovery, post location and post editing; typecheck, lint and production build passed. Browser QA verified native GPS and denial, map click and pin dragging, exact API persistence, mobile layout and canceled/reopened selections. Browser map tiles were mocked locally for automated checks.

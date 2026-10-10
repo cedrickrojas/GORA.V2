@@ -20,14 +20,20 @@ export const MEDIA_URL_OPTIONS = {
   require_protocol: true,
 };
 
-/**
- * Add Story. The photo or video is a URL to external storage until uploads exist; the
- * story expires 24 hours after it is posted (set by the server, never by the client).
- */
-export class CreateStoryDto extends AudienceDto {
+/** Story expiration and author are always set by the server. */
+export class StoryMetadataDto extends AudienceDto {
   @IsIn(STORY_MEDIA_TYPES, { message: 'mediaType must be IMAGE or VIDEO.' })
   mediaType!: StoryMediaType;
 
+  @Transform(trimOptional)
+  @IsOptional()
+  @IsString()
+  @MaxLength(STORY_CAPTION_MAX_LENGTH)
+  caption?: string;
+}
+
+/** Existing external media URLs remain supported by the API. */
+export class CreateStoryDto extends StoryMetadataDto {
   @Transform(trim)
   @IsUrl(MEDIA_URL_OPTIONS, {
     message: 'Media must be a valid http(s) URL.',
@@ -42,12 +48,19 @@ export class CreateStoryDto extends AudienceDto {
   })
   @MaxLength(MEDIA_URL_MAX_LENGTH, { message: 'Thumbnail URL is too long.' })
   thumbnailUrl?: string | null;
+}
 
-  @Transform(trimOptional)
-  @IsOptional()
-  @IsString()
-  @MaxLength(STORY_CAPTION_MAX_LENGTH)
-  caption?: string;
+/** Multipart custom viewers are a JSON array; inherited audience validation still applies. */
+export class UploadStoryDto extends StoryMetadataDto {
+  @Transform(({ value }: { value: unknown }) => {
+    if (typeof value !== 'string') return value;
+    try {
+      return JSON.parse(value) as unknown;
+    } catch {
+      return value;
+    }
+  })
+  declare customViewerIds?: string[];
 }
 
 /** Edit story: only the caption. A blank caption (or null) removes it. */

@@ -19,7 +19,7 @@
             </button>
           </div>
           <div class="reels-top__side reels-top__side--end">
-            <button type="button" class="reels-top__live" aria-label="Watch live" @click="showLaterPhaseNotice('Live')">
+            <button type="button" class="reels-top__live" aria-label="Watch live" @click="router.push('/live')">
               <ion-icon :icon="radioOutline" aria-hidden="true" />
               <span class="reels-top__live-badge">LIVE</span>
             </button>
@@ -61,6 +61,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
+import { useRouter } from 'vue-router';
 import { IonContent, IonIcon, IonPage, onIonViewWillEnter } from '@ionic/vue';
 import { peopleOutline, radioOutline } from 'ionicons/icons';
 import ReelSlide from '@/components/reels/ReelSlide.vue';
@@ -78,6 +79,7 @@ import {
 } from '@/utils/reels';
 
 const reelsStore = useReelsStore();
+const router = useRouter();
 const followsStore = useFollowsStore();
 const session = useSessionStore();
 

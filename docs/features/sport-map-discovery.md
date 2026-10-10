@@ -1,6 +1,6 @@
 # Sport-Based Live Activity Map (game discovery)
 
-Status: implemented in Prompt 11 with the built-in map preview. Real GORA games come from `GET /api/v1/games/discover`, filtered by sport, date, status, and distance on the server. No map provider package, map API key, or external API is required; a Google Maps, Mapbox, or OpenStreetMap adapter can be added later without changing the discovery rules. Live tracking, real-time updates, a venue database, routing, and PostGIS are not implemented.
+Status: implemented in Prompt 11 with the built-in map preview. Real GORA games come from `GET /api/v1/games/discover`, filtered by sport, date, status, and distance on the server. Game discovery itself requires no map provider package, map API key, or external API; a Google Maps, Mapbox, or OpenStreetMap adapter can be added later without changing the discovery rules. Live tracking, real-time updates, a venue database, routing, and PostGIS are not implemented.
 
 ## Concept
 
@@ -133,5 +133,7 @@ No migration was needed. `Game` already has `sportId`, `gameDate`, `startTime`, 
 ## Not implemented (later prompts)
 
 - A real map provider adapter (Google Maps, Mapbox, or OpenStreetMap tiles). Set `VITE_MAP_PROVIDER` / `VITE_MAP_API_KEY` and add a canvas component implementing `MapCanvasProps` to `CANVASES` in `GameDiscoveryMap.vue`.
-- Place search, picking a point on the map, and "use current location" in Create Game / Create Post.
+- External place/address search and a location picker for Create Game remain future work. Create Post and Edit Post now support GORA place search, device location and a Leaflet/OpenStreetMap point picker with explicit confirmation.
 - Real-time map updates (WebSocket), PostGIS, live location sharing, background tracking, routing, and a venue database.
+
+The post location picker uses precise coordinates only when the author requests and confirms them. Those coordinates follow the post audience; discovery location remains a rounded, temporary search center. The interactive post picker is independent of the existing game discovery preview. See the Post location picker section in docs/ARCHITECTURE.md.

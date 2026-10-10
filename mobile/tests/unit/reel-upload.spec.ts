@@ -1,3 +1,4 @@
+import { FakeUpload } from './helpers/fake-upload';
 import { createPinia, setActivePinia } from 'pinia';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { ApiError } from '@/services/api-client';
@@ -30,43 +31,6 @@ const saved: ApiReel = {
   createdAt: '2026-10-10T00:00:00Z',
   updatedAt: '2026-10-10T00:00:00Z',
 };
-
-class FakeUpload {
-  static instances: FakeUpload[] = [];
-  headers: Record<string, string> = {};
-  method = '';
-  url = '';
-  timeout = 0;
-  status = 0;
-  responseText = '';
-  body?: FormData;
-  upload: { onprogress?: (event: { lengthComputable: boolean; loaded: number; total: number }) => void } = {};
-  onload?: () => void;
-  onerror?: () => void;
-  ontimeout?: () => void;
-  onabort?: () => void;
-  constructor() {
-    FakeUpload.instances.push(this);
-  }
-  open(method: string, url: string) {
-    this.method = method;
-    this.url = url;
-  }
-  setRequestHeader(name: string, value: string) {
-    this.headers[name] = value;
-  }
-  send(body: FormData) {
-    this.body = body;
-  }
-  abort() {
-    this.onabort?.();
-  }
-  respond(status: number, body: unknown) {
-    this.status = status;
-    this.responseText = JSON.stringify(body);
-    this.onload?.();
-  }
-}
 
 function signIn(id = ME, token = 'token') {
   const auth = useAuthStore();

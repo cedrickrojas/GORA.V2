@@ -1,13 +1,6 @@
 import { actionSheetController } from '@ionic/vue';
-import {
-  calendarOutline,
-  createOutline,
-  radioOutline,
-  sparklesOutline,
-  videocamOutline,
-} from 'ionicons/icons';
+import { calendarOutline, createOutline, radioOutline, sparklesOutline, videocamOutline } from 'ionicons/icons';
 import { useRouter } from 'vue-router';
-import { showLaterPhaseNotice } from '@/utils/notice';
 
 export type CreateActionId = 'POST' | 'GAME' | 'REEL' | 'STORY' | 'LIVE';
 
@@ -15,8 +8,7 @@ export interface CreateAction {
   id: CreateActionId;
   label: string;
   icon: string;
-  /** Screens that exist today; the rest show a later-phase notice. */
-  route?: string;
+  route: string;
 }
 
 export const CREATE_ACTIONS: readonly CreateAction[] = [
@@ -24,7 +16,7 @@ export const CREATE_ACTIONS: readonly CreateAction[] = [
   { id: 'GAME', label: 'Create Game', icon: calendarOutline, route: '/create/game' },
   { id: 'REEL', label: 'Upload Reel', icon: videocamOutline, route: '/create/reel' },
   { id: 'STORY', label: 'Add Story', icon: sparklesOutline, route: '/create/story' },
-  { id: 'LIVE', label: 'Go Live', icon: radioOutline },
+  { id: 'LIVE', label: 'Go Live', icon: radioOutline, route: '/create/live' },
 ];
 
 export function useCreateMenu(): {
@@ -34,12 +26,7 @@ export function useCreateMenu(): {
   const router = useRouter();
 
   function runCreateAction(action: CreateAction): void {
-    if (action.route) {
-      void router.push(action.route);
-      return;
-    }
-
-    void showLaterPhaseNotice(action.label);
+    void router.push(action.route);
   }
 
   async function openCreateMenu(): Promise<void> {

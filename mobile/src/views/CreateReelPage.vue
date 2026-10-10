@@ -14,9 +14,9 @@
 
         <label class="create-media__label" for="create-reel-video">Upload video</label>
         <label
-          class="reel-upload__picker"
+          class="media-upload__picker"
           for="create-reel-video"
-          :class="{ 'reel-upload__picker--disabled': isSaving }"
+          :class="{ 'media-upload__picker--disabled': isSaving }"
         >
           <ion-icon :icon="cloudUploadOutline" aria-hidden="true" />
           <strong>{{ videoFile ? 'Change video' : 'Choose a video' }}</strong>
@@ -24,13 +24,13 @@
         <input
           id="create-reel-video"
           ref="fileInput"
-          class="reel-upload__file"
+          class="media-upload__file"
           type="file"
           accept="video/mp4,video/webm,.mp4,.webm"
           :disabled="isSaving"
           @change="selectVideo"
         />
-        <div v-if="videoFile" class="reel-upload__selection">
+        <div v-if="videoFile" class="media-upload__selection">
           <span
             >{{ videoFile.name }} <small>{{ (videoFile.size / 1024 / 1024).toFixed(1) }} MB</small></span
           >
@@ -39,7 +39,7 @@
         <video
           v-if="previewUrl"
           :key="previewUrl"
-          class="reel-upload__preview"
+          class="media-upload__preview"
           :src="previewUrl"
           controls
           playsinline
@@ -72,11 +72,11 @@
         </select>
 
         <span class="create-media__label">Who can see it</span>
-        <fieldset class="reel-upload__audience" :disabled="isSaving">
+        <fieldset class="media-upload__audience" :disabled="isSaving">
           <PostAudiencePicker v-model:visibility="visibility" v-model:custom-viewer-ids="customViewerIds" />
         </fieldset>
         <p v-if="error" class="create-media__error" role="alert">{{ error }}</p>
-        <div v-if="isSaving" class="reel-upload__progress" role="status" aria-live="polite">
+        <div v-if="isSaving" class="media-upload__progress" role="status" aria-live="polite">
           <progress :value="uploadProgress" max="100" aria-label="Video upload progress" />
           <span>{{ uploadProgress < 100 ? `Uploading… ${uploadProgress}%` : 'Saving your reel…' }}</span>
           <button type="button" @click="cancelUpload">Cancel upload</button>
@@ -238,86 +238,4 @@ onMounted(() => {
 </script>
 
 <style scoped src="@/theme/create-media.css"></style>
-<style scoped>
-.reel-upload__picker {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 10px;
-  padding: 28px 16px;
-  border: 2px dashed var(--gora-line-strong);
-  border-radius: 16px;
-  background: var(--gora-surface);
-  cursor: pointer;
-  text-align: center;
-}
-.reel-upload__picker:hover {
-  border-color: var(--ion-color-primary);
-}
-.reel-upload__picker ion-icon {
-  color: var(--ion-color-primary);
-  font-size: 36px;
-}
-.reel-upload__picker--disabled {
-  opacity: 0.6;
-  cursor: default;
-}
-.reel-upload__file {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-}
-.reel-upload__picker:has(+ input:focus-visible) {
-  outline: 2px solid var(--ion-color-primary);
-  outline-offset: 3px;
-}
-.reel-upload__preview {
-  width: 100%;
-  max-height: 360px;
-  border-radius: 14px;
-  background: #000;
-  object-fit: contain;
-}
-.reel-upload__selection {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  font-size: 0.85rem;
-}
-.reel-upload__selection span {
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
-.reel-upload__selection small {
-  color: var(--gora-muted);
-}
-.reel-upload__selection button,
-.reel-upload__progress button {
-  border: 0;
-  background: transparent;
-  color: var(--ion-color-primary);
-  cursor: pointer;
-  font: inherit;
-}
-.reel-upload__audience {
-  min-width: 0;
-  margin: 0;
-  padding: 0;
-  border: 0;
-}
-.reel-upload__progress {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 10px;
-  padding-top: 16px;
-  font-size: 0.85rem;
-}
-.reel-upload__progress progress {
-  width: 100%;
-  accent-color: var(--ion-color-primary);
-}
-</style>
+<style scoped src="@/theme/media-upload.css"></style>

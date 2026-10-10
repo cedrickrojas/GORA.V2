@@ -1,9 +1,9 @@
-import type { MapPoint } from '@/utils/location-map';
+import { isValidPoint, type MapPoint } from '@/utils/location-map';
 
 /**
- * The device location, used only to center the map and measure distance to games. It is
- * never saved (no User column, no table, no storage) and never shown to anyone else; the
- * only place it goes is the latitude/longitude of a discovery search.
+ * Device readings are never stored by this service. Discovery uses a rounded point only
+ * for searches. A post author can explicitly select and confirm a precise point to attach
+ * to a post; that location follows the post's audience.
  */
 
 export type LocationPermissionState = 'granted' | 'denied' | 'prompt' | 'unsupported';
@@ -31,8 +31,8 @@ function geolocation(): Geolocation | null {
   return typeof navigator !== 'undefined' && navigator.geolocation ? navigator.geolocation : null;
 }
 
-function roundCoordinate(value: number): number {
-  const factor = 10 ** COORDINATE_DECIMALS;
+function roundCoordinate(value: number, decimals = COORDINATE_DECIMALS): number {
+  const factor = 10 ** decimals;
   return Math.round(value * factor) / factor;
 }
 
@@ -58,7 +58,10 @@ export async function checkPermission(): Promise<LocationPermissionState> {
 }
 
 /** One reading. Resolves (never rejects) with the point or why there is none. */
-export function getCurrentLocation(timeoutMs = LOCATION_TIMEOUT_MS): Promise<LocationResult> {
+export function getCurrentLocation(
+  timeoutMs = LOCATION_TIMEOUT_MS,
+  options: { precise?: boolean } = {},
+): Promise<LocationResult> {
   const provider = geolocation();
 
   if (!provider) {
@@ -66,21 +69,33 @@ export function getCurrentLocation(timeoutMs = LOCATION_TIMEOUT_MS): Promise<Loc
   }
 
   return new Promise((resolve) => {
+    let settled = false;
+    const finish = (result: LocationResult) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(deadline);
+      resolve(result);
+    };
+    // Some browsers leave a permission prompt pending beyond their native timeout.
+    const deadline = setTimeout(() => finish({ ok: false, reason: 'TIMEOUT' }), timeoutMs);
     try {
       provider.getCurrentPosition(
-        (position) =>
-          resolve({
-            ok: true,
-            point: {
-              latitude: roundCoordinate(position.coords.latitude),
-              longitude: roundCoordinate(position.coords.longitude),
-            },
-          }),
-        (error) => resolve({ ok: false, reason: POSITION_ERROR_REASONS[error.code] ?? 'UNAVAILABLE' }),
-        { enableHighAccuracy: false, timeout: timeoutMs, maximumAge: 5 * 60_000 },
+        (position) => {
+          const point = {
+            latitude: roundCoordinate(position.coords.latitude, options.precise ? 6 : COORDINATE_DECIMALS),
+            longitude: roundCoordinate(position.coords.longitude, options.precise ? 6 : COORDINATE_DECIMALS),
+          };
+          finish(isValidPoint(point) ? { ok: true, point } : { ok: false, reason: 'UNAVAILABLE' });
+        },
+        (error) => finish({ ok: false, reason: POSITION_ERROR_REASONS[error.code] ?? 'UNAVAILABLE' }),
+        {
+          enableHighAccuracy: options.precise === true,
+          timeout: timeoutMs,
+          maximumAge: options.precise ? 0 : 5 * 60_000,
+        },
       );
     } catch {
-      resolve({ ok: false, reason: 'UNAVAILABLE' });
+      finish({ ok: false, reason: 'UNAVAILABLE' });
     }
   });
 }

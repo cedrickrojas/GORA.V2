@@ -48,7 +48,12 @@ export interface ApiStory {
   thumbnailUrl: string | null;
   caption: string | null;
   visibility: PostVisibility;
-  music: { title: string; artist: string | null; startTime: number | null; duration: number | null } | null;
+  music: {
+    title: string;
+    artist: string | null;
+    startTime: number | null;
+    duration: number | null;
+  } | null;
   createdAt: string;
   expiresAt: string;
   /** Only sent to the author. */
@@ -63,10 +68,18 @@ export interface CreateStoryInput {
   customViewerIds?: string[];
 }
 
-/** Add Story form. Media is a URL until uploads exist. */
+/** External URL creation remains available through the API. */
 export interface StoryDraft {
   mediaType: 'IMAGE' | 'VIDEO';
   mediaUrl: string;
+  caption: string;
+  visibility: PostVisibility;
+  customViewerIds: string[];
+}
+
+/** Add Story form selects a photo or video directly from the device. */
+export interface StoryUploadDraft {
+  media: File;
   caption: string;
   visibility: PostVisibility;
   customViewerIds: string[];

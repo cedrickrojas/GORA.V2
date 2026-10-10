@@ -17,7 +17,7 @@ export function toStory(story: ApiStory): Story {
     user: toUserSummary(story.author),
     media: {
       type: story.mediaType === 'VIDEO' ? 'video' : 'image',
-      url: story.mediaUrl,
+      url: story.mediaUrl.startsWith('/api/v1/stories/') ? `${getApiBaseUrl()}${story.mediaUrl}` : story.mediaUrl,
       caption: story.caption ?? '',
       sport: '',
     },
@@ -102,8 +102,8 @@ export function validateStoryDraft(draft: StoryDraft, authorId: string | null): 
   }
 
   return (
-    validateCaption(draft.caption, STORY_CAPTION_MAX_LENGTH)
-    ?? validatePostAudience(draft.visibility, draft.customViewerIds, authorId, 'story')
+    validateCaption(draft.caption, STORY_CAPTION_MAX_LENGTH) ??
+    validatePostAudience(draft.visibility, draft.customViewerIds, authorId, 'story')
   );
 }
 
@@ -118,7 +118,7 @@ export function validateReelDraft(draft: ReelDraft, authorId: string | null): st
   }
 
   return (
-    validateCaption(draft.caption, REEL_CAPTION_MAX_LENGTH)
-    ?? validatePostAudience(draft.visibility, draft.customViewerIds, authorId, 'reel')
+    validateCaption(draft.caption, REEL_CAPTION_MAX_LENGTH) ??
+    validatePostAudience(draft.visibility, draft.customViewerIds, authorId, 'reel')
   );
 }

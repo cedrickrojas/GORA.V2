@@ -13,6 +13,7 @@ import { SportsModule } from './sports/sports.module';
 import { StoriesModule } from './stories/stories.module';
 import { UsersModule } from './users/users.module';
 import { DirectChatModule } from './chat/direct-chat.module';
+import { LiveModule } from './live/live.module';
 
 @Module({
   imports: [
@@ -30,6 +31,7 @@ import { DirectChatModule } from './chat/direct-chat.module';
     StoriesModule,
     ReelsModule,
     DirectChatModule,
+    LiveModule,
   ],
 })
 export class AppModule {}

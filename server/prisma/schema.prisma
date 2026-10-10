@@ -780,6 +780,7 @@ model LiveStream {
   @@index([hostId])
   @@index([gameId])
   @@index([status])
+  @@unique([hostId], map: "LiveStream_one_active_host", where: raw("(status = 'LIVE'::\"LiveStreamStatus\")"))
 }
 
 model LiveViewer {
@@ -788,6 +789,9 @@ model LiveViewer {
   userId       String     @db.Uuid
   joinedAt     DateTime   @default(now())
   leftAt       DateTime?
+  lastSeenAt   DateTime   @default(now())
+  offer        String?   @db.Text
+  answer       String?   @db.Text
   liveStream   LiveStream @relation(fields: [liveStreamId], references: [id], onDelete: Cascade)
   user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
 

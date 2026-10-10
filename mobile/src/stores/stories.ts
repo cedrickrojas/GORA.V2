@@ -8,9 +8,12 @@ import {
   listMyStories,
   updateStory as updateStoryRequest,
   updateStoryVisibility as updateStoryVisibilityRequest,
+  uploadStory as uploadStoryRequest,
 } from '@/services/stories-api.service';
+import type { MediaUploadOptions } from '@/services/media-upload.service';
 import type { PostVisibility } from '@/types/post';
-import type { ApiStory, Story, StoryDraft, StoryGroup } from '@/types/story';
+import type { ApiStory, Story, StoryDraft, StoryGroup, StoryUploadDraft } from '@/types/story';
+import { storyFileType, validateStoryFile } from '@/utils/story-upload';
 import { STORY_CAPTION_MAX_LENGTH, toStory, validateCaption, validateStoryDraft } from '@/utils/media-api';
 import { isServerId } from '@/utils/post-api';
 import { validatePostAudience } from '@/utils/post-privacy';
@@ -50,13 +53,11 @@ export const useStoriesStore = defineStore('stories', () => {
   const viewer = computed(() => session.me);
   const savesToServer = computed(() => auth.accessToken !== null);
 
-  const allStories = computed(() => savesToServer.value ? serverStories.value : stories.value);
+  const allStories = computed(() => (savesToServer.value ? serverStories.value : stories.value));
 
   /** Your stories, active and expired (My Stories). Only the signed-in account's own. */
   const myStories = computed(() =>
-    savesToServer.value
-      ? myServerStories.value
-      : stories.value.filter((story) => story.user.id === viewer.value?.id),
+    savesToServer.value ? myServerStories.value : stories.value.filter((story) => story.user.id === viewer.value?.id),
   );
 
   watch(
@@ -73,13 +74,16 @@ export const useStoriesStore = defineStore('stories', () => {
     { flush: 'sync' },
   );
 
-  watch(() => friendsStore.revision, () => {
-    generation++;
-    serverStories.value = [];
-    serverStatus.value = 'idle';
-    loadedForUserId.value = null;
-    if (savesToServer.value && isLoaded.value) void refresh();
-  });
+  watch(
+    () => friendsStore.revision,
+    () => {
+      generation++;
+      serverStories.value = [];
+      serverStatus.value = 'idle';
+      loadedForUserId.value = null;
+      if (savesToServer.value && isLoaded.value) void refresh();
+    },
+  );
 
   async function load(): Promise<void> {
     if (!isLoaded.value) {
@@ -117,7 +121,10 @@ export const useStoriesStore = defineStore('stories', () => {
     }
   }
 
-  function getFeedAt(nowMs: number): { own: StoryGroup | null; others: StoryGroup[] } {
+  function getFeedAt(nowMs: number): {
+    own: StoryGroup | null;
+    others: StoryGroup[];
+  } {
     const { active } = partitionStories(allStories.value, nowMs);
     const groups = groupStoriesByUser(active);
     const viewerId = viewer.value?.id;
@@ -129,8 +136,9 @@ export const useStoriesStore = defineStore('stories', () => {
   }
 
   function findOwnStory(storyId: string): Story | undefined {
-    const story = myServerStories.value.find((candidate) => candidate.id === storyId)
-      ?? serverStories.value.find((candidate) => candidate.id === storyId);
+    const story =
+      myServerStories.value.find((candidate) => candidate.id === storyId) ??
+      serverStories.value.find((candidate) => candidate.id === storyId);
 
     return story && story.fromServer && story.user.id === viewer.value?.id ? story : undefined;
   }
@@ -179,6 +187,43 @@ export const useStoriesStore = defineStore('stories', () => {
       myServerStories.value = [story, ...myServerStories.value];
       return { story };
     } catch (caught) {
+      return { error: describeContentError(caught, STORY_UNAVAILABLE_MESSAGE) };
+    }
+  }
+
+  async function uploadStory(
+    draft: StoryUploadDraft,
+    options: MediaUploadOptions = {},
+  ): Promise<{ story: Story } | { error: string }> {
+    const isCurrent = captureSession(auth);
+    if (!savesToServer.value) return { error: STORY_SIGN_IN_MESSAGE };
+    const error =
+      validateStoryFile(draft.media) ??
+      validateCaption(draft.caption, STORY_CAPTION_MAX_LENGTH) ??
+      validatePostAudience(draft.visibility, draft.customViewerIds, auth.currentUser?.id ?? null, 'story');
+    if (error) return { error };
+    if (draft.visibility === 'CUSTOM' && !draft.customViewerIds.every(isServerId))
+      return { error: DEMO_PEOPLE_MESSAGE };
+    try {
+      const created = await authorized((token) =>
+        uploadStoryRequest(
+          token,
+          draft.media,
+          {
+            mediaType: storyFileType(draft.media)!,
+            visibility: draft.visibility,
+            ...(draft.caption.trim() ? { caption: draft.caption.trim() } : {}),
+            ...(draft.visibility === 'CUSTOM' ? { customViewerIds: draft.customViewerIds } : {}),
+          },
+          options,
+        ),
+      );
+      const story = toStory(created);
+      serverStories.value = [...serverStories.value, story];
+      myServerStories.value = [story, ...myServerStories.value];
+      return { story };
+    } catch (caught) {
+      if (options.signal?.aborted && isCurrent()) return { error: 'Upload canceled.' };
       return { error: describeContentError(caught, STORY_UNAVAILABLE_MESSAGE) };
     }
   }
@@ -283,6 +328,7 @@ export const useStoriesStore = defineStore('stories', () => {
     refresh,
     getFeedAt,
     createStory,
+    uploadStory,
     editStory,
     updateStoryVisibility,
     deleteStory,

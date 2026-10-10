@@ -9,7 +9,14 @@ import {
   Patch,
   Post,
   UseGuards,
+  UseInterceptors,
+  UploadedFile,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import {
+  VIDEO_MAX_BYTES,
+  type MediaUploadFile,
+} from '../common/media/private-media.storage';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import type { CurrentUser as CurrentUserContext } from '../users/user.types';
@@ -17,6 +24,7 @@ import {
   CreateStoryDto,
   UpdateStoryDto,
   UpdateStoryVisibilityDto,
+  UploadStoryDto,
 } from './dto/story.dto';
 import { STORY_NOT_FOUND_MESSAGE, StoriesService } from './stories.service';
 import type { DeletedStoryView, StoryView } from './story.types';
@@ -29,6 +37,25 @@ const storyIdPipe = new ParseUUIDPipe({
 @UseGuards(JwtAuthGuard)
 export class StoriesController {
   constructor(private readonly storiesService: StoriesService) {}
+
+  @Post('upload')
+  @UseInterceptors(
+    FileInterceptor('media', {
+      limits: {
+        fileSize: VIDEO_MAX_BYTES,
+        files: 1,
+        fields: 4,
+        fieldSize: 16 * 1024,
+      },
+    }),
+  )
+  upload(
+    @CurrentUser() viewer: CurrentUserContext,
+    @Body() dto: UploadStoryDto,
+    @UploadedFile() file: MediaUploadFile | undefined,
+  ): Promise<StoryView> {
+    return this.storiesService.upload(viewer.id, dto, file);
+  }
 
   @Post()
   create(

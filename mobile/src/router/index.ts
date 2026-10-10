@@ -80,6 +80,21 @@ export const routes: RouteRecordRaw[] = [
         component: () => import('../views/CreateReelPage.vue'),
       },
       {
+        path: 'create/live',
+        name: 'create-live',
+        component: () => import('../views/LivePage.vue'),
+      },
+      {
+        path: 'live',
+        name: 'live-broadcasts',
+        component: () => import('../views/LiveDirectoryPage.vue'),
+      },
+      {
+        path: 'live/:liveId',
+        name: 'watch-live',
+        component: () => import('../views/LivePage.vue'),
+      },
+      {
         path: 'games/:gameId',
         name: 'game-details',
         component: () => import('../views/GameDetailsPage.vue'),
