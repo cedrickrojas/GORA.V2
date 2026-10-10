@@ -68,7 +68,7 @@ test('uploads a photo as multipart with audience, auth and progress', async () =
     { onProgress },
   );
   const request = FakeUpload.instances[0];
-  expect(request.url).toBe('http://localhost:3000/api/v1/stories/upload');
+  expect(request.url).toBe('/api/v1/stories/upload');
   expect(request.method).toBe('POST');
   expect(request.headers.Authorization).toBe('Bearer private-token');
   expect(request.headers['Content-Type']).toBeUndefined();
@@ -115,7 +115,7 @@ test.each(['IMAGE', 'VIDEO'] as const)(
     expect(request.body?.has('senderId')).toBe(false);
     request.respond(201, { ...saved, mediaType });
     expect(await result).toHaveProperty('story');
-    expect(store.serverStories[0].media.url).toBe(`http://localhost:3000${saved.mediaUrl}`);
+    expect(store.serverStories[0].media.url).toBe(saved.mediaUrl);
     expect(store.myStories[0].id).toBe(ID);
   },
 );

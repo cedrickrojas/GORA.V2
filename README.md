@@ -118,7 +118,29 @@ npm run mobile
 
 Vite serves the Ionic app at [http://localhost:5173](http://localhost:5173). The first screen is the GORA landing page.
 
-The client reads `VITE_API_BASE_URL` from the environment. See `mobile/.env.example`. When that variable is unset, local development uses `http://localhost:3000`.
+The client reads `VITE_API_BASE_URL` from the environment. See `mobile/.env.example`. Leave it unset or empty for same-origin `/api/v1` requests. During standalone Vite development, Vite proxies `/api` to `http://localhost:3000`. Native clients or a separately hosted API can set this variable to the API's public origin, without `/api/v1`.
+
+## Vercel deployment
+
+Use this directory (the `GORA` Git repository containing `mobile/`, `server/`, and `vercel.json`) as the Vercel project root. The surrounding `GORAJUV` checkout is a separate repository. Deploy both services as one project:
+
+- `mobile`: static Vite frontend, public at `/` and all non-API paths. Its service-level rewrite supports Vue Router deep links.
+- `server`: NestJS backend, public at `/api` and `/api/*`. The original request path is preserved; controllers already use `/api/v1`.
+- No internal-only application service or service binding is needed: the frontend calls the public API from the browser, and the backend does not call another deployed application service. Bindings are available only in functions at runtime, so they cannot provide a browser build's API URL. Do not put an internal binding URL into `VITE_API_BASE_URL`.
+
+Leave `VITE_API_BASE_URL` unset or empty in Vercel so production and preview builds use their own domain. Remove any existing localhost override. Each service installs and builds independently; the server build generates the ignored Prisma client before compiling NestJS. The JavaScript entrypoint `server/main.js` loads `dist/bootstrap-server.js` from Nest's compiler to preserve decorator metadata required by dependency injection. The server's `postinstall` builds this output for fresh installations and `vercel dev`. After backend edits, run `npm run server:build` and restart `vercel dev`, or use standalone `npm run server` for watch mode.
+
+Set `DATABASE_URL` to an externally hosted PostgreSQL database and `JWT_SECRET` to a random secret of at least 32 characters in the project's Vercel environment settings. Optional server settings are listed in `server/.env.example`. Same-origin web requests need no CORS override; set `CORS_ORIGIN` to explicit allowed origins for separately hosted browser clients. Keep database credentials and JWT/TURN secrets out of all `VITE_*` variables. Apply migrations and seed the target database using the existing Prisma commands before serving application traffic; builds do not migrate or seed databases.
+
+Test the combined routing from this directory with a Vercel CLI that supports Services:
+
+```bash
+vercel dev
+```
+
+For local testing without a cloud login, use `vercel dev -L`. Supply the server environment settings as above (locally, `server/.env`). Check `/`, a frontend deep link such as `/login`, `/api/v1/health`, and an unknown `/api/v1/...` route (which must return the API's 404 response).
+
+Deployment limitation: story and reel uploads currently use local filesystem storage in `server/src/common/media/private-media.storage.ts` (10 MB photos, 50 MB videos). Vercel Functions do not provide durable local upload storage and impose request body size limits. Production uploads need durable object storage and direct browser uploads; changing a directory to `/tmp` will not make uploaded media persistent. This configuration does not migrate media storage. See [Vercel Services](https://vercel.com/docs/services), [bindings](https://vercel.com/docs/services/bindings), and [Functions limits](https://vercel.com/docs/functions/limitations).
 
 ## How to run the backend
 

@@ -68,7 +68,7 @@ describe('video upload transport', () => {
       { onProgress },
     );
     const request = FakeUpload.instances[0];
-    expect(request.url).toBe('http://localhost:3000/api/v1/reels/upload');
+    expect(request.url).toBe('/api/v1/reels/upload');
     expect(request.method).toBe('POST');
     expect(request.headers.Authorization).toBe('Bearer private-token');
     expect(request.headers['Content-Type']).toBeUndefined();
@@ -139,7 +139,7 @@ describe('upload validation and account boundaries', () => {
     expect(FakeUpload.instances[0].body?.get('caption')).toBe('Game winner');
     FakeUpload.instances[0].respond(201, saved);
     expect(await result).toHaveProperty('reel');
-    expect(store.myReels[0].videoUrl).toBe(`http://localhost:3000${saved.videoUrl}`);
+    expect(store.myReels[0].videoUrl).toBe(saved.videoUrl);
     expect(toHighlight(toReel(saved)).videoUrl).toBe(store.myReels[0].videoUrl);
   });
 

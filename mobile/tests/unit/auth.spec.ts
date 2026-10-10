@@ -155,7 +155,7 @@ describe('auth store', () => {
     expect(localStorage.getItem(TOKEN_KEY)).toBe('token-123');
 
     const [loginUrl, loginInit] = fetchMock.mock.calls[0];
-    expect(String(loginUrl)).toBe('http://localhost:3000/api/v1/auth/login');
+    expect(String(loginUrl)).toBe('/api/v1/auth/login');
     expect(JSON.parse(String(loginInit?.body))).toEqual({ email: 'louis@example.com', password: 'correct-horse-9' });
 
     const [, meInit] = fetchMock.mock.calls[1];

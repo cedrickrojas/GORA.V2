@@ -2,11 +2,28 @@ import { afterEach, describe, expect, test, vi } from 'vitest';
 import { ApiError, apiRequest, NETWORK_ERROR_MESSAGE, REQUEST_TIMEOUT_MS } from '@/services/api-client';
 
 afterEach(() => {
+  vi.unstubAllEnvs();
   vi.unstubAllGlobals();
   vi.useRealTimers();
 });
 
 describe('API response handling', () => {
+  test('uses the current deployment for browser API requests', async () => {
+    vi.stubEnv('VITE_API_BASE_URL', '');
+    const fetch = vi.fn(() => Promise.resolve(new Response('null')));
+    vi.stubGlobal('fetch', fetch);
+    await apiRequest('/posts');
+    expect(fetch).toHaveBeenCalledWith('/api/v1/posts', expect.any(Object));
+  });
+
+  test('supports a separately hosted public API origin', async () => {
+    vi.stubEnv('VITE_API_BASE_URL', ' https://api.gora.example/// ');
+    const fetch = vi.fn(() => Promise.resolve(new Response('null')));
+    vi.stubGlobal('fetch', fetch);
+    await apiRequest('/posts');
+    expect(fetch).toHaveBeenCalledWith('https://api.gora.example/api/v1/posts', expect.any(Object));
+  });
+
   test('keeps a valid JSON null response for an absent join request', async () => {
     vi.stubGlobal(
       'fetch',

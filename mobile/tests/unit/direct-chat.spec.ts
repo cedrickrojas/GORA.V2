@@ -63,7 +63,7 @@ function fakeApi() {
   vi.stubGlobal(
     'fetch',
     vi.fn((url: string, init: RequestInit = {}) => {
-      const path = new URL(url).pathname.replace('/api/v1', '');
+      const path = new URL(url, 'https://gora.example').pathname.replace('/api/v1', '');
       const method = init.method ?? 'GET';
       const token = (init.headers as Record<string, string>)?.Authorization?.replace('Bearer ', '');
       calls.push({ path, method, token, body: init.body ? (JSON.parse(String(init.body)) as unknown) : undefined });

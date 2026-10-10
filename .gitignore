@@ -41,6 +41,7 @@ server/src/generated/
 
 # Test artifacts
 .runtime/
+.vercel/
 mobile/tmp/
 cypress/videos/
 cypress/screenshots/

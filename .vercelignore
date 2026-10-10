@@ -1,0 +1,9 @@
+.runtime/
+mobile/tmp/
+**/node_modules/
+**/dist/
+**/uploads/
+**/.env
+**/.env.*
+!**/.env.example
+*.log
