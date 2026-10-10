@@ -18,7 +18,7 @@ export function isBioTooLong(text: string): boolean {
   return text.trim().length > PROFILE_BIO_MAX_LENGTH;
 }
 
-/** Only http(s) links to a real host; images are stored externally, never in the database. */
+/** Only http(s) links to a real host, including signed cover links from GORA. */
 export function isImageUrl(text: string): boolean {
   const value = text.trim();
 

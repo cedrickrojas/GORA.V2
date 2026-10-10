@@ -3,29 +3,16 @@
     <div
       class="profile-header__cover"
       :class="{ 'profile-header__cover--default': !profile.coverImageUrl }"
-      :style="
-        profile.coverImageUrl
-          ? { backgroundImage: `url(${JSON.stringify(profile.coverImageUrl)})` }
-          : undefined
-      "
+      :style="profile.coverImageUrl ? { backgroundImage: `url(${JSON.stringify(profile.coverImageUrl)})` } : undefined"
     >
-      <router-link
-        v-if="editable"
-        to="/profile/edit"
-        class="profile-header__cover-edit"
-      >
+      <button v-if="editable" type="button" class="profile-header__cover-edit" @click="coverOpen = true">
         <ion-icon :icon="cameraOutline" aria-hidden="true" />
-        <span>{{
-          profile.coverImageUrl ? 'Edit cover' : 'Add cover photo'
-        }}</span>
-      </router-link>
+        <span>{{ profile.coverImageUrl ? 'Edit cover' : 'Add cover photo' }}</span>
+      </button>
     </div>
 
     <div class="profile-header__identity">
-      <div
-        class="profile-header__ring"
-        :class="{ 'profile-header__ring--story': hasActiveStory }"
-      >
+      <div class="profile-header__ring" :class="{ 'profile-header__ring--story': hasActiveStory }">
         <span class="profile-header__inner">
           <UserAvatar :user="summary" :size="112" />
         </span>
@@ -37,11 +24,7 @@
         <span>{{ profile.city }}</span>
       </p>
       <p v-if="profile.bio" class="profile-header__bio">{{ profile.bio }}</p>
-      <router-link
-        v-else-if="editable"
-        to="/profile/edit"
-        class="profile-header__add-bio"
-      >
+      <router-link v-else-if="editable" to="/profile/edit" class="profile-header__add-bio">
         <ion-icon :icon="addOutline" aria-hidden="true" />
         Add a bio
       </router-link>
@@ -50,21 +33,28 @@
     <div class="profile-header__actions">
       <slot name="actions" />
     </div>
+    <CoverPhotoModal
+      v-if="editable"
+      :is-open="coverOpen"
+      :current-url="profile.coverImageUrl"
+      @close="coverOpen = false"
+    />
   </section>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import { IonIcon } from '@ionic/vue';
 import { addOutline, cameraOutline, locationOutline } from 'ionicons/icons';
 import UserAvatar from '@/components/common/UserAvatar.vue';
 import type { ProfileIdentity } from '@/types/profile';
 import { toUserSummary } from '@/utils/display-name';
+import CoverPhotoModal from './CoverPhotoModal.vue';
 
 const props = withDefaults(
   defineProps<{
     profile: ProfileIdentity;
-    /** The owner's own header links cover and bio to Edit Profile. */
+    /** The owner's header can change its cover and edit its bio. */
     editable?: boolean;
     hasActiveStory?: boolean;
   }>(),
@@ -72,6 +62,7 @@ const props = withDefaults(
 );
 
 const summary = computed(() => toUserSummary(props.profile));
+const coverOpen = ref(false);
 </script>
 
 <style scoped>
@@ -95,6 +86,9 @@ const summary = computed(() => toUserSummary(props.profile));
 }
 
 .profile-header__cover-edit {
+  border: 0;
+  font-family: inherit;
+  cursor: pointer;
   position: absolute;
   right: 12px;
   bottom: 12px;

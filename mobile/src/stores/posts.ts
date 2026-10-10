@@ -1,8 +1,11 @@
 import { defineStore } from 'pinia';
+import { ApiError } from '@/services/api-client';
 import { computed, ref, watch } from 'vue';
 import { fetchPosts, publishPost, updatePostTags, updatePostVisibility } from '@/services/post.service';
 import {
   createPost as createPostRequest,
+  getPost,
+  recordPostShare,
   deletePost as deletePostRequest,
   listFeed,
   listUserPosts,
@@ -23,10 +26,10 @@ import { useFriendsStore } from './friends';
 import type { LoadStatus } from './sports';
 import { useSportsStore } from './sports';
 import { useSessionStore } from './session';
+import { preparePostPhoto } from '@/utils/post-photos';
 
 export const POST_UNAVAILABLE_MESSAGE = 'This post is no longer available.';
 export const DEMO_PEOPLE_MESSAGE = 'Saved posts can only tag or include GORA accounts.';
-export const PHOTOS_LATER_MESSAGE = 'Photo uploads are not available yet. Remove the photos to post.';
 
 /** The server writes its 403 messages for people ("Only the author can edit this post."). */
 const describePostError = (caught: unknown): string => describeContentError(caught, POST_UNAVAILABLE_MESSAGE);
@@ -257,7 +260,7 @@ export const usePostsStore = defineStore('posts', () => {
     return sportsStore.activeSports.find((sport) => sport.name === name)?.id ?? null;
   }
 
-  async function publish(author: UserSummary, draft: PostDraft): Promise<FeedPost | null> {
+  async function publish(author: UserSummary, draft: PostDraft, files: File[] = []): Promise<FeedPost | null> {
     const isCurrent = captureSession(auth);
     publishError.value = null;
 
@@ -271,8 +274,8 @@ export const usePostsStore = defineStore('posts', () => {
       return post;
     }
 
-    if (draft.photoUrls.length > 0) {
-      publishError.value = PHOTOS_LATER_MESSAGE;
+    if (draft.photoUrls.length !== files.length) {
+      publishError.value = 'Choose your photos again before posting.';
       return null;
     }
 
@@ -284,11 +287,18 @@ export const usePostsStore = defineStore('posts', () => {
     }
 
     try {
+      const photos: string[] = [];
+      // Sequential preparation bounds memory on phones.
+      for (const file of files) {
+        photos.push(await preparePostPhoto(file));
+        if (!isCurrent()) return null;
+      }
       const sportId = await sportIdFor(draft.sport);
       if (!isCurrent()) return null;
       const created = await authorized((token) =>
         createPostRequest(token, {
           caption: draft.body.trim(),
+          ...(photos.length ? { photos } : {}),
           visibility: draft.visibility,
           ...(sportId ? { sportId } : {}),
           ...(draft.visibility === 'CUSTOM' ? { customViewerIds: draft.customViewerIds } : {}),
@@ -301,8 +311,25 @@ export const usePostsStore = defineStore('posts', () => {
       friendPosts.value = [post, ...friendPosts.value];
       return post;
     } catch (caught) {
-      if (isCurrent()) publishError.value = describePostError(caught);
+      if (isCurrent())
+        publishError.value =
+          caught instanceof Error && !(caught instanceof ApiError) ? caught.message : describePostError(caught);
       return null;
+    }
+  }
+
+  async function loadPost(postId: string): Promise<FeedPost> {
+    const result = toFeedPost(await authorized((token) => getPost(token, postId)));
+    rememberProfilePosts([result]);
+    return result;
+  }
+
+  async function share(postId: string): Promise<string | null> {
+    try {
+      replacePost(toFeedPost(await authorized((token) => recordPostShare(token, postId))));
+      return null;
+    } catch (caught) {
+      return describePostError(caught);
     }
   }
 
@@ -315,7 +342,7 @@ export const usePostsStore = defineStore('posts', () => {
       return 'Only the author can edit this post.';
     }
 
-    const error = validatePostEdit(edit);
+    const error = validatePostEdit(edit, post.media.length > 0);
 
     if (error) {
       return error;
@@ -519,5 +546,7 @@ export const usePostsStore = defineStore('posts', () => {
     toggleLike,
     findPost,
     rememberProfilePosts,
+    loadPost,
+    share,
   };
 });

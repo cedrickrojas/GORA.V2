@@ -10,87 +10,85 @@
 
     <ion-content>
       <form class="create-post" @submit.prevent="publish">
-        <div v-if="author" class="create-post__author">
-          <UserAvatar :user="author" :size="42" />
-          <span class="create-post__author-meta">
-            <strong>{{ author.displayName }}</strong>
-            <span class="create-post__privacy">{{ privacy.emoji }} {{ privacy.label }}</span>
-          </span>
-        </div>
+        <fieldset class="create-post__fields" :disabled="isPublishing">
+          <div v-if="author" class="create-post__author">
+            <UserAvatar :user="author" :size="42" />
+            <span class="create-post__author-meta">
+              <strong>{{ author.displayName }}</strong>
+              <span class="create-post__privacy">{{ privacy.emoji }} {{ privacy.label }}</span>
+            </span>
+          </div>
 
-        <label class="create-post__label" for="create-post-caption">Caption</label>
-        <textarea
-          id="create-post-caption"
-          v-model="caption"
-          class="create-post__caption"
-          rows="4"
-          :maxlength="POST_CAPTION_MAX_LENGTH"
-          placeholder="How did the game go?"
-        />
-        <span class="create-post__counter">{{ caption.length }}/{{ POST_CAPTION_MAX_LENGTH }}</span>
+          <label class="create-post__label" for="create-post-caption">Caption</label>
+          <textarea
+            id="create-post-caption"
+            v-model="caption"
+            class="create-post__caption"
+            rows="4"
+            :maxlength="POST_CAPTION_MAX_LENGTH"
+            placeholder="How did the game go?"
+          />
+          <span class="create-post__counter">{{ caption.length }}/{{ POST_CAPTION_MAX_LENGTH }}</span>
 
-        <span class="create-post__label">Photos</span>
-        <p v-if="postsStore.savesToServer" class="create-post__note">
-          📷 Photo uploads come later. Your post is saved with its caption, sport, privacy, and location.
-        </p>
-        <div v-else class="create-post__photos">
-          <div v-for="(photo, index) in photos" :key="photo.url" class="create-post__photo">
-            <img :src="photo.url" :alt="`Selected photo ${index + 1}`" />
-            <button
-              type="button"
-              class="create-post__remove"
-              :aria-label="`Remove photo ${index + 1}`"
-              @click="removePhoto(index)"
-            >
-              <ion-icon :icon="close" aria-hidden="true" />
+          <span class="create-post__label">Photos</span>
+          <div class="create-post__photos">
+            <div v-for="(photo, index) in photos" :key="photo.url" class="create-post__photo">
+              <img :src="photo.url" :alt="`Selected photo ${index + 1}`" />
+              <button
+                type="button"
+                class="create-post__remove"
+                :aria-label="`Remove photo ${index + 1}`"
+                @click="removePhoto(index)"
+              >
+                <ion-icon :icon="close" aria-hidden="true" />
+              </button>
+            </div>
+            <label v-if="photos.length < POST_PHOTO_LIMIT" class="create-post__add">
+              <ion-icon :icon="imagesOutline" aria-hidden="true" />
+              <span>Add photos</span>
+              <input type="file" accept="image/*" multiple class="create-post__file" @change="addPhotos" />
+            </label>
+          </div>
+          <span class="create-post__counter"> {{ photos.length }}/{{ POST_PHOTO_LIMIT }} photos </span>
+          <p v-if="photoError" class="create-post__error" role="alert">{{ photoError }}</p>
+
+          <div class="create-post__extras">
+            <button type="button" class="create-post__extra" @click="isTagging = true">
+              <span aria-hidden="true">👤</span> Tag People
+            </button>
+            <button type="button" class="create-post__extra" @click="isPickingLocation = true">
+              <span aria-hidden="true">📍</span> Add Location
             </button>
           </div>
-          <label v-if="photos.length < POST_PHOTO_LIMIT" class="create-post__add">
-            <ion-icon :icon="imagesOutline" aria-hidden="true" />
-            <span>Add photos</span>
-            <input type="file" accept="image/*" multiple class="create-post__file" @change="addPhotos" />
-          </label>
-        </div>
-        <span v-if="!postsStore.savesToServer" class="create-post__counter">
-          {{ photos.length }}/{{ POST_PHOTO_LIMIT }} photos · videos come later
-        </span>
+          <div v-if="taggedPeople.length > 0 || location" class="create-post__chips">
+            <span v-if="taggedPeople.length > 0" class="create-post__chip">
+              with {{ taggedPeople.map((person) => person.displayName).join(', ') }}
+              <button type="button" aria-label="Remove tags" @click="taggedUserIds = []">
+                <ion-icon :icon="close" aria-hidden="true" />
+              </button>
+            </span>
+            <span v-if="location" class="create-post__chip">
+              📍 {{ location.name }}
+              <button type="button" aria-label="Remove location" @click="location = null">
+                <ion-icon :icon="close" aria-hidden="true" />
+              </button>
+            </span>
+          </div>
 
-        <div class="create-post__extras">
-          <button type="button" class="create-post__extra" @click="isTagging = true">
-            <span aria-hidden="true">👤</span> Tag People
+          <label class="create-post__label" for="create-post-sport">Sport</label>
+          <select id="create-post-sport" v-model="sport" class="create-post__select">
+            <option v-for="option in sportOptions" :key="option" :value="option">{{ option }}</option>
+          </select>
+
+          <span class="create-post__label">Privacy</span>
+          <PostAudiencePicker v-model:visibility="visibility" v-model:custom-viewer-ids="customViewerIds" />
+          <p v-if="audienceError && visibility === 'CUSTOM'" class="create-post__hint">{{ audienceError }}</p>
+          <p v-if="postsStore.publishError" class="create-post__error" role="alert">{{ postsStore.publishError }}</p>
+
+          <button type="submit" class="create-post__submit" :disabled="!canPublish || isPublishing">
+            {{ isPublishing ? 'Posting…' : 'Publish' }}
           </button>
-          <button type="button" class="create-post__extra" @click="isPickingLocation = true">
-            <span aria-hidden="true">📍</span> Add Location
-          </button>
-        </div>
-        <div v-if="taggedPeople.length > 0 || location" class="create-post__chips">
-          <span v-if="taggedPeople.length > 0" class="create-post__chip">
-            with {{ taggedPeople.map((person) => person.displayName).join(', ') }}
-            <button type="button" aria-label="Remove tags" @click="taggedUserIds = []">
-              <ion-icon :icon="close" aria-hidden="true" />
-            </button>
-          </span>
-          <span v-if="location" class="create-post__chip">
-            📍 {{ location.name }}
-            <button type="button" aria-label="Remove location" @click="location = null">
-              <ion-icon :icon="close" aria-hidden="true" />
-            </button>
-          </span>
-        </div>
-
-        <label class="create-post__label" for="create-post-sport">Sport</label>
-        <select id="create-post-sport" v-model="sport" class="create-post__select">
-          <option v-for="option in sportOptions" :key="option" :value="option">{{ option }}</option>
-        </select>
-
-        <span class="create-post__label">Privacy</span>
-        <PostAudiencePicker v-model:visibility="visibility" v-model:custom-viewer-ids="customViewerIds" />
-        <p v-if="audienceError && visibility === 'CUSTOM'" class="create-post__hint">{{ audienceError }}</p>
-        <p v-if="postsStore.publishError" class="create-post__error" role="alert">{{ postsStore.publishError }}</p>
-
-        <button type="submit" class="create-post__submit" :disabled="!canPublish || isPublishing">
-          Publish
-        </button>
+        </fieldset>
       </form>
 
       <TagPeopleModal :is-open="isTagging" :initial-ids="taggedUserIds" :save="setTags" @close="isTagging = false" />
@@ -125,10 +123,11 @@ import { POST_CAPTION_MAX_LENGTH, POST_PHOTO_LIMIT, canPublishPost } from '@/uti
 import { showNotice } from '@/utils/notice';
 import { validatePostTags } from '@/utils/post-details';
 import { getPrivacyOption, validatePostAudience } from '@/utils/post-privacy';
+import { POST_PHOTO_SOURCE_MAX_BYTES } from '@/utils/post-photos';
 
 interface SelectedPhoto {
-  /** Local preview only; the upload service will return the stored URL. */
   url: string;
+  file: File;
 }
 
 const router = useRouter();
@@ -147,6 +146,7 @@ const customViewerIds = ref<string[]>([]);
 const taggedUserIds = ref<string[]>([]);
 const location = ref<PostLocation | null>(null);
 const photos = ref<SelectedPhoto[]>([]);
+const photoError = ref<string | null>(null);
 const isPublishing = ref(false);
 const isTagging = ref(false);
 const isPickingLocation = ref(false);
@@ -204,11 +204,17 @@ const canPublish = computed(() => author.value !== null && canPublishPost(draft.
 function addPhotos(event: Event): void {
   const input = event.target as HTMLInputElement;
   const room = POST_PHOTO_LIMIT - photos.value.length;
-  const files = Array.from(input.files ?? [])
-    .filter((file) => file.type.startsWith('image/'))
-    .slice(0, room);
+  const selected = Array.from(input.files ?? []);
+  const valid = selected.filter((file) => file.type.startsWith('image/') && file.size <= POST_PHOTO_SOURCE_MAX_BYTES);
+  photoError.value =
+    valid.length !== selected.length
+      ? 'Choose images smaller than 20 MB.'
+      : selected.length > room
+        ? `You can add up to ${POST_PHOTO_LIMIT} photos.`
+        : null;
+  const files = valid.slice(0, room);
 
-  photos.value = [...photos.value, ...files.map((file) => ({ url: URL.createObjectURL(file) }))];
+  photos.value = [...photos.value, ...files.map((file) => ({ url: URL.createObjectURL(file), file }))];
   input.value = '';
 }
 
@@ -226,18 +232,24 @@ function resetForm(): void {
   customViewerIds.value = [];
   taggedUserIds.value = [];
   location.value = null;
+  photos.value.forEach((photo) => URL.revokeObjectURL(photo.url));
   photos.value = [];
+  photoError.value = null;
 }
 
 async function publish(): Promise<void> {
-  if (!canPublish.value || !author.value) {
+  if (!canPublish.value || !author.value || isPublishing.value) {
     return;
   }
 
   isPublishing.value = true;
 
   try {
-    const post = await postsStore.publish(author.value, draft.value);
+    const post = await postsStore.publish(
+      author.value,
+      draft.value,
+      photos.value.map((photo) => photo.file),
+    );
 
     if (post) {
       resetForm();
@@ -263,6 +275,9 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
+.create-post__fields {
+  display: contents;
+}
 .create-post {
   display: flex;
   flex-direction: column;

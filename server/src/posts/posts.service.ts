@@ -10,6 +10,7 @@ import { AudienceService } from '../social/audience.service';
 import { RelationshipService } from '../social/relationship.service';
 import { AUTHOR_SELECT } from '../users/user.types';
 import { UsersService } from '../users/users.service';
+import { PostPhotosService } from './post-photos.service';
 import type {
   CreatePostDto,
   ListPostsQueryDto,
@@ -48,11 +49,23 @@ function postSelect(viewerId: string) {
     updatedAt: true,
     user: { select: AUTHOR_SELECT },
     sport: { select: { id: true, name: true } },
-    _count: { select: { likes: true, comments: true, shares: true } },
+    _count: {
+      select: {
+        likes: true,
+        comments: { where: { user: visibleTaggedUserWhere(viewerId) } },
+        shares: true,
+      },
+    },
     likes: { where: { userId: viewerId }, select: { id: true } },
     media: {
       orderBy: { sortOrder: 'asc' },
-      select: { id: true, mediaType: true, mediaUrl: true, thumbnailUrl: true },
+      select: {
+        id: true,
+        mediaType: true,
+        mediaUrl: true,
+        thumbnailUrl: true,
+        contentType: true,
+      },
     },
     tags: {
       where: { user: visibleTaggedUserWhere(viewerId) },
@@ -83,9 +96,15 @@ export class PostsService {
     private readonly usersService: UsersService,
     private readonly relationships: RelationshipService,
     private readonly audience: AudienceService,
+    private readonly photos: PostPhotosService,
   ) {}
 
   async create(authorId: string, dto: CreatePostDto): Promise<PostView> {
+    const media = (dto.photos ?? []).map((photo, index) =>
+      this.photos.decode(photo, index),
+    );
+    if (!dto.caption?.trim() && media.length === 0)
+      throw new BadRequestException('Write something or add a photo to post.');
     const viewerIds = await this.resolveAudience(
       authorId,
       dto.visibility,
@@ -100,7 +119,8 @@ export class PostsService {
     const post = await this.prisma.post.create({
       data: {
         userId: authorId,
-        caption: dto.caption,
+        caption: dto.caption?.trim() || null,
+        media: media.length ? { create: media } : undefined,
         visibility: dto.visibility,
         sportId: dto.sportId,
         locationName: dto.location?.name,
@@ -132,6 +152,78 @@ export class PostsService {
     }
 
     return this.toView(post, viewerId);
+  }
+
+  async listComments(
+    viewerId: string,
+    postId: string,
+    query: ListPostsQueryDto,
+  ) {
+    await this.findVisible(viewerId, postId);
+    const limit = query.limit ?? 30;
+    const comments = await this.prisma.postComment.findMany({
+      where: { postId, user: visibleTaggedUserWhere(viewerId) },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      take: limit + 1,
+      ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
+      select: {
+        id: true,
+        content: true,
+        createdAt: true,
+        user: { select: AUTHOR_SELECT },
+      },
+    });
+    return {
+      comments: comments
+        .slice(0, limit)
+        .map(({ user, ...comment }) => ({ ...comment, author: user })),
+      nextCursor: comments.length > limit ? comments[limit - 1].id : null,
+    };
+  }
+
+  async addComment(viewerId: string, postId: string, content: string) {
+    await this.findVisible(viewerId, postId);
+    const { user, ...comment } = await this.prisma.postComment.create({
+      data: { postId, userId: viewerId, content },
+      select: {
+        id: true,
+        content: true,
+        createdAt: true,
+        user: { select: AUTHOR_SELECT },
+      },
+    });
+    return {
+      comment: { ...comment, author: user },
+      post: await this.findVisible(viewerId, postId),
+    };
+  }
+
+  async deleteComment(
+    viewerId: string,
+    postId: string,
+    commentId: string,
+  ): Promise<PostView> {
+    const post = await this.findVisible(viewerId, postId);
+    const comment = await this.prisma.postComment.findFirst({
+      where: { id: commentId, postId, user: visibleTaggedUserWhere(viewerId) },
+      select: { userId: true },
+    });
+    if (!comment) throw new NotFoundException('Comment not found.');
+    if (comment.userId !== viewerId && post.author.id !== viewerId)
+      throw new ForbiddenException(
+        'Only the comment or post author can delete this comment.',
+      );
+    await this.prisma.postComment.deleteMany({
+      where: { id: commentId, postId },
+    });
+    return this.findVisible(viewerId, postId);
+  }
+
+  /** A completed link share records an event without changing the post's audience. */
+  async share(viewerId: string, postId: string): Promise<PostView> {
+    await this.findVisible(viewerId, postId);
+    await this.prisma.postShare.create({ data: { postId, userId: viewerId } });
+    return this.findVisible(viewerId, postId);
   }
 
   /** Idempotent reactions; hidden and deleted posts use the same 404 as reads. */
@@ -201,6 +293,14 @@ export class PostsService {
       postId,
       'Only the author can edit this post.',
     );
+
+    if (
+      dto.caption !== undefined &&
+      !dto.caption.trim() &&
+      current._count.media === 0
+    ) {
+      throw new BadRequestException('Write something or add a photo to post.');
+    }
 
     if (dto.sportId) {
       await this.assertSportExists(dto.sportId);
@@ -384,7 +484,7 @@ export class PostsService {
         locationName: true,
         latitude: true,
         longitude: true,
-        _count: { select: { customViewers: true } },
+        _count: { select: { customViewers: true, media: true } },
       },
     });
 
@@ -460,6 +560,12 @@ export class PostsService {
     } = post;
     const view: PostView = {
       ...fields,
+      media: fields.media.map(({ contentType, ...item }) => ({
+        ...item,
+        mediaUrl: contentType
+          ? this.photos.url(post.id, item.id, viewerId)
+          : item.mediaUrl,
+      })),
       author: user,
       likeCount: _count.likes,
       commentCount: _count.comments,

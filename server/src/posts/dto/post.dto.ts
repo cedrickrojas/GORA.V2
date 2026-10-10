@@ -81,12 +81,19 @@ class TaggedUsersDto {
 }
 
 export class CreatePostDto extends PostAudienceDto {
-  /** Text is required until media uploads exist. */
+  /** A caption or at least one photo is required by the service. */
+  @IsOptional()
   @Transform(trim)
   @IsString()
-  @IsNotEmpty({ message: 'Write something to post.' })
   @MaxLength(POST_CAPTION_MAX_LENGTH)
-  caption!: string;
+  caption?: string;
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(10)
+  @IsString({ each: true })
+  @MaxLength(349600, { each: true })
+  photos?: string[];
 
   @IsOptional()
   @IsUUID('all', { message: 'sportId must be a sport id.' })
@@ -111,13 +118,12 @@ export class CreatePostDto extends PostAudienceDto {
 
 /**
  * Edit Post: only the fields that are sent change. `sportId: null` and `location: null`
- * remove the sport or the location; the caption can be changed but never emptied.
+ * remove the sport or the location. A photo post may have an empty caption.
  */
 export class UpdatePostDto {
   @ValidateIf((_, value) => value !== undefined)
   @Transform(trim)
   @IsString({ message: 'Write something to post.' })
-  @IsNotEmpty({ message: 'Write something to post.' })
   @MaxLength(POST_CAPTION_MAX_LENGTH)
   caption?: string;
 
@@ -153,4 +159,12 @@ export class ListPostsQueryDto {
   @IsOptional()
   @IsUUID('all')
   cursor?: string;
+}
+
+export class CreatePostCommentDto {
+  @Transform(trim)
+  @IsString()
+  @IsNotEmpty({ message: 'Write a comment.' })
+  @MaxLength(2200)
+  content!: string;
 }

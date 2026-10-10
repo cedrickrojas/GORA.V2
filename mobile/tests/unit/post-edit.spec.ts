@@ -1,7 +1,7 @@
 import { createPinia, setActivePinia } from 'pinia';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { useAuthStore } from '@/stores/auth';
-import { DEMO_PEOPLE_MESSAGE, PHOTOS_LATER_MESSAGE, usePostsStore } from '@/stores/posts';
+import { DEMO_PEOPLE_MESSAGE, usePostsStore } from '@/stores/posts';
 import type { ApiPost, PostDraft } from '@/types/post';
 import { toFeedPost, validatePostEdit } from '@/utils/post-api';
 
@@ -288,13 +288,13 @@ describe('posts stored in the database', () => {
     expect(store.myPosts[0].id).toBe('77777777-7777-4777-8777-777777777777');
   });
 
-  test('photos and demo people are refused before anything is sent', async () => {
+  test('missing photo files and demo people are refused before anything is sent', async () => {
     const calls = fakeApi();
     const store = usePostsStore();
     await store.load();
 
     expect(await store.publish(store.me!, draft({ photoUrls: ['blob:photo'] }))).toBeNull();
-    expect(store.publishError).toBe(PHOTOS_LATER_MESSAGE);
+    expect(store.publishError).toBe('Choose your photos again before posting.');
     expect(await store.publish(store.me!, draft({ taggedUserIds: ['user-maria'] }))).toBeNull();
     expect(store.publishError).toBe(DEMO_PEOPLE_MESSAGE);
     expect(calls.some((call) => call.method === 'POST')).toBe(false);

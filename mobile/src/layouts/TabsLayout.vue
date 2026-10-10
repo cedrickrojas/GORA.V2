@@ -86,7 +86,7 @@ const clubChatStore = useClubChatStore();
 
 const showSidebars = computed(() => SIDEBAR_PATHS.includes(route.path));
 // Conversation pages keep the composer directly above the keyboard.
-const isMessageThread = computed(() => ['chat-thread', 'chat-request', 'club-chat'].includes(String(route.name)));
+const isMessageThread = computed(() => ['chat-thread', 'chat-request', 'club-chat', 'post-details'].includes(String(route.name)));
 
 // An API call that got 401 (expired or revoked token) ends the session; return to Log In
 // and come back to this page afterwards.

@@ -35,6 +35,11 @@ export const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true },
     children: [
       {
+        path: 'posts/:postId',
+        name: 'post-details',
+        component: () => import('../views/PostDetailsPage.vue'),
+      },
+      {
         path: 'home',
         name: 'home',
         component: () => import('../views/HomePage.vue'),

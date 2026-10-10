@@ -24,7 +24,7 @@ export interface UserProfile extends UserSummary {
   headline: string;
   /** Short intro under the name (User.bio, up to 160 characters). */
   bio: string | null;
-  /** Cover photo URL in external storage; null shows the default cover. */
+  /** Uploaded cover link or external image URL; null shows the default cover. */
   coverImageUrl: string | null;
   sports: SportProfile[];
   highlights: Highlight[];

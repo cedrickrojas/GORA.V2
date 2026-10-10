@@ -17,6 +17,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import type { CurrentUser as CurrentUserContext } from '../users/user.types';
 import {
   CreatePostDto,
+  CreatePostCommentDto,
   ListPostsQueryDto,
   UpdatePostDto,
   UpdatePostTagsDto,
@@ -33,6 +34,41 @@ const postIdPipe = new ParseUUIDPipe({
 @UseGuards(JwtAuthGuard)
 export class PostsController {
   constructor(private readonly postsService: PostsService) {}
+
+  @Get('posts/:postId/comments')
+  comments(
+    @CurrentUser() viewer: CurrentUserContext,
+    @Param('postId', postIdPipe) postId: string,
+    @Query() query: ListPostsQueryDto,
+  ) {
+    return this.postsService.listComments(viewer.id, postId, query);
+  }
+
+  @Post('posts/:postId/comments')
+  comment(
+    @CurrentUser() viewer: CurrentUserContext,
+    @Param('postId', postIdPipe) postId: string,
+    @Body() dto: CreatePostCommentDto,
+  ) {
+    return this.postsService.addComment(viewer.id, postId, dto.content);
+  }
+
+  @Delete('posts/:postId/comments/:commentId')
+  deleteComment(
+    @CurrentUser() viewer: CurrentUserContext,
+    @Param('postId', postIdPipe) postId: string,
+    @Param('commentId', postIdPipe) commentId: string,
+  ) {
+    return this.postsService.deleteComment(viewer.id, postId, commentId);
+  }
+
+  @Post('posts/:postId/shares')
+  share(
+    @CurrentUser() viewer: CurrentUserContext,
+    @Param('postId', postIdPipe) postId: string,
+  ) {
+    return this.postsService.share(viewer.id, postId);
+  }
 
   @Post('posts')
   create(

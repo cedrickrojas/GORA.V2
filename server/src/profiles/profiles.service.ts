@@ -16,6 +16,7 @@ import { visibleStoriesWhere } from '../stories/story-visibility';
 import { formatDisplayName } from '../users/display-name';
 import { PROFILE_USER_SELECT } from '../users/user.types';
 import type { UpdateProfileDto } from './dto/update-profile.dto';
+import { ProfileCoverService } from './profile-cover.service';
 import type {
   OwnProfileView,
   ProfileSections,
@@ -40,6 +41,7 @@ export class ProfilesService {
     private readonly prisma: PrismaService,
     private readonly relationships: RelationshipService,
     private readonly userSports: UserSportsService,
+    private readonly covers: ProfileCoverService,
   ) {}
 
   async getOwn(userId: string): Promise<OwnProfileView> {
@@ -98,7 +100,7 @@ export class ProfilesService {
 
     if (state === 'BLOCKED') {
       return {
-        ...this.toBase({ ...user, bio: null, city: null }, []),
+        ...this.toBase({ ...user, bio: null, city: null }, [], viewerId),
         isOwnProfile: false,
         relationship,
         stats: null,
@@ -113,7 +115,7 @@ export class ProfilesService {
     ]);
 
     return {
-      ...this.toBase(user, sports),
+      ...this.toBase(user, sports, viewerId),
       isOwnProfile: false,
       relationship,
       stats,
@@ -133,6 +135,9 @@ export class ProfilesService {
     }
     if (dto.coverImageUrl !== undefined) {
       data.coverImageUrl = dto.coverImageUrl;
+      data.coverPhotoData = null;
+      data.coverPhotoType = null;
+      data.coverPhotoRevision = null;
     }
     if (dto.dateOfBirth !== undefined) {
       data.dateOfBirth =
@@ -253,7 +258,11 @@ export class ProfilesService {
     return { posts, games, reels, stories, clubs, activity, badges };
   }
 
-  private toBase(user: ProfileUser, sports: UserSportView[]) {
+  private toBase(
+    user: ProfileUser,
+    sports: UserSportView[],
+    viewerId = user.id,
+  ) {
     return {
       id: user.id,
       username: user.username,
@@ -261,7 +270,12 @@ export class ProfilesService {
       lastName: user.lastName,
       displayName: formatDisplayName(user),
       profileImageUrl: user.profileImageUrl,
-      coverImageUrl: user.coverImageUrl,
+      coverImageUrl: this.covers.url(
+        user.coverImageUrl,
+        user.coverPhotoRevision,
+        user.id,
+        viewerId,
+      ),
       bio: user.bio,
       city: user.city,
       sports,

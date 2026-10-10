@@ -1,4 +1,12 @@
-import type { ApiPost, ApiPostPage, CreatePostInput, PostVisibility, UpdatePostInput } from '@/types/post';
+import type {
+  ApiPost,
+  ApiPostPage,
+  ApiPostComment,
+  ApiPostCommentPage,
+  CreatePostInput,
+  PostVisibility,
+  UpdatePostInput,
+} from '@/types/post';
 import { apiRequest } from './api-client';
 
 /**
@@ -8,6 +16,32 @@ import { apiRequest } from './api-client';
 
 const FEED_PAGE_SIZE = 50;
 const post = (postId: string) => `/posts/${encodeURIComponent(postId)}`;
+
+export function getPost(token: string, postId: string): Promise<ApiPost> {
+  return apiRequest<ApiPost>(post(postId), { token });
+}
+
+export function listPostComments(token: string, postId: string, cursor?: string): Promise<ApiPostCommentPage> {
+  const query = new URLSearchParams({ limit: '30' });
+  if (cursor) query.set('cursor', cursor);
+  return apiRequest<ApiPostCommentPage>(`${post(postId)}/comments?${query}`, { token });
+}
+
+export function addPostComment(
+  token: string,
+  postId: string,
+  content: string,
+): Promise<{ comment: ApiPostComment; post: ApiPost }> {
+  return apiRequest(`${post(postId)}/comments`, { method: 'POST', body: { content }, token });
+}
+
+export function deletePostComment(token: string, postId: string, commentId: string): Promise<ApiPost> {
+  return apiRequest(`${post(postId)}/comments/${encodeURIComponent(commentId)}`, { method: 'DELETE', token });
+}
+
+export function recordPostShare(token: string, postId: string): Promise<ApiPost> {
+  return apiRequest(`${post(postId)}/shares`, { method: 'POST', token });
+}
 
 export function listFeed(token: string, scope: 'ALL' | 'FRIENDS' = 'ALL', cursor?: string): Promise<ApiPostPage> {
   const query = new URLSearchParams({ limit: String(FEED_PAGE_SIZE), scope });

@@ -103,11 +103,24 @@ export interface ApiPostPage {
 
 export interface CreatePostInput {
   caption: string;
+  photos?: string[];
   visibility: PostVisibility;
   sportId?: string;
   customViewerIds?: string[];
   taggedUserIds?: string[];
   location?: PostLocation;
+}
+
+export interface ApiPostComment {
+  id: string;
+  content: string;
+  createdAt: string;
+  author: ApiPostPerson;
+}
+
+export interface ApiPostCommentPage {
+  comments: ApiPostComment[];
+  nextCursor: string | null;
 }
 
 /** PATCH /posts/:id: only the fields sent change; null removes the sport or the location. */

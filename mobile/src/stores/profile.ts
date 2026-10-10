@@ -1,7 +1,15 @@
 import { defineStore } from 'pinia';
 import { computed, ref, watch } from 'vue';
 import { fetchActivityStats, fetchBadges, fetchCurrentProfile } from '@/services/profile.service';
-import { getMyProfile, getProfile, updateMyProfile } from '@/services/profile-api.service';
+import {
+  getMyProfile,
+  getProfile,
+  updateMyProfile,
+  uploadMyCover,
+  removeMyCover,
+} from '@/services/profile-api.service';
+import { preparePostPhoto } from '@/utils/post-photos';
+import { ApiError } from '@/services/api-client';
 import type { Badge } from '@/types/achievement';
 import type { ActivityStats } from '@/types/activity';
 import type { OtherProfile, OwnProfile, ProfileUpdateInput, UserProfile, UserSportEntry } from '@/types/profile';
@@ -118,6 +126,25 @@ export const useProfileStore = defineStore('profile', () => {
     }
   }
 
+  async function updateCover(file: File | null): Promise<ActionResult> {
+    if (saving.value) return { ok: false, message: 'Please wait for the current change to finish.' };
+    const isCurrent = captureSession(auth);
+    saving.value = true;
+    try {
+      const photo = file ? await preparePostPhoto(file) : null;
+      if (!isCurrent()) return { ok: false, message: 'The account changed. Try again.' };
+      currentProfile.value = await authorized((token) => (photo ? uploadMyCover(token, photo) : removeMyCover(token)));
+      return { ok: true };
+    } catch (caught) {
+      return {
+        ok: false,
+        message: caught instanceof Error && !(caught instanceof ApiError) ? caught.message : describeApiError(caught),
+      };
+    } finally {
+      if (isCurrent()) saving.value = false;
+    }
+  }
+
   function setOwnSports(sports: UserSportEntry[]): void {
     if (currentProfile.value && currentProfile.value.sports !== sports) {
       currentProfile.value = { ...currentProfile.value, sports };
@@ -157,6 +184,7 @@ export const useProfileStore = defineStore('profile', () => {
     fetchMyProfile,
     fetchProfile,
     updateProfile,
+    updateCover,
     setOwnSports,
     profile,
     activityStats,

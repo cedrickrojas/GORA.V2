@@ -2,6 +2,7 @@ import type { ApiPost, FeedPost, PostEdit } from '@/types/post';
 import { toUserSummary } from './display-name';
 import { POST_CAPTION_MAX_LENGTH } from './feed';
 import { validatePostLocation } from './post-details';
+import { getApiBaseUrl } from '@/services/api-config';
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -23,7 +24,7 @@ export function toFeedPost(post: ApiPost): FeedPost {
     media: post.media.map((item) => ({
       id: item.id,
       type: item.mediaType === 'VIDEO' ? 'video' : 'image',
-      url: item.mediaUrl,
+      url: item.mediaUrl.startsWith('/') ? `${getApiBaseUrl()}${item.mediaUrl}` : item.mediaUrl,
     })),
     visibility: post.visibility,
     customViewerIds: post.customViewers?.map((viewer) => viewer.id),
@@ -40,10 +41,10 @@ export function toFeedPost(post: ApiPost): FeedPost {
 }
 
 /** The same rules as PATCH /posts/:id. Returns a message, or null when the edit is valid. */
-export function validatePostEdit(edit: PostEdit): string | null {
+export function validatePostEdit(edit: PostEdit, hasMedia = false): string | null {
   const caption = edit.body.trim();
 
-  if (caption.length === 0) {
+  if (caption.length === 0 && !hasMedia) {
     return 'Write something to post.';
   }
 

@@ -55,6 +55,7 @@ export const PROFILE_USER_SELECT = {
   lastName: true,
   profileImageUrl: true,
   coverImageUrl: true,
+  coverPhotoRevision: true,
   bio: true,
   city: true,
   dateOfBirth: true,

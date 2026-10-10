@@ -70,11 +70,7 @@
       class="post-card__media"
       :class="`post-card__media--${Math.min(availableMedia.length, MEDIA_PREVIEW_LIMIT)}`"
     >
-      <div
-        v-for="(item, index) in visibleMedia"
-        :key="item.id"
-        class="post-card__photo"
-      >
+      <div v-for="(item, index) in visibleMedia" :key="item.id" class="post-card__photo">
         <video
           v-if="item.type === 'video' && item.url"
           :src="item.url"
@@ -84,18 +80,47 @@
           preload="metadata"
           @error="failedMedia.add(item.id)"
         />
-        <img
+        <button
           v-else
-          :src="item.url ?? undefined"
-          :alt="`Photo ${index + 1} from ${post.author.displayName}`"
-          loading="lazy"
-          @error="failedMedia.add(item.id)"
-        />
+          type="button"
+          class="post-card__open-photo"
+          :aria-label="`Open photo ${index + 1}`"
+          @click="galleryOpen = true"
+        >
+          <img
+            :src="item.url ?? undefined"
+            :alt="`Photo ${index + 1} from ${post.author.displayName}`"
+            loading="lazy"
+            @error="failedMedia.add(item.id)"
+          />
+        </button>
         <span v-if="index === visibleMedia.length - 1 && hiddenMediaCount > 0" class="post-card__more">
           +{{ hiddenMediaCount }}
         </span>
       </div>
     </div>
+
+    <ion-modal :is-open="galleryOpen" @did-dismiss="galleryOpen = false">
+      <ion-header
+        ><ion-toolbar
+          ><ion-title>Photos</ion-title
+          ><ion-buttons slot="end"
+            ><ion-button @click="galleryOpen = false">Close</ion-button></ion-buttons
+          ></ion-toolbar
+        ></ion-header
+      >
+      <ion-content>
+        <div class="post-card__gallery">
+          <img
+            v-for="(item, index) in availableMedia.filter((photo) => photo.type === 'image')"
+            :key="item.id"
+            :src="item.url ?? undefined"
+            :alt="`Photo ${index + 1} from ${post.author.displayName}`"
+            loading="lazy"
+          />
+        </div>
+      </ion-content>
+    </ion-modal>
 
     <footer class="post-card__actions">
       <button
@@ -124,8 +149,19 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue';
-import { IonIcon, actionSheetController, alertController } from '@ionic/vue';
+import { computed, ref, watch } from 'vue';
+import {
+  IonIcon,
+  IonModal,
+  IonContent,
+  IonHeader,
+  IonToolbar,
+  IonTitle,
+  IonButtons,
+  IonButton,
+  actionSheetController,
+  alertController,
+} from '@ionic/vue';
 import {
   arrowRedoOutline,
   chatbubbleOutline,
@@ -174,6 +210,7 @@ const postsStore = usePostsStore();
 const isEditingPost = ref(false);
 const isEditingPrivacy = ref(false);
 const isEditingTags = ref(false);
+const galleryOpen = ref(false);
 
 /** Only the indicator is shown; the list of custom viewers never appears on the card. */
 const privacy = computed(() => getPrivacyOption(props.post.visibility));
@@ -257,12 +294,35 @@ async function confirmDelete(): Promise<void> {
 }
 
 const failedMedia = ref(new Set<string>());
+watch(() => props.post.media, () => { failedMedia.value = new Set(); });
 const availableMedia = computed(() => props.post.media.filter((item) => item.url && !failedMedia.value.has(item.id)));
 const visibleMedia = computed(() => availableMedia.value.slice(0, MEDIA_PREVIEW_LIMIT));
 const hiddenMediaCount = computed(() => availableMedia.value.length - visibleMedia.value.length);
 </script>
 
 <style scoped>
+.post-card__open-photo {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  border: 0;
+  padding: 0;
+  cursor: zoom-in;
+}
+.post-card__gallery {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+}
+.post-card__gallery img {
+  display: block;
+  width: 100%;
+  max-height: 80vh;
+  object-fit: contain;
+}
+.post-card__more {
+  pointer-events: none;
+}
 .post-card {
   overflow: hidden;
   border: 1px solid var(--gora-line);

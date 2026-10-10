@@ -8,6 +8,7 @@ import {
   Param,
   Patch,
   Post,
+  Put,
   UseGuards,
 } from '@nestjs/common';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
@@ -23,6 +24,8 @@ import type { CurrentUser as CurrentUserContext } from '../users/user.types';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import type { OwnProfileView, PublicProfileView } from './profile.types';
 import { ProfilesService } from './profiles.service';
+import { ProfileCoverService } from './profile-cover.service';
+import { UploadCoverDto } from './dto/upload-cover.dto';
 
 /**
  * Every write targets the signed-in user ("me"), so nobody can edit another profile:
@@ -35,7 +38,25 @@ export class ProfilesController {
   constructor(
     private readonly profiles: ProfilesService,
     private readonly userSports: UserSportsService,
+    private readonly covers: ProfileCoverService,
   ) {}
+
+  @Put('me/cover')
+  async uploadCover(
+    @CurrentUser() viewer: CurrentUserContext,
+    @Body() dto: UploadCoverDto,
+  ): Promise<OwnProfileView> {
+    await this.covers.save(viewer.id, dto.photo);
+    return this.profiles.getOwn(viewer.id);
+  }
+
+  @Delete('me/cover')
+  async removeCover(
+    @CurrentUser() viewer: CurrentUserContext,
+  ): Promise<OwnProfileView> {
+    await this.covers.remove(viewer.id);
+    return this.profiles.getOwn(viewer.id);
+  }
 
   @Get('me')
   getMe(@CurrentUser() viewer: CurrentUserContext): Promise<OwnProfileView> {
