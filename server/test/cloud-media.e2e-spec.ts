@@ -1,5 +1,6 @@
 import type { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
+import { ConfigService } from '@nestjs/config';
 import { randomBytes, randomUUID } from 'node:crypto';
 import request from 'supertest';
 import type { App } from 'supertest/types';
@@ -11,6 +12,11 @@ import { BlobGateway } from '../src/common/media/blob.gateway';
 const PNG = Buffer.from('89504e470d0a1a0a0000000d49484452', 'hex');
 const media = new Map<string, { bytes: Buffer; contentType: string }>();
 const blobs = {
+  put: jest.fn(
+    async (pathname: string, file: { buffer: Buffer; mimetype: string }) => {
+      media.set(pathname, { bytes: file.buffer, contentType: file.mimetype });
+    },
+  ),
   mint: jest.fn(async () => 'scoped-test-client-token'),
   head: jest.fn(async (pathname: string) => {
     const item = media.get(pathname)!;
@@ -148,6 +154,63 @@ describe('Direct private cloud uploads (database + mocked storage boundary)', ()
       size: 20,
       userId: users[1].id,
     }).expect(400);
+  });
+  it('keeps old multipart reel and story pages working on Vercel using private cloud files', async () => {
+    const config = app.get(ConfigService),
+      previous = config.get<unknown>('VERCEL');
+    config.set('VERCEL', '1');
+    try {
+      const bytes = Buffer.from(
+        '1a45dfa39f4286810142f7810142f2810442f381084282847765626d',
+        'hex',
+      );
+      const result = await http()
+        .post('/api/v1/reels/upload')
+        .auth(users[0].token, { type: 'bearer' })
+        .field('visibility', 'ONLY_ME')
+        .field('durationSeconds', '7')
+        .attach('video', bytes, {
+          filename: 'old-page.webm',
+          contentType: 'video/webm',
+        })
+        .expect(201);
+      const reel = result.body as { id: string; videoUrl: string };
+      expect(
+        (await prisma.reel.findUniqueOrThrow({ where: { id: reel.id } }))
+          .videoUrl,
+      ).toMatch(/^blob:/);
+      expect((await http().get(reel.videoUrl).expect(200)).body).toEqual(bytes);
+      const photoResult = await http()
+        .post('/api/v1/stories/upload')
+        .auth(users[0].token, { type: 'bearer' })
+        .field('visibility', 'ONLY_ME')
+        .field('mediaType', 'IMAGE')
+        .attach('media', PNG, {
+          filename: 'old-page.png',
+          contentType: 'image/png',
+        })
+        .expect(201);
+      const story = photoResult.body as { id: string; mediaUrl: string };
+      expect(
+        (await prisma.story.findUniqueOrThrow({ where: { id: story.id } }))
+          .mediaUrl,
+      ).toMatch(/^blob:/);
+      expect((await http().get(story.mediaUrl).expect(200)).body).toEqual(PNG);
+      const before = media.size;
+      await http()
+        .post('/api/v1/reels/upload')
+        .auth(users[0].token, { type: 'bearer' })
+        .field('visibility', 'CUSTOM')
+        .field('customViewerIds', JSON.stringify([randomUUID()]))
+        .attach('video', bytes, {
+          filename: 'rejected.webm',
+          contentType: 'video/webm',
+        })
+        .expect(400);
+      expect(media.size).toBe(before);
+    } finally {
+      config.set('VERCEL', previous);
+    }
   });
   it('shares only the owner upload once, persists it, and keeps completed media on late cancellation', async () => {
     const ticket = await photo();

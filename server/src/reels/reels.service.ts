@@ -77,7 +77,7 @@ export class ReelsService {
     dto: UploadReelDto,
     file: ReelVideoFile | undefined,
   ): Promise<ReelView> {
-    const videoUrl = await this.videos.save(file);
+    const videoUrl = await this.videos.save(file, 'VIDEO', authorId);
     try {
       return await this.create(authorId, { ...dto, videoUrl });
     } catch (error) {

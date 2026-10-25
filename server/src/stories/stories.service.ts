@@ -70,7 +70,7 @@ export class StoriesService {
     dto: UploadStoryDto,
     file: MediaUploadFile | undefined,
   ): Promise<StoryView> {
-    const mediaUrl = await this.media.save(file, dto.mediaType);
+    const mediaUrl = await this.media.save(file, dto.mediaType, authorId);
     try {
       return await this.create(authorId, { ...dto, mediaUrl });
     } catch (error) {

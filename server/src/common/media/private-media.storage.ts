@@ -56,6 +56,7 @@ export class PrivateMediaStorage {
   async save(
     file: MediaUploadFile | undefined,
     kind: 'IMAGE' | 'VIDEO' = 'VIDEO',
+    ownerId?: string,
   ): Promise<string> {
     const video = kind === 'VIDEO';
     if (!file || file.size === 0)
@@ -75,10 +76,13 @@ export class PrivateMediaStorage {
           ? 'Choose an MP4 or WebM video.'
           : 'Choose a JPEG, PNG, WebP or GIF photo.',
       );
-    if (this.config.get<string>('VERCEL'))
+    if (this.config.get<string>('VERCEL')) {
+      if (this.cloud && ownerId)
+        return this.cloud.saveFile(ownerId, this.resource, file, extension);
       throw new ServiceUnavailableException(
         'Please reload GORA to use cloud uploads.',
       );
+    }
     await mkdir(this.directory, { recursive: true });
     const name = `${randomUUID()}.${extension}`;
     const path = resolve(this.directory, name);

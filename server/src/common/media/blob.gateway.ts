@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { del, get, head } from '@vercel/blob';
+import { del, get, head, put } from '@vercel/blob';
+import type { MediaUploadFile } from './private-media.storage';
 import { generateClientTokenFromReadWriteToken } from '@vercel/blob/client';
 
 /** Kept separate so storage/network failures can be tested without real cloud data. */
@@ -23,6 +24,15 @@ export class BlobGateway {
   }
   head(pathname: string) {
     return head(pathname, { token: this.token });
+  }
+  put(pathname: string, file: MediaUploadFile) {
+    return put(pathname, file.buffer, {
+      access: 'private',
+      token: this.token,
+      contentType: file.mimetype,
+      addRandomSuffix: false,
+      allowOverwrite: false,
+    });
   }
   get(pathname: string, range?: string) {
     return get(pathname, {

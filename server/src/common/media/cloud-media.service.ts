@@ -14,7 +14,11 @@ import type { Prisma } from '../../generated/prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { BlobGateway } from './blob.gateway';
 import { MEDIA_TYPES, type StartMediaUploadDto } from './cloud-media.dto';
-import { PHOTO_MAX_BYTES, mediaExtension } from './private-media.storage';
+import {
+  PHOTO_MAX_BYTES,
+  mediaExtension,
+  type MediaUploadFile,
+} from './private-media.storage';
 
 const REF = /^blob:([a-f0-9-]{36})\.(jpg|png|webp|gif|mp4|webm)$/;
 const TTL = 15 * 60 * 1000;
@@ -91,6 +95,37 @@ export class CloudMediaService {
       clientToken,
       expiresAt: expiresAt.toISOString(),
     };
+  }
+  /** Compatibility for multipart pages opened before direct cloud uploads shipped.
+   * New clients continue to upload directly, including files over the Function limit.
+   */
+  async saveFile(
+    userId: string,
+    resource: MediaResource,
+    file: MediaUploadFile,
+    extension: string,
+  ): Promise<string> {
+    this.enabled();
+    const id = randomUUID(),
+      pathname = `gora/${resource}/${id}.${extension}`;
+    try {
+      await this.blobs.put(pathname, file);
+      await this.prisma.cloudMediaUpload.create({
+        data: {
+          id,
+          userId,
+          resource,
+          contentType: file.mimetype,
+          size: file.size,
+          expiresAt: new Date(Date.now() + TTL),
+          claimedAt: new Date(),
+        },
+      });
+    } catch (error) {
+      await this.blobs.remove(pathname).catch(() => undefined);
+      throw error;
+    }
+    return `blob:${id}.${extension}`;
   }
   async complete<T>(
     userId: string,
@@ -238,17 +273,15 @@ export class CloudMediaService {
         'Video seeking is temporarily unavailable.',
       );
     }
-    response
-      .status(range ? 206 : 200)
-      .set({
-        'Content-Type': meta.contentType,
-        'Content-Length': String(end - start + 1),
-        'Accept-Ranges': 'bytes',
-        'Cache-Control': 'private, no-store',
-        'X-Content-Type-Options': 'nosniff',
-        'Referrer-Policy': 'no-referrer',
-        ...(range ? { 'Content-Range': `bytes ${start}-${end}/${size}` } : {}),
-      });
+    response.status(range ? 206 : 200).set({
+      'Content-Type': meta.contentType,
+      'Content-Length': String(end - start + 1),
+      'Accept-Ranges': 'bytes',
+      'Cache-Control': 'private, no-store',
+      'X-Content-Type-Options': 'nosniff',
+      'Referrer-Policy': 'no-referrer',
+      ...(range ? { 'Content-Range': `bytes ${start}-${end}/${size}` } : {}),
+    });
     try {
       await pipeline(
         Readable.fromWeb(
