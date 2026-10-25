@@ -1,10 +1,15 @@
 import { HttpException, NotFoundException } from '@nestjs/common';
 import type { Response } from 'express';
+import type { PrivateMediaFile } from './private-media.storage';
 
 export async function sendPrivateMedia(
   response: Response,
-  file: { path: string; contentType: string },
+  file: PrivateMediaFile,
 ): Promise<void> {
+  if ('send' in file) {
+    await file.send(response);
+    return;
+  }
   await new Promise<void>((resolve, reject) =>
     response.sendFile(
       file.path,

@@ -13,9 +13,13 @@ import type {
   UpdateStoryDto,
   UpdateStoryVisibilityDto,
   UploadStoryDto,
+  CompleteStoryUploadDto,
 } from './dto/story.dto';
 import { StoryMediaStorage } from './story-media.storage';
-import type { MediaUploadFile } from '../common/media/private-media.storage';
+import type {
+  MediaUploadFile,
+  PrivateMediaFile,
+} from '../common/media/private-media.storage';
 import type { DeletedStoryView, StoryView } from './story.types';
 import { visibleStoriesWhere } from './story-visibility';
 
@@ -79,7 +83,7 @@ export class StoriesService {
   async uploadedMedia(
     viewerId: string,
     storyId: string,
-  ): Promise<{ path: string; contentType: string }> {
+  ): Promise<PrivateMediaFile> {
     const story = await this.prisma.story.findFirst({
       where: {
         AND: [{ id: storyId }, visibleStoriesWhere(viewerId, new Date())],
@@ -91,7 +95,20 @@ export class StoriesService {
     return this.media.file(story.mediaUrl);
   }
 
-  async create(authorId: string, dto: CreateStoryDto): Promise<StoryView> {
+  complete(authorId: string, dto: CompleteStoryUploadDto): Promise<StoryView> {
+    return this.media.complete(
+      authorId,
+      dto.uploadId,
+      dto.mediaType,
+      (mediaUrl, tx) => this.create(authorId, { ...dto, mediaUrl }, tx),
+    );
+  }
+
+  async create(
+    authorId: string,
+    dto: CreateStoryDto,
+    database: Prisma.TransactionClient = this.prisma,
+  ): Promise<StoryView> {
     const viewerIds = await this.audience.resolve(
       authorId,
       dto.visibility,
@@ -100,7 +117,7 @@ export class StoriesService {
     );
     const now = new Date();
 
-    const story = await this.prisma.story.create({
+    const story = await database.story.create({
       data: {
         userId: authorId,
         mediaType: dto.mediaType,

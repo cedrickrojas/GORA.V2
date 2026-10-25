@@ -11,6 +11,7 @@ datasource db {
 }
 
 model User {
+  cloudMediaUploads        CloudMediaUpload[]
   id                      String                    @id @default(uuid()) @db.Uuid
   username                String                    @unique
   email                   String                    @unique
@@ -1073,4 +1074,17 @@ enum ReportStatus {
   REVIEWING
   RESOLVED
   DISMISSED
+}
+
+model CloudMediaUpload {
+  id String @id @db.Uuid
+  userId String @db.Uuid
+  resource String
+  contentType String
+  size Int
+  expiresAt DateTime
+  claimedAt DateTime?
+  createdAt DateTime @default(now())
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([userId, claimedAt, expiresAt])
 }

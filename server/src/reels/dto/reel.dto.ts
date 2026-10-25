@@ -71,6 +71,11 @@ export class UploadReelDto extends ReelMetadataDto {
   declare customViewerIds?: string[];
 }
 
+export class CompleteReelUploadDto extends ReelMetadataDto {
+  @IsUUID()
+  uploadId!: string;
+}
+
 /** Edit reel: caption and sport. null (or a blank caption) removes the value. */
 export class UpdateReelDto {
   @Transform(trimToNull)

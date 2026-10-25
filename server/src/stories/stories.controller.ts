@@ -25,6 +25,7 @@ import {
   UpdateStoryDto,
   UpdateStoryVisibilityDto,
   UploadStoryDto,
+  CompleteStoryUploadDto,
 } from './dto/story.dto';
 import { STORY_NOT_FOUND_MESSAGE, StoriesService } from './stories.service';
 import type { DeletedStoryView, StoryView } from './story.types';
@@ -37,6 +38,14 @@ const storyIdPipe = new ParseUUIDPipe({
 @UseGuards(JwtAuthGuard)
 export class StoriesController {
   constructor(private readonly storiesService: StoriesService) {}
+
+  @Post('upload/complete')
+  complete(
+    @CurrentUser() viewer: CurrentUserContext,
+    @Body() dto: CompleteStoryUploadDto,
+  ) {
+    return this.storiesService.complete(viewer.id, dto);
+  }
 
   @Post('upload')
   @UseInterceptors(

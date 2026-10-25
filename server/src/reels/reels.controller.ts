@@ -25,6 +25,7 @@ import {
   UpdateReelDto,
   UpdateReelVisibilityDto,
   UploadReelDto,
+  CompleteReelUploadDto,
 } from './dto/reel.dto';
 import type { DeletedReelView, ReelPage, ReelView } from './reel.types';
 import { REEL_NOT_FOUND_MESSAGE, ReelsService } from './reels.service';
@@ -37,6 +38,14 @@ const reelIdPipe = new ParseUUIDPipe({
 @UseGuards(JwtAuthGuard)
 export class ReelsController {
   constructor(private readonly reelsService: ReelsService) {}
+
+  @Post('reels/upload/complete')
+  complete(
+    @CurrentUser() viewer: CurrentUserContext,
+    @Body() dto: CompleteReelUploadDto,
+  ) {
+    return this.reelsService.complete(viewer.id, dto);
+  }
 
   @Post('reels/upload')
   @UseInterceptors(

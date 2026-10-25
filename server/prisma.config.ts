@@ -14,6 +14,17 @@ export default defineConfig({
   },
   datasource: {
     // Read directly so `prisma generate` works before DATABASE_URL is set.
-    url: process.env.DATABASE_URL,
+    url: migrationUrl(),
   },
 });
+
+/** Migrations need a session connection; runtime traffic keeps using the pooler. */
+function migrationUrl(): string | undefined {
+  const configured =
+    process.env.DATABASE_URL_UNPOOLED || process.env.DATABASE_URL;
+  if (!configured) return undefined;
+  const url = new URL(configured);
+  if (url.hostname.endsWith('.neon.tech'))
+    url.hostname = url.hostname.replace('-pooler.', '.');
+  return url.toString();
+}

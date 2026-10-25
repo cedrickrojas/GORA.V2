@@ -29,7 +29,7 @@ GORA helps athletes find players, create games, and connect with each other. The
 - PostgreSQL
 - Prisma ORM
 
-Redis, object storage, video processing, and push notifications remain planned. Post location selection uses Leaflet/OpenStreetMap; the game discovery preview needs no key. Go Live uses native WebRTC and the API's authenticated signaling endpoints.
+Redis, video processing, and push notifications remain planned. Story and reel media use private object storage on Vercel. Post location selection uses Leaflet/OpenStreetMap; the game discovery preview needs no key. Go Live uses native WebRTC and the API's authenticated signaling endpoints.
 
 ## Project structure
 
@@ -140,7 +140,7 @@ vercel dev
 
 For local testing without a cloud login, use `vercel dev -L`. Supply the server environment settings as above (locally, `server/.env`). Check `/`, a frontend deep link such as `/login`, `/api/v1/health`, and an unknown `/api/v1/...` route (which must return the API's 404 response).
 
-Deployment limitation: story and reel uploads currently use local filesystem storage in `server/src/common/media/private-media.storage.ts` (10 MB photos, 50 MB videos). Vercel Functions do not provide durable local upload storage and impose request body size limits. Production uploads need durable object storage and direct browser uploads; changing a directory to `/tmp` will not make uploaded media persistent. This configuration does not migrate media storage. See [Vercel Services](https://vercel.com/docs/services), [bindings](https://vercel.com/docs/services/bindings), and [Functions limits](https://vercel.com/docs/functions/limitations).
+Story and reel uploads on Vercel use a connected **private Vercel Blob store**. Create/link a private store in the project's Storage tab (or `vercel blob create-store gora-private-media --access private --yes`); the server needs `BLOB_READ_WRITE_TOKEN`. Keep this secret out of `VITE_*` variables. The browser uploads directly to Blob using a short-lived token limited to one server-generated path, media type and size, then sends only metadata to the API. PostgreSQL stores the media reference, owner, audience and single-use upload ticket. No public media URL or full storage credential is sent to viewers. Playback streams through authenticated audience checks, including byte ranges for video, expiry and deletion. Local development without Blob credentials keeps the existing filesystem flow. Existing local files are not automatically copied to Blob. The deployment build applies `20261025140000_cloud_media_uploads`. Prisma migrations automatically use Neon's direct endpoint; optionally supply `DATABASE_URL_UNPOOLED` for other setups. Runtime queries keep using pooled `DATABASE_URL`.
 
 ## How to run the backend
 

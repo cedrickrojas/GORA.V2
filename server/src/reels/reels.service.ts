@@ -17,10 +17,12 @@ import type {
   UpdateReelDto,
   UpdateReelVisibilityDto,
   UploadReelDto,
+  CompleteReelUploadDto,
 } from './dto/reel.dto';
 import type { DeletedReelView, ReelPage, ReelView } from './reel.types';
 import { visibleReelsWhere } from './reel-visibility';
 import { ReelVideoStorage, type ReelVideoFile } from './reel-video.storage';
+import type { PrivateMediaFile } from '../common/media/private-media.storage';
 
 export const REEL_NOT_FOUND_MESSAGE = 'Reel not found.';
 const DEFAULT_PAGE_SIZE = 20;
@@ -91,7 +93,7 @@ export class ReelsService {
   async uploadedVideo(
     viewerId: string,
     reelId: string,
-  ): Promise<{ path: string; contentType: string }> {
+  ): Promise<PrivateMediaFile> {
     const reel = await this.prisma.reel.findFirst({
       where: { AND: [{ id: reelId }, visibleReelsWhere(viewerId)] },
       select: { videoUrl: true },
@@ -100,7 +102,20 @@ export class ReelsService {
     return this.videos.file(reel.videoUrl);
   }
 
-  async create(authorId: string, dto: CreateReelDto): Promise<ReelView> {
+  complete(authorId: string, dto: CompleteReelUploadDto): Promise<ReelView> {
+    return this.videos.complete(
+      authorId,
+      dto.uploadId,
+      'VIDEO',
+      (videoUrl, tx) => this.create(authorId, { ...dto, videoUrl }, tx),
+    );
+  }
+
+  async create(
+    authorId: string,
+    dto: CreateReelDto,
+    database: Prisma.TransactionClient = this.prisma,
+  ): Promise<ReelView> {
     const viewerIds = await this.audience.resolve(
       authorId,
       dto.visibility,
@@ -112,7 +127,7 @@ export class ReelsService {
       await this.assertActiveSport(dto.sportId);
     }
 
-    const reel = await this.prisma.reel.create({
+    const reel = await database.reel.create({
       data: {
         userId: authorId,
         videoUrl: dto.videoUrl,

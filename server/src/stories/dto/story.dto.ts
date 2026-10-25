@@ -1,5 +1,12 @@
 import { Transform } from 'class-transformer';
-import { IsIn, IsOptional, IsString, IsUrl, MaxLength } from 'class-validator';
+import {
+  IsIn,
+  IsOptional,
+  IsString,
+  IsUrl,
+  IsUUID,
+  MaxLength,
+} from 'class-validator';
 import type { StoryMediaType } from '../../generated/prisma/client';
 import {
   trim,
@@ -61,6 +68,11 @@ export class UploadStoryDto extends StoryMetadataDto {
     }
   })
   declare customViewerIds?: string[];
+}
+
+export class CompleteStoryUploadDto extends StoryMetadataDto {
+  @IsUUID()
+  uploadId!: string;
 }
 
 /** Edit story: only the caption. A blank caption (or null) removes it. */

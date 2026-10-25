@@ -15,6 +15,7 @@ import { UsersModule } from './users/users.module';
 import { DirectChatModule } from './chat/direct-chat.module';
 import { LiveModule } from './live/live.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { CloudMediaModule } from './common/media/cloud-media.module';
 
 @Module({
   imports: [
@@ -34,6 +35,7 @@ import { NotificationsModule } from './notifications/notifications.module';
     DirectChatModule,
     LiveModule,
     NotificationsModule,
+    CloudMediaModule,
   ],
 })
 export class AppModule {}
