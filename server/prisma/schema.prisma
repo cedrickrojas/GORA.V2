@@ -1,0 +1,1090 @@
+generator client {
+  provider            = "prisma-client"
+  output              = "../src/generated/prisma"
+  previewFeatures     = ["partialIndexes"]
+  importFileExtension = ""
+  moduleFormat        = "cjs"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  cloudMediaUploads        CloudMediaUpload[]
+  id                      String                    @id @default(uuid()) @db.Uuid
+  username                String                    @unique
+  email                   String                    @unique
+  passwordHash            String
+  firstName               String
+  lastName                String
+  createdAt               DateTime                  @default(now())
+  updatedAt               DateTime                  @updatedAt
+  bio                     String?
+  city                    String?
+  dateOfBirth             DateTime?                 @db.Date
+  isActive                Boolean                   @default(true)
+  profileImageUrl         String?
+  role                    UserRole                  @default(USER)
+  coverImageUrl           String?
+  coverPhotoData          Bytes?
+  coverPhotoType          String?
+  coverPhotoRevision      String?                   @db.Uuid
+  callsStarted            DirectCall[]              @relation("CallCaller")
+  callsReceived           DirectCall[]              @relation("CallCallee")
+  ownedClubs              Club[]                    @relation("ClubOwner")
+  clubFollows             ClubFollow[]
+  receivedClubInvites     ClubInvite[]              @relation("ClubInviteInvitee")
+  sentClubInvites         ClubInvite[]              @relation("ClubInviteInviter")
+  clubMemberships         ClubMember[]
+  conversations           ConversationParticipant[]
+  blockedFriendships      Friendship[]              @relation("FriendshipBlockedBy")
+  receivedFriendships     Friendship[]              @relation("FriendshipReceiver")
+  sentFriendships         Friendship[]              @relation("FriendshipRequester")
+  hostedGames             Game[]                    @relation("GameHost")
+  gameParticipants        GameParticipant[]
+  joinRequests            JoinRequest[]
+  hostedLiveStreams       LiveStream[]
+  liveViews               LiveViewer[]
+  sentMessages            Message[]
+  messageReactions        MessageReaction[]
+  receivedMessageRequests MessageRequest[]          @relation("MessageRequestReceiver")
+  sentMessageRequests     MessageRequest[]          @relation("MessageRequestSender")
+  actorNotifications      Notification[]            @relation("NotificationActor")
+  notifications           Notification[]            @relation("NotificationRecipient")
+  posts                   Post[]
+  postComments            PostComment[]
+  customViewerPosts       PostCustomViewer[]
+  postLikes               PostLike[]
+  postShares              PostShare[]
+  postTags                PostTag[]
+  reels                   Reel[]
+  reelComments            ReelComment[]
+  customViewerReels       ReelCustomViewer[]
+  reelLikes               ReelLike[]
+  reelShares              ReelShare[]
+  reelViews               ReelView[]
+  reportsReceived         Report[]                  @relation("ReportReportedUser")
+  reportsFiled            Report[]                  @relation("ReportReporter")
+  reportsResolved         Report[]                  @relation("ReportResolver")
+  stories                 Story[]
+  customViewerStories     StoryCustomViewer[]
+  storyViews              StoryView[]
+  badges                  UserBadge[]
+  following               UserFollow[]              @relation("UserFollowFollower")
+  followers               UserFollow[]              @relation("UserFollowFollowing")
+  sports                  UserSport[]
+
+  @@index([isActive])
+}
+
+model Sport {
+  id          String      @id @default(uuid()) @db.Uuid
+  name        String      @unique
+  description String?
+  iconUrl     String?
+  isActive    Boolean     @default(true)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  clubs       Club[]
+  clubSports  ClubSport[]
+  games       Game[]
+  posts       Post[]
+  reels       Reel[]
+  players     UserSport[]
+}
+
+model UserSport {
+  id         String     @id @default(uuid()) @db.Uuid
+  userId     String     @db.Uuid
+  sportId    String     @db.Uuid
+  position   String?
+  skillLevel SkillLevel @default(BEGINNER)
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+  sport      Sport      @relation(fields: [sportId], references: [id])
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, sportId])
+  @@index([sportId])
+}
+
+model Game {
+  id              String            @id @default(uuid()) @db.Uuid
+  hostId          String            @db.Uuid
+  sportId         String            @db.Uuid
+  title           String
+  description     String?
+  requiredPlayers Int
+  gameDate        DateTime          @db.Date
+  startTime       DateTime
+  endTime         DateTime?
+  locationName    String
+  latitude        Float?
+  longitude       Float?
+  status          GameStatus        @default(OPEN)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  clubId          String?           @db.Uuid
+  conversation    Conversation?
+  club            Club?             @relation(fields: [clubId], references: [id])
+  host            User              @relation("GameHost", fields: [hostId], references: [id])
+  sport           Sport             @relation(fields: [sportId], references: [id])
+  participants    GameParticipant[]
+  joinRequests    JoinRequest[]
+  liveStreams     LiveStream[]
+  notifications   Notification[]
+  reels           Reel[]
+  reports         Report[]
+
+  @@index([sportId])
+  @@index([hostId])
+  @@index([gameDate])
+  @@index([status])
+  @@index([sportId, gameDate, status])
+  @@index([latitude, longitude])
+  @@index([createdAt])
+  @@index([clubId, startTime])
+}
+
+model GameParticipant {
+  id          String            @id @default(uuid()) @db.Uuid
+  gameId      String            @db.Uuid
+  userId      String            @db.Uuid
+  status      ParticipantStatus @default(ACTIVE)
+  joinedAt    DateTime          @default(now())
+  completedAt DateTime?
+  game        Game              @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  user        User              @relation(fields: [userId], references: [id])
+
+  @@unique([gameId, userId])
+  @@index([userId])
+  @@index([gameId, status])
+  @@index([status])
+}
+
+model JoinRequest {
+  id            String            @id @default(uuid()) @db.Uuid
+  gameId        String            @db.Uuid
+  userId        String            @db.Uuid
+  message       String?
+  status        JoinRequestStatus @default(PENDING)
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+  respondedAt   DateTime?
+  game          Game              @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  user          User              @relation(fields: [userId], references: [id])
+  notifications Notification[]
+
+  @@unique([gameId, userId])
+  @@index([userId])
+  @@index([gameId, status])
+  @@index([status])
+}
+
+model Friendship {
+  id            String           @id @default(uuid()) @db.Uuid
+  requesterId   String           @db.Uuid
+  receiverId    String           @db.Uuid
+  pairKey       String           @unique
+  status        FriendshipStatus @default(PENDING)
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  blockedById   String?          @db.Uuid
+  blockedBy     User?            @relation("FriendshipBlockedBy", fields: [blockedById], references: [id], onDelete: Cascade)
+  receiver      User             @relation("FriendshipReceiver", fields: [receiverId], references: [id], onDelete: Cascade)
+  requester     User             @relation("FriendshipRequester", fields: [requesterId], references: [id], onDelete: Cascade)
+  notifications Notification[]
+
+  @@index([requesterId, status])
+  @@index([receiverId, status])
+  @@index([status])
+  @@index([blockedById])
+}
+
+model UserFollow {
+  id          String   @id @default(uuid()) @db.Uuid
+  followerId  String   @db.Uuid
+  followingId String   @db.Uuid
+  createdAt   DateTime @default(now())
+  follower    User     @relation("UserFollowFollower", fields: [followerId], references: [id], onDelete: Cascade)
+  following   User     @relation("UserFollowFollowing", fields: [followingId], references: [id], onDelete: Cascade)
+
+  @@unique([followerId, followingId])
+  @@index([followerId])
+  @@index([followingId])
+}
+
+model Club {
+  id                String             @id @default(uuid()) @db.Uuid
+  ownerId           String             @db.Uuid
+  name              String
+  slug              String             @unique
+  description       String?
+  profileImageUrl   String?
+  coverImageUrl     String?
+  sportId           String?            @db.Uuid
+  city              String?
+  locationName      String?
+  latitude          Float?
+  longitude         Float?
+  isPublic          Boolean            @default(true)
+  isActive          Boolean            @default(true)
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  about             String?
+  activityDay       ClubActivityDay?
+  activityEndTime   String?
+  activityStartTime String?
+  barangay          String?
+  contactEmail      String?
+  country           String?
+  facebookUrl       String?
+  homeCourt         String?
+  instagramUrl      String?
+  maxMembers        Int
+  membershipType    ClubMembershipType @default(OPEN)
+  tiktokUrl         String?
+  trainingSchedule  String?
+  websiteUrl        String?
+  owner             User               @relation("ClubOwner", fields: [ownerId], references: [id])
+  sport             Sport?             @relation(fields: [sportId], references: [id])
+  follows           ClubFollow[]
+  invites           ClubInvite[]
+  members           ClubMember[]
+  rules             ClubRule[]
+  additionalSports  ClubSport[]
+  tags              ClubTag[]
+  chat              Conversation?
+  games             Game[]
+  posts             Post[]
+  reels             Reel[]
+  reports           Report[]
+
+  @@index([ownerId])
+  @@index([sportId])
+  @@index([city])
+  @@index([isActive, isPublic])
+  @@index([latitude, longitude])
+  @@index([name])
+}
+
+model ClubMember {
+  id        String           @id @default(uuid()) @db.Uuid
+  clubId    String           @db.Uuid
+  userId    String           @db.Uuid
+  role      ClubMemberRole   @default(MEMBER)
+  status    ClubMemberStatus @default(PENDING)
+  joinedAt  DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+  club      Club             @relation(fields: [clubId], references: [id], onDelete: Cascade)
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([clubId, userId])
+  // Keep this partial index at model level so club membership remains one-to-many.
+  @@unique([clubId], map: "ClubMember_one_owner_idx", where: raw("(role = 'OWNER'::\"ClubMemberRole\")"))
+  @@index([clubId, status])
+  @@index([userId, status])
+}
+
+model ClubFollow {
+  id        String   @id @default(uuid()) @db.Uuid
+  clubId    String   @db.Uuid
+  userId    String   @db.Uuid
+  createdAt DateTime @default(now())
+  club      Club     @relation(fields: [clubId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([clubId, userId])
+  @@index([userId])
+}
+
+model ClubSport {
+  id        String   @id @default(uuid()) @db.Uuid
+  clubId    String   @db.Uuid
+  sportId   String   @db.Uuid
+  createdAt DateTime @default(now())
+  club      Club     @relation(fields: [clubId], references: [id], onDelete: Cascade)
+  sport     Sport    @relation(fields: [sportId], references: [id], onDelete: Cascade)
+
+  @@unique([clubId, sportId])
+  @@index([sportId])
+}
+
+model ClubTag {
+  id        String   @id @default(uuid()) @db.Uuid
+  clubId    String   @db.Uuid
+  tag       String
+  createdAt DateTime @default(now())
+  club      Club     @relation(fields: [clubId], references: [id], onDelete: Cascade)
+
+  @@unique([clubId, tag])
+  @@index([tag])
+}
+
+model ClubRule {
+  id        String   @id @default(uuid()) @db.Uuid
+  clubId    String   @db.Uuid
+  position  Int
+  text      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  club      Club     @relation(fields: [clubId], references: [id], onDelete: Cascade)
+
+  @@unique([clubId, position])
+}
+
+model ClubInvite {
+  id          String           @id @default(uuid()) @db.Uuid
+  clubId      String           @db.Uuid
+  inviterId   String           @db.Uuid
+  inviteeId   String           @db.Uuid
+  status      ClubInviteStatus @default(PENDING)
+  createdAt   DateTime         @default(now())
+  respondedAt DateTime?
+  club        Club             @relation(fields: [clubId], references: [id], onDelete: Cascade)
+  invitee     User             @relation("ClubInviteInvitee", fields: [inviteeId], references: [id], onDelete: Cascade)
+  inviter     User             @relation("ClubInviteInviter", fields: [inviterId], references: [id], onDelete: Cascade)
+
+  @@unique([clubId, inviteeId])
+  @@index([inviteeId, status])
+}
+
+model Post {
+  id             String             @id @default(uuid()) @db.Uuid
+  userId         String             @db.Uuid
+  caption        String?
+  visibility     PostVisibility     @default(PUBLIC)
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+  clubId         String?            @db.Uuid
+  isAnnouncement Boolean            @default(false)
+  sportId        String?            @db.Uuid
+  latitude       Float?
+  locationName   String?
+  longitude      Float?
+  editedAt       DateTime?
+  deletedAt      DateTime?
+  notifications  Notification[]
+  club           Club?              @relation(fields: [clubId], references: [id])
+  sport          Sport?             @relation(fields: [sportId], references: [id])
+  user           User               @relation(fields: [userId], references: [id])
+  comments       PostComment[]
+  customViewers  PostCustomViewer[]
+  likes          PostLike[]
+  media          PostMedia[]
+  shares         PostShare[]
+  tags           PostTag[]
+  reports        Report[]
+
+  @@index([userId, createdAt])
+  @@index([createdAt])
+  @@index([clubId, createdAt])
+  @@index([sportId, createdAt])
+  @@index([visibility])
+  @@index([latitude, longitude])
+}
+
+model PostTag {
+  id        String   @id @default(uuid()) @db.Uuid
+  postId    String   @db.Uuid
+  userId    String   @db.Uuid
+  createdAt DateTime @default(now())
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, userId])
+  @@index([userId, createdAt])
+}
+
+model PostCustomViewer {
+  id        String   @id @default(uuid()) @db.Uuid
+  postId    String   @db.Uuid
+  userId    String   @db.Uuid
+  createdAt DateTime @default(now())
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, userId])
+  @@index([postId])
+  @@index([userId])
+}
+
+model PostMedia {
+  id           String    @id @default(uuid()) @db.Uuid
+  postId       String    @db.Uuid
+  mediaType    MediaType
+  mediaUrl     String
+  thumbnailUrl String?
+  photoData    Bytes?
+  contentType  String?
+  sortOrder    Int       @default(0)
+  createdAt    DateTime  @default(now())
+  post         Post      @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@index([postId])
+}
+
+model PostLike {
+  id        String   @id @default(uuid()) @db.Uuid
+  postId    String   @db.Uuid
+  userId    String   @db.Uuid
+  createdAt DateTime @default(now())
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, userId])
+  @@index([userId])
+}
+
+model PostComment {
+  id        String   @id @default(uuid()) @db.Uuid
+  postId    String   @db.Uuid
+  userId    String   @db.Uuid
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id])
+  reports   Report[]
+
+  @@index([postId, createdAt])
+  @@index([userId])
+}
+
+model PostShare {
+  id        String   @id @default(uuid()) @db.Uuid
+  postId    String   @db.Uuid
+  userId    String   @db.Uuid
+  createdAt DateTime @default(now())
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([postId])
+  @@index([userId, createdAt])
+}
+
+model Reel {
+  id              String             @id @default(uuid()) @db.Uuid
+  userId          String             @db.Uuid
+  sportId         String?            @db.Uuid
+  gameId          String?            @db.Uuid
+  caption         String?
+  videoUrl        String
+  thumbnailUrl    String?
+  durationSeconds Int?
+  viewCount       Int                @default(0)
+  visibility      ReelVisibility     @default(PUBLIC)
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  clubId          String?            @db.Uuid
+  deletedAt       DateTime?
+  notifications   Notification[]
+  club            Club?              @relation(fields: [clubId], references: [id])
+  game            Game?              @relation(fields: [gameId], references: [id])
+  sport           Sport?             @relation(fields: [sportId], references: [id])
+  user            User               @relation(fields: [userId], references: [id])
+  comments        ReelComment[]
+  customViewers   ReelCustomViewer[]
+  likes           ReelLike[]
+  shares          ReelShare[]
+  views           ReelView[]
+  reports         Report[]
+
+  @@index([userId, createdAt])
+  @@index([sportId])
+  @@index([sportId, createdAt])
+  @@index([gameId])
+  @@index([createdAt])
+  @@index([viewCount])
+  @@index([clubId, createdAt])
+}
+
+model ReelCustomViewer {
+  id        String   @id @default(uuid()) @db.Uuid
+  reelId    String   @db.Uuid
+  userId    String   @db.Uuid
+  createdAt DateTime @default(now())
+  reel      Reel     @relation(fields: [reelId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([reelId, userId])
+  @@index([userId])
+}
+
+model ReelView {
+  id           String   @id @default(uuid()) @db.Uuid
+  reelId       String   @db.Uuid
+  userId       String   @db.Uuid
+  watchSeconds Int      @default(0)
+  completed    Boolean  @default(false)
+  viewedAt     DateTime @default(now())
+  reel         Reel     @relation(fields: [reelId], references: [id], onDelete: Cascade)
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([reelId, userId])
+  @@index([userId, viewedAt])
+}
+
+model ReelShare {
+  id        String   @id @default(uuid()) @db.Uuid
+  reelId    String   @db.Uuid
+  userId    String   @db.Uuid
+  createdAt DateTime @default(now())
+  reel      Reel     @relation(fields: [reelId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([reelId])
+  @@index([userId, createdAt])
+}
+
+model ReelLike {
+  id        String   @id @default(uuid()) @db.Uuid
+  reelId    String   @db.Uuid
+  userId    String   @db.Uuid
+  createdAt DateTime @default(now())
+  reel      Reel     @relation(fields: [reelId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([reelId, userId])
+  @@index([userId])
+}
+
+model ReelComment {
+  id        String   @id @default(uuid()) @db.Uuid
+  reelId    String   @db.Uuid
+  userId    String   @db.Uuid
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  reel      Reel     @relation(fields: [reelId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id])
+  reports   Report[]
+
+  @@index([reelId, createdAt])
+  @@index([userId])
+}
+
+model Story {
+  id             String              @id @default(uuid()) @db.Uuid
+  userId         String              @db.Uuid
+  mediaType      StoryMediaType
+  mediaUrl       String
+  thumbnailUrl   String?
+  caption        String?
+  createdAt      DateTime            @default(now())
+  expiresAt      DateTime
+  musicArtist    String?
+  musicDuration  Int?
+  musicStartTime Int?
+  musicTitle     String?
+  musicTrackId   String?             @db.Uuid
+  deletedAt      DateTime?
+  visibility     PostVisibility      @default(PUBLIC)
+  notifications  Notification[]
+  reports        Report[]
+  musicTrack     MusicTrack?         @relation(fields: [musicTrackId], references: [id])
+  user           User                @relation(fields: [userId], references: [id])
+  customViewers  StoryCustomViewer[]
+  views          StoryView[]
+
+  @@index([userId, expiresAt])
+  @@index([expiresAt])
+  @@index([musicTrackId])
+}
+
+model StoryCustomViewer {
+  id        String   @id @default(uuid()) @db.Uuid
+  storyId   String   @db.Uuid
+  userId    String   @db.Uuid
+  createdAt DateTime @default(now())
+  story     Story    @relation(fields: [storyId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([storyId, userId])
+  @@index([userId])
+}
+
+model MusicTrack {
+  id              String   @id @default(uuid()) @db.Uuid
+  provider        String
+  providerTrackId String
+  title           String
+  artist          String
+  album           String?
+  artworkUrl      String?
+  previewUrl      String?
+  durationSeconds Int
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  stories         Story[]
+
+  @@unique([provider, providerTrackId])
+  @@index([isActive])
+}
+
+model StoryView {
+  id       String   @id @default(uuid()) @db.Uuid
+  storyId  String   @db.Uuid
+  userId   String   @db.Uuid
+  viewedAt DateTime @default(now())
+  story    Story    @relation(fields: [storyId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([storyId, userId])
+  @@index([userId])
+}
+
+model Notification {
+  id            String           @id @default(uuid()) @db.Uuid
+  userId        String           @db.Uuid
+  actorId       String?          @db.Uuid
+  type          NotificationType
+  postId        String?          @db.Uuid
+  gameId        String?          @db.Uuid
+  storyId       String?          @db.Uuid
+  reelId        String?          @db.Uuid
+  friendshipId  String?          @db.Uuid
+  messageId     String?          @db.Uuid
+  joinRequestId String?          @db.Uuid
+  badgeId       String?          @db.Uuid
+  isRead        Boolean          @default(false)
+  createdAt     DateTime         @default(now())
+  actor         User?            @relation("NotificationActor", fields: [actorId], references: [id])
+  badge         Badge?           @relation(fields: [badgeId], references: [id])
+  friendship    Friendship?      @relation(fields: [friendshipId], references: [id])
+  game          Game?            @relation(fields: [gameId], references: [id])
+  joinRequest   JoinRequest?     @relation(fields: [joinRequestId], references: [id])
+  message       Message?         @relation(fields: [messageId], references: [id])
+  post          Post?            @relation(fields: [postId], references: [id])
+  reel          Reel?            @relation(fields: [reelId], references: [id])
+  story         Story?           @relation(fields: [storyId], references: [id])
+  user          User             @relation("NotificationRecipient", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead, createdAt])
+  @@index([userId, createdAt])
+  @@index([actorId])
+}
+
+model Badge {
+  id            String           @id @default(uuid()) @db.Uuid
+  name          String           @unique
+  description   String
+  iconUrl       String?
+  category      BadgeCategory
+  requirement   BadgeRequirement
+  target        Int
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  notifications Notification[]
+  userBadges    UserBadge[]
+
+  @@index([requirement])
+}
+
+model UserBadge {
+  id         String    @id @default(uuid()) @db.Uuid
+  userId     String    @db.Uuid
+  badgeId    String    @db.Uuid
+  progress   Int       @default(0)
+  unlocked   Boolean   @default(false)
+  unlockedAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  badge      Badge     @relation(fields: [badgeId], references: [id])
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, badgeId])
+  @@index([userId, unlocked])
+}
+
+model Conversation {
+  id             String                    @id @default(uuid()) @db.Uuid
+  type           ConversationType
+  gameId         String?                   @unique @db.Uuid
+  directKey      String?                   @unique
+  createdAt      DateTime                  @default(now())
+  updatedAt      DateTime                  @updatedAt
+  clubId         String?                   @unique @db.Uuid
+  club           Club?                     @relation(fields: [clubId], references: [id], onDelete: Cascade)
+  game           Game?                     @relation(fields: [gameId], references: [id])
+  participants   ConversationParticipant[]
+  messages       Message[]
+  messageRequest MessageRequest?
+  calls          DirectCall[]
+
+  @@index([type, updatedAt])
+}
+
+model ConversationParticipant {
+  id             String       @id @default(uuid()) @db.Uuid
+  conversationId String       @db.Uuid
+  userId         String       @db.Uuid
+  joinedAt       DateTime     @default(now())
+  lastReadAt     DateTime?
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user           User         @relation(fields: [userId], references: [id])
+
+  @@unique([conversationId, userId])
+  @@index([userId])
+}
+
+model Message {
+  id             String         @id @default(uuid()) @db.Uuid
+  conversationId String         @db.Uuid
+  senderId       String         @db.Uuid
+  content        String
+  messageType    MessageType    @default(TEXT)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  readAt         DateTime?
+  deletedAt      DateTime?
+  conversation   Conversation   @relation(fields: [conversationId], references: [id])
+  sender         User           @relation(fields: [senderId], references: [id])
+  notifications  Notification[]
+  reports        Report[]
+  reactions      MessageReaction[]
+  attachmentData Bytes?
+  attachmentType String?
+  pinnedAt       DateTime?
+  isForwarded    Boolean        @default(false)
+
+  @@index([conversationId, createdAt])
+  @@index([senderId])
+}
+
+model DirectCall {
+  id               String       @id @default(uuid()) @db.Uuid
+  conversationId   String       @db.Uuid
+  callerId         String       @db.Uuid
+  calleeId         String       @db.Uuid
+  mode             String
+  status           String       @default("RINGING")
+  offer            String
+  answer           String?
+  callerCandidates String[]     @default([])
+  calleeCandidates String[]     @default([])
+  callerSeenAt     DateTime     @default(now())
+  calleeSeenAt     DateTime?
+  createdAt        DateTime     @default(now())
+  answeredAt       DateTime?
+  endedAt          DateTime?
+  conversation     Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  caller           User         @relation("CallCaller", fields: [callerId], references: [id], onDelete: Cascade)
+  callee           User         @relation("CallCallee", fields: [calleeId], references: [id], onDelete: Cascade)
+
+  @@index([calleeId, status])
+  @@index([callerId, status])
+  @@unique([conversationId], map: "DirectCall_one_active", where: raw("(status IN ('RINGING', 'ACTIVE'))"))
+}
+
+model MessageReaction {
+  messageId String   @db.Uuid
+  userId    String   @db.Uuid
+  emoji     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([messageId, userId])
+  @@index([userId])
+}
+
+model MessageRequest {
+  id             String               @id @default(uuid()) @db.Uuid
+  senderId       String               @db.Uuid
+  receiverId     String               @db.Uuid
+  pairKey        String               @unique
+  initialMessage String
+  status         MessageRequestStatus @default(PENDING)
+  conversationId String?              @unique @db.Uuid
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+  acceptedAt     DateTime?
+  rejectedAt     DateTime?
+  conversation   Conversation?        @relation(fields: [conversationId], references: [id])
+  receiver       User                 @relation("MessageRequestReceiver", fields: [receiverId], references: [id], onDelete: Cascade)
+  sender         User                 @relation("MessageRequestSender", fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@index([senderId, status])
+  @@index([receiverId, status])
+  @@index([status])
+}
+
+model LiveStream {
+  id           String           @id @default(uuid()) @db.Uuid
+  hostId       String           @db.Uuid
+  gameId       String?          @db.Uuid
+  title        String
+  streamUrl    String?
+  playbackUrl  String?
+  thumbnailUrl String?
+  status       LiveStreamStatus @default(SCHEDULED)
+  startedAt    DateTime?
+  endedAt      DateTime?
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  game         Game?            @relation(fields: [gameId], references: [id])
+  host         User             @relation(fields: [hostId], references: [id])
+  viewers      LiveViewer[]
+
+  @@index([hostId])
+  @@index([gameId])
+  @@index([status])
+  @@unique([hostId], map: "LiveStream_one_active_host", where: raw("(status = 'LIVE'::\"LiveStreamStatus\")"))
+}
+
+model LiveViewer {
+  id           String     @id @default(uuid()) @db.Uuid
+  liveStreamId String     @db.Uuid
+  userId       String     @db.Uuid
+  joinedAt     DateTime   @default(now())
+  leftAt       DateTime?
+  lastSeenAt   DateTime   @default(now())
+  offer        String?   @db.Text
+  answer       String?   @db.Text
+  liveStream   LiveStream @relation(fields: [liveStreamId], references: [id], onDelete: Cascade)
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([liveStreamId, leftAt])
+  @@index([userId])
+}
+
+model Report {
+  id             String       @id @default(uuid()) @db.Uuid
+  reporterId     String       @db.Uuid
+  reportedUserId String?      @db.Uuid
+  postId         String?      @db.Uuid
+  reelId         String?      @db.Uuid
+  postCommentId  String?      @db.Uuid
+  reelCommentId  String?      @db.Uuid
+  gameId         String?      @db.Uuid
+  storyId        String?      @db.Uuid
+  messageId      String?      @db.Uuid
+  reason         ReportReason
+  description    String?
+  status         ReportStatus @default(PENDING)
+  resolvedById   String?      @db.Uuid
+  createdAt      DateTime     @default(now())
+  resolvedAt     DateTime?
+  clubId         String?      @db.Uuid
+  club           Club?        @relation(fields: [clubId], references: [id])
+  game           Game?        @relation(fields: [gameId], references: [id])
+  message        Message?     @relation(fields: [messageId], references: [id])
+  postComment    PostComment? @relation(fields: [postCommentId], references: [id])
+  post           Post?        @relation(fields: [postId], references: [id])
+  reelComment    ReelComment? @relation(fields: [reelCommentId], references: [id])
+  reel           Reel?        @relation(fields: [reelId], references: [id])
+  reportedUser   User?        @relation("ReportReportedUser", fields: [reportedUserId], references: [id])
+  reporter       User         @relation("ReportReporter", fields: [reporterId], references: [id])
+  resolvedBy     User?        @relation("ReportResolver", fields: [resolvedById], references: [id])
+  story          Story?       @relation(fields: [storyId], references: [id])
+
+  @@index([status, createdAt])
+  @@index([reporterId])
+  @@index([reportedUserId])
+  @@index([clubId])
+}
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+enum SkillLevel {
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+  PROFESSIONAL
+}
+
+enum GameStatus {
+  OPEN
+  FULL
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+enum ParticipantStatus {
+  ACTIVE
+  LEFT
+  COMPLETED
+  REMOVED
+}
+
+enum JoinRequestStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  CANCELLED
+}
+
+enum FriendshipStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  BLOCKED
+}
+
+enum PostVisibility {
+  PUBLIC
+  FRIENDS
+  CUSTOM
+  ONLY_ME
+}
+
+enum ReelVisibility {
+  PUBLIC
+  FRIENDS
+  CUSTOM
+  ONLY_ME
+}
+
+enum MediaType {
+  IMAGE
+  VIDEO
+}
+
+enum StoryMediaType {
+  IMAGE
+  VIDEO
+}
+
+enum NotificationType {
+  FRIEND_REQUEST
+  FRIEND_ACCEPTED
+  GAME_JOIN_REQUEST
+  GAME_JOIN_ACCEPTED
+  GAME_JOIN_REJECTED
+  GAME_FULL
+  GAME_CANCELLED
+  GAME_COMPLETED
+  NEW_MESSAGE
+  MESSAGE_REQUEST
+  POST_LIKE
+  POST_COMMENT
+  REEL_LIKE
+  REEL_COMMENT
+  STORY_REPLY
+  BADGE_UNLOCKED
+  LIVE_STARTED
+  NEW_FOLLOWER
+}
+
+enum BadgeCategory {
+  GAMES
+  COMPLETION
+  HOSTING
+  HIGHLIGHTS
+  STORIES
+  SOCIAL
+  COMMUNITY
+}
+
+enum BadgeRequirement {
+  GAMES_JOINED
+  GAMES_COMPLETED
+  GAMES_HOSTED
+  HIGHLIGHTS_UPLOADED
+  STORIES_POSTED
+  FRIENDS
+  SPORTS_PARTICIPATED
+}
+
+enum ConversationType {
+  DIRECT
+  GAME
+  CLUB
+}
+
+enum MessageType {
+  TEXT
+  IMAGE
+  VIDEO
+  FILE
+}
+
+enum MessageRequestStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  BLOCKED
+}
+
+enum ClubMemberRole {
+  OWNER
+  ADMIN
+  MODERATOR
+  MEMBER
+}
+
+enum ClubMemberStatus {
+  PENDING
+  ACTIVE
+  REMOVED
+  BANNED
+}
+
+enum ClubMembershipType {
+  OPEN
+  APPROVAL_REQUIRED
+  INVITE_ONLY
+}
+
+enum ClubActivityDay {
+  MONDAY
+  TUESDAY
+  WEDNESDAY
+  THURSDAY
+  FRIDAY
+  SATURDAY
+  SUNDAY
+}
+
+enum ClubInviteStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  REVOKED
+}
+
+enum LiveStreamStatus {
+  SCHEDULED
+  LIVE
+  ENDED
+  CANCELLED
+}
+
+enum ReportReason {
+  SPAM
+  HARASSMENT
+  HATE_SPEECH
+  VIOLENCE
+  INAPPROPRIATE_CONTENT
+  SCAM
+  IMPERSONATION
+  OTHER
+}
+
+enum ReportStatus {
+  PENDING
+  REVIEWING
+  RESOLVED
+  DISMISSED
+}
+
+model CloudMediaUpload {
+  id String @id @db.Uuid
+  userId String @db.Uuid
+  resource String
+  contentType String
+  size Int
+  expiresAt DateTime
+  claimedAt DateTime?
+  createdAt DateTime @default(now())
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([userId, claimedAt, expiresAt])
+}

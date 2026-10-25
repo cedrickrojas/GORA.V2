@@ -1,0 +1,47 @@
+# Dependencies
+node_modules/
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Build output
+dist/
+www/
+.vite/
+coverage/
+*.tsbuildinfo
+
+# Logs
+uploads/
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+*.suo
+*.swp
+
+# Ionic
+.ionic/
+platforms/
+plugins/
+
+# Capacitor native projects, when added later
+android/
+ios/
+
+# Prisma generated client
+server/src/generated/
+
+# Test artifacts
+.runtime/
+.vercel/
+mobile/tmp/
+cypress/videos/
+cypress/screenshots/

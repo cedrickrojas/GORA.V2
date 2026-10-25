@@ -1,0 +1,346 @@
+---
+alwaysApply: true
+---
+# GORA Locked Design
+
+This design is locked for Prompt 4 and every later prompt. Do not rename, reorder, or drop
+items without an explicit instruction from the user. Build only what the current prompt asks for.
+
+## Navigation
+- Bottom tabs, exactly 7 and in order: Home, Search, Discover, Create (+), Reels, Chat, Profile.
+  Never add an 8th (no Clubs tab). Routes: /home, /search, /discover, /create, /reels, /chat, /profile.
+- Create (+) opens the create action sheet (the /create route lists the same actions).
+- Responsive, Facebook-style web view (mobile/src/theme/responsive.css): under 768px is the phone layout;
+  768px+ centers pages in a 680px column; 1024px+ moves the same 7 tabs, in order, into a top bar
+  (DesktopTopNav: avatar + GORA + search pill left, tab icons center, filter + bell right) and hides the
+  bottom bar; 1240px+ adds a shortcuts sidebar (left) and friend requests + contacts (right) on Home and Discover.
+- Header: profile avatar TOP-LEFT (a secondary shortcut, not the primary Profile entry), GORA branding,
+  filter icon + notifications bell TOP-RIGHT (filter sits beside the bell). Every main tab except Reels.
+- Avatar tap opens a dropdown: Profile, My Games, My Reels, My Stories, Friends, Badges, Activity, Settings.
+- Filter tap opens a Tinder-style dropdown: maximum-distance slider (1, 5, 10, 25, 50, 100 km, Any)
+  and a sport dropdown. It applies to Home, Search, and Discover.
+
+## Home (bottom tab)
+- Social sports newsfeed: stories, a composer that opens Create Post, then one feed mixing
+  POST (photo or text, Like/Comment/Share), GAME (host note + game card with PLAYERS, View Game,
+  Request to Join), REEL (preview), and ACTIVITY (game completed/joined, badge unlocked).
+- Newest first. No ranking algorithm until a prompt asks for one.
+
+## Create Post
+Create (+) -> Create Post (/create/post) -> caption -> photos -> 👤 Tag People -> 📍 Add Location -> sport -> privacy -> publish.
+The post appears on Home, Profile, and Search. Images now; video later.
+- Tags (PostTag, unique per post+user, never the author, max 20): friends first, never blocked users. Card shows
+ "with A, B" (more than 3 names: "and N others"). Only the author adds or removes tags ("⋯" -> Edit tags).
+ Tagging never changes who can see a post. Tag notifications come later.
+- Location is optional: Post.locationName/latitude/longitude, all three or none, picked explicitly by the author
+ (search GORA venues -> select -> Confirm Location; current location / select on map come with the map provider).
+ Card shows "📍 Name", which opens the location view.
+- Privacy selector: 🌎 Public, 👥 Friends, ⚙️ Custom, 🔒 Only Me (PostVisibility PUBLIC/FRIENDS/CUSTOM/ONLY_ME).
+ Custom = only the chosen people (PostCustomViewer) plus the author; never "all friends"; nobody preselected.
+- Cards show a privacy indicator only, never the viewer list. The author edits privacy from "⋯"; it applies at once.
+- Author "⋯" menu, in order: Edit post, Edit privacy, Tag people / Edit tags, Delete post (destructive), Cancel.
+ Edit post (EditPostModal, PATCH /posts/:id) changes caption (never empty), sport, and location only, sets editedAt,
+ and the card shows "· Edited". Delete post confirms "Delete post?" then DELETE /posts/:id = soft delete (Post.deletedAt;
+ row, likes, comments, tags kept; hidden from everyone incl. the author; later reads 404). Never hard-delete posts.
+- Posts are stored in PostgreSQL when signed in: stores/posts.ts loads GET /posts (Home feed, newest first) plus the
+ account's GET /users/:username/posts, publishes with POST /posts (sport name -> sportId). Real posts (fromServer) come
+ first and are never re-filtered on the client; demo posts stay beside them, changed locally only. No photo upload yet
+ (photo picker hidden while signed in); Tag People / Custom list only real accounts (none until the Friends system).
+
+## Post privacy (backend-enforced)
+- server/src/posts/post-visibility.ts visiblePostsWhere(viewerId) is the only visibility rule; every post read uses it.
+ Author sees all; others: PUBLIC; FRIENDS only if ACCEPTED friends; CUSTOM only if listed; ONLY_ME never.
+ A block in either direction, an inactive author, or a private club (non-member) hides posts.
+- Hidden and missing posts both answer 404. Custom viewers are returned only to the author. The client mirror
+ (mobile/src/utils/post-privacy.ts) is for mock data only; never rely on the frontend for privacy.
+
+## Other users' profiles
+- /profile/:username (not a tab; /users/:username redirects there; your own username redirects to /profile).
+ Reached from post authors, player rows, Discover players, request names, and the chat header.
+- Read-only, from GET /profiles/:username: no Edit Profile, no Settings, never dateOfBirth or email. Counts cover
+ only what the viewer may see. Unknown, inactive, and BLOCKED_BY_THEM users answer 404.
+- Reserved usernames (server/src/users/reserved-usernames.ts, mirrored in mobile/src/utils/auth.ts) cannot be
+ registered because they clash with /profile/* routes.
+- Buttons come from the relationship state (server/src/social/relationship.ts, mobile/src/utils/relationship.ts):
+ NO_RELATIONSHIP [Add Friend][Message], REQUEST_SENT [Request Sent][Message], REQUEST_RECEIVED [Accept][Delete],
+ FRIENDS [Friends][Message], BLOCKED [Unblock]. BLOCKED_BY_THEM answers 404. No self friend requests.
+- Message: friends -> direct conversation; non-friends -> the same chat screen (/chat/request/:userId) whose first
+ message is the one message request per pair (then "Waiting for X to accept…"); blocked -> none. Never a popup.
+- The full Friends system (add/accept/reject/block endpoints, followers lists) and profile privacy come later.
+
+## Profile (bottom tab)
+- Data comes from GET /profiles/me (server/src/profiles/) through the profile Pinia store; never fabricate counts.
+- Header: cover photo (User.coverImageUrl), avatar with story ring, display name (formatDisplayName helper),
+  @username, city with a location icon, bio (max 160), and an [Edit Profile] button (/profile/edit).
+- Then 3 tappable stats (Friends, Followers, Following), the section links, MY SPORTS [+ Add Sport],
+  MY CLUBS (every club you are an ACTIVE member of as "[Club] 24/50 Members · Role", See all clubs; no Create Club
+  here), HIGHLIGHTS (3 newest, See all -> My Reels), and MY FEED with a "Share a game moment…" composer (opens
+  Create Post) above ONLY the signed-in account's own posts (never anyone else's). New posts are authored by the
+  signed-in account (postsStore.me), not the demo user.
+- Sections, in order: My Games, My Reels, My Stories, Friends, Followers, Following, Badges, Activity, My Clubs,
+  Settings. Shown as plain text links: the first 4 in a row, the rest under "More ▾" (each with its summary).
+  The avatar dropdown keeps its 8 items.
+- Edit Profile (/profile/edit): photo URL, first/last name, bio, city, date of birth, cover URL; Save and Cancel.
+  Username and email cannot be changed there. Images are URLs; uploads are a stub (services/upload.service.ts).
+- MY SPORTS: UserSport with skill level BEGINNER/INTERMEDIATE/ADVANCED/PROFESSIONAL and optional position
+  (max 40; suggestions for Basketball, Volleyball, Football). One entry per sport; add, edit, remove.
+  Add: Sport tiles (icon, name, selected check) -> Skill Level -> optional Position -> [Save Sport]. Edit changes level and
+  position only. Remove asks "Remove Volleyball from your sports?" [Cancel] [Remove] and deletes only the UserSport row.
+- Friends has two parts: Friends and Requests (Received with Accept/Decline, Sent with Cancel).
+
+## Sports (Prompt 7)
+- One central Sport table (id, unique name, description, iconUrl, isActive) used by UserSport, Game (required),
+ and the optional Post/Reel/Club sportId and ClubSport. Never duplicate Sport or UserSport. The 10 seeded sports:
+ Basketball, Volleyball, Football, Tennis, Badminton, Running, Table Tennis, Swimming, Cycling, Other (seed upserts by
+ name and never touches isActive). Only active sports are listed or addable; retired ones stay for history.
+- Users only read sports: GET /sports (active, {id,name,description,iconUrl,isActive}), GET /sports/:id. No create,
+ edit, activate, or delete route (future admin module).
+- Own sports: GET|POST /users/me/sports, PATCH|DELETE /users/me/sports/:sportId (server/src/sports/user-sports.*,
+ UserSportsService, exported). Owner from the JWT only; userId in a body is 400. Unknown/retired sport 404,
+ duplicate 409, bad UUID 400 (body) or 404 (path). /profiles/me/sports is an alias using the same service.
+- Client: stores/sports.ts (fetchSports, fetchMySports, addSport, updateSport, removeSport; cached, one request at a
+ time) via services/sports-api.service.ts; it syncs profile.currentProfile.sports. components/sports/SportIcon.vue
+ shows iconUrl, else the built-in icon for the name; the icon is never the identity (the id is).
+- Search tiles, the sport page, and Discover Trending Sports still use the demo catalog stats (services/mock).
+
+## Chat (bottom tab)
+- Three tabs, in order: [Friends] (conversations with accepted friends), [Clubs] (official club chats:
+  club image, name, last message, time, unread), [Requests] (Message Requests from non-friends, then Sent).
+- Message Request: Accept -> conversation becomes active; Delete -> rejected/removed.
+  One request per pair of users, so requests cannot be spammed. Block/Report come later.
+- Conversation screen at /chat/:conversationId. Game group chats (type GAME) are supported by the
+  schema but not built yet.
+- Group chats belong ONLY to clubs. Never add "Create Group" / "New Group", a group-creation endpoint,
+  DIRECT -> group conversion, or adding arbitrary users. DIRECT is 2 people (trigger-enforced).
+- ConversationType DIRECT | GAME | CLUB (Conversation_context_check). Exactly one CLUB chat per club
+  (Conversation.clubId @unique), created by the Club_create_chat trigger in the club's transaction.
+- Club chat access is derived from ClubMember only: ACTIVE (any role) in an active club. PENDING, REMOVED,
+  BANNED, non-members: no access. Never copy members into the conversation; participant rows are read state.
+- Endpoints: GET /chat/clubs, GET /clubs/:clubId/chat, GET|POST /clubs/:clubId/chat/messages
+  (server/src/clubs/club-chat.*). Each checks user, club exists (404), active (403), ACTIVE membership (403),
+  CLUB chat of that club. Sender comes from the JWT; extra body fields are 400. Triggers also guard senders.
+- Club chat screen /chat/clubs/:clubId: club image, name, "Members: N", "Official Club Chat" banner,
+  sender names, "Type a message..." + Send; visually distinct from DMs. Club page [Chat] button is
+  disabled unless ACTIVE. Inactive club: history kept, no new messages. Chat badge includes club unread.
+- Permissions: OWNER/ADMIN manage, MODERATOR+ moderate, MEMBER reads and sends. Pins, announcements,
+  media, polls, mentions, deletion, moderation actions, and push notifications come later.
+
+## Search (Spotify-style browse, for sports)
+- Search across: Players, Sports, Games, Locations, Posts, Reels, Clubs.
+- Browse with sports category tiles.
+- Distance filters: 1 km, 5 km, 10 km, 25 km, 50 km, 100 km, Any.
+- No distance or sport chips on the Search page; those live in the header filter.
+- Tapping a sport opens its full section at /search/:sport (games, players, clubs, reels, locations, posts)
+ with a "Search in <Sport>" box that filters every section, date chips for games ([All] default = every upcoming
+ game; Today, Tomorrow, This Week are optional; Custom later), and a [Map] [List] toggle. Posts are every visible
+ post of that sport, newest first, as full post cards; the date chips never hide posts.
+- Game discovery map (Prompt 11, docs/features/sport-map-discovery.md): markers are real GORA games from
+ GET /games/discover only (never real-world courts, never demo data), sport emoji markers (getSportMarker; the Sport id
+ is the identity), statuses OPEN/FULL/ACTIVE (never CANCELLED; COMPLETED only on request), games closer than 100 m share
+ one marker. Marker preview = DiscoveredGameCard: sport, "Today • 6:00 PM", place, "1.2 km away", "Players: 8/12",
+ "Hosted by @user", [View Game] [Request to Join] (existing join request flow). Counts and distance come from the server.
+ Map provider abstraction (services/map-provider.ts): VITE_MAP_PROVIDER / VITE_MAP_API_KEY from env only, never
+ hardcoded; unset, keyless, or not-yet-connected providers fall back to the built-in PlaceholderMapCanvas (no key,
+ no network). No map packages or external APIs until a prompt adds a provider adapter (MapCanvasProps contract).
+- Device location (services/location.service.ts): asked only from "Use my location" (or reused if already granted),
+ a denial is remembered, never re-prompted. Rounded (~110 m), memory only, sent only as the discovery search center;
+ never stored (no User column, no UserLocation table, no local storage), never public. Denied/unavailable shows
+ "Location access is unavailable. You can still browse GORA games by sport and date." and browsing still works.
+- Location view /map/:lat/:lng?name=&game= (not a tab), opened by tapping 📍 on a post, game card, or Game Details
+ (📍 name + [View on Map], only when the game has coordinates): GameDiscoveryMap centered on the place, real GORA games
+ within 2 km (discovery.discoverAround). From a game, that game is "Selected game" and always shown.
+- Post location (social context) and Game location (required venue + sportId, gameDate, startTime, endTime, status)
+ stay separate; only games become markers. Never expose home locations; no GPS or background tracking.
+
+## Create (+) actions
+Create Post, Create Game, Upload Reel, Add Story, Go Live.
+
+## Games (Prompt 8)
+- Module server/src/games/ (GamesController -> GamesService -> Prisma). POST /games, GET /games
+ (?sportId&status&gameDate=upcoming|today|YYYY-MM-DD&limit&offset; soonest first; default OPEN/FULL/ACTIVE, today on),
+ GET /games/mine (hosted), GET /games/playing (ACTIVE seat), GET /games/:id, PATCH /games/:id (host only, OPEN/FULL only), PATCH /games/:id/cancel
+ (host only, sets CANCELLED, never deletes). Never a DELETE route.
+- GET /games/discover (declared before :gameId; GameDiscoveryService, separate from CRUD, read-only):
+ ?sportId (UUID; unknown/retired 404) &date (today|tomorrow|this-week|YYYY-MM-DD, default upcoming, GAME_TIMEZONE clock)
+ &latitude&longitude (both or neither, -90..90 / -180..180, blanks and text 400, never 0) &distanceKm (0.1-100, needs a
+ center; omitted = Any) &status (OPEN|FULL|ACTIVE|COMPLETED; default OPEN/FULL/ACTIVE; CANCELLED 400) &limit (1-100, 50).
+ visibleGamesWhere always applies. Distance = Haversine in server/src/games/geo-distance.ts (bounding-box prefilter;
+ PostGIS later), nearest first with a center, else soonest first. Games without coordinates never appear in radius
+ results (listed with distanceKm null otherwise). Response {games[DiscoveredGameView], dateFrom, dateTo, distanceKm};
+ host = id, username, firstName, lastName, displayName, profileImageUrl only; currentPlayers = ACTIVE GameParticipant rows.
+- CreateGameDto: sportId, clubId?, title (3-80), description? (500), requiredPlayers (1-100), gameDate, startTime,
+ endTime, locationName (2-120), latitude?/longitude? (both or neither). hostId from the JWT only; hostId, status,
+ counts, timestamps in a body are 400. New games are OPEN; status is never set by the client.
+- gameDate "YYYY-MM-DD" and "HH:mm" times are the venue's wall clock (timestamp without time zone), never shifted.
+ Today is decided in GAME_TIMEZONE (default Asia/Manila). Date today..+365 days; end > start; today cannot start in the past.
+- Sport must be active (else 404). Club: exists (404), active (403), host ACTIVE member (HOST_CLUB_GAMES, 403).
+- visibleGamesWhere (server/src/games/game-visibility.ts) is the only game visibility rule: host, or active host with
+ no block and a null / public / member club. Hidden and missing games both answer 404.
+- Client: stores/games.ts (createGame, fetchGame, fetchGames, fetchMyGames, updateGame, cancelGame; cache by id) via
+ services/games-api.service.ts; utils/game-form.ts mirrors the rules. /create/game (Create Game), /games/:gameId/edit,
+ Game Details for UUID ids (ServerGameDetails), My Games = Hosting (GET /games/mine) + Playing (GET /games/playing,
+ fetchPlayingGames) + Past & cancelled. GameView.isPlayer = viewer has an ACTIVE seat. The demo `games` list
+ still feeds Home, Search, Discover, and the sport page.
+
+## Join requests (Prompt 9)
+- Existing JoinRequest model (unique per game+user, no migration). server/src/games/join-requests.* (JoinRequestsController ->
+ JoinRequestsService -> Prisma). POST /games/:gameId/join-requests {message? max 300}, GET .../me ({joinRequest|null}),
+ PATCH .../me/cancel, GET .../join-requests (host only), PATCH .../:requestId/accept, PATCH .../:requestId/reject (host only).
+- Requester/host from the JWT only; any other body field is 400. Only PENDING moves: -> ACCEPTED/REJECTED (host, respondedAt)
+ or CANCELLED (requester). Conditional updateMany; loser 409. Never delete rows.
+- Create: visible game (else 404), not the host (403), OPEN and not started (409; FULL = "This game is already full."),
+ not an ACTIVE player, no PENDING/REJECTED row (409). A CANCELLED row, or an ACCEPTED row whose player left or was
+ removed, is reused (back to PENDING); declined is final for that game.
+- Accept: one transaction locking the Game row; request PENDING, game OPEN and not started, requester active and
+ unblocked, ACTIVE players < requiredPlayers (409); then request -> ACCEPTED and GameParticipant upserted to ACTIVE
+ (reusing the row). The trigger sets FULL at capacity. Old pending requests on a FULL game stay PENDING, never auto-accepted.
+- Host list: requester id, username, first/last name, displayName, profileImageUrl only. GameView.pendingRequestCount
+ (host only, else null).
+- Client: stores/join-requests.ts (createJoinRequest, fetchMyJoinRequest, cancelJoinRequest, fetchGameJoinRequests,
+ acceptJoinRequest, rejectJoinRequest; one action at a time) via services/join-requests-api.service.ts;
+ utils/join-requests.ts decides the button. ServerGameDetails: [Request to Join] -> JoinRequestModal (message,
+ [Cancel] [Send Request]); PENDING: disabled [Request Pending] + [Cancel Request]; ACTIVE player: [Leave Game];
+ REJECTED: "Request declined". Host: HostJoinRequests ("Pending Requests: N", [Accept] [Reject], answered history).
+
+## Players (Prompt 10)
+- Existing GameParticipant (unique per game+user, status ACTIVE/LEFT/COMPLETED/REMOVED), no migration.
+ server/src/games/game-players.* (GamePlayersController -> GamePlayersService -> Prisma); helpers in game-roster.ts
+ (lockGame, countSeatedPlayers, withCapacityGuard, GAME_FULL_MESSAGE) and game-capacity.ts.
+- GET /games/:gameId/players {gameId, requiredPlayers, currentPlayers, availableSlots, status, players[id, username,
+ firstName, lastName, displayName, profileImageUrl, joinedAt]} (ACTIVE only, join order; visible game else 404).
+ GET .../players/me {gameId, status ACTIVE|LEFT|COMPLETED|REMOVED|NOT_A_PLAYER, joinedAt, completedAt}.
+ PATCH .../players/me/leave (ACTIVE -> LEFT). PATCH .../players/:userId/remove (host only 403; not self 400; ACTIVE -> REMOVED).
+ No body is read. Missing seat 404, non-ACTIVE seat or ACTIVE/COMPLETED game 409.
+- Count = ACTIVE rows only, everywhere (GameView.currentPlayers and the roster). Never delete participant rows; rejoin
+ reactivates the same row, so never two ACTIVE seats. Leave/remove lock the Game row; the trigger reopens FULL -> OPEN.
+ CANCELLED/ACTIVE/COMPLETED are never changed by roster moves; ACTIVE/COMPLETED lifecycle is not automated.
+- Capacity: service count under the row lock + GameParticipant_capacity_guard trigger (mapped to 409
+ "This game is already full."). Concurrent accepts for the last seat: one 200, one 409, never 13/12.
+- Client: stores/game-players.ts (fetchPlayers, fetchMyParticipation, leaveGame, removePlayer, refreshGameCount; one
+ action at a time) via services/game-players-api.service.ts; the join requests store refreshes the count after
+ accept/reject. ServerGameDetails "Player Roster": players (link /profile/:username, "You"), then Open slots from
+ buildRosterSlots (never fake users). Host: [Manage Players] -> [Remove Player] per row (confirm). Player: [Leave Game] (confirm).
+ Left/removed users see why and may request again.
+
+## Stories
+- 24-hour expiry: `expiresAt = createdAt + 24h`; rings; "Your Story" first, then others.
+- Expired stories are hidden, never deleted (kept for a future archive/history).
+- Music is optional: Story.musicTrackId/musicTitle/musicArtist/musicStartTime/musicDuration (seconds).
+  MusicTrack references a licensed provider. Never store or download copyrighted audio.
+  Planned flow: Photo/Video -> Add Music -> search -> track -> segment -> preview -> post.
+- Stored in PostgreSQL (server/src/stories/). Add Story (/create/story, from Create (+) and the Your Story add button):
+ Photo/Video link (http(s); uploads later), caption (max 500), privacy. Story.visibility uses PostVisibility
+ (PUBLIC/FRIENDS/CUSTOM/ONLY_ME, custom viewers in StoryCustomViewer); visibleStoriesWhere is the only rule.
+- The author's "⋯" menu (story viewer, My Stories): Edit caption, Edit privacy, Delete (confirm). Delete is soft
+ (Story.deletedAt): hidden for everyone, including the author and My Stories; the row is kept.
+
+## Reels
+- Vertical full-screen video feed with Like, Comment, Share, Follow, and player/sport context.
+- TikTok-style: no app header on Reels. The video fills the screen; overlaid on top are the text tabs
+  centered and a LIVE button TOP-RIGHT (opens live viewing; a later-phase notice until Live exists).
+  The 7 bottom tabs stay visible.
+- Tabs: Following | For You (For You is the default). Following = reels from accounts the viewer follows.
+- For You recommendations are not implemented; the database (ReelView, likes, comments, shares,
+  follows, sport) only supports them. The client shows the order it receives.
+- Reels are Profile HIGHLIGHTS / My Reels, stored in PostgreSQL (server/src/reels/). Upload Reel (/create/reel):
+ video link (uploads later), optional thumbnail link, caption (max 2200), optional sport, privacy.
+ ReelVisibility PUBLIC/FRIENDS/CUSTOM/ONLY_ME (custom viewers in ReelCustomViewer); visibleReelsWhere is the only rule.
+- The author's "⋯" menu (Highlights, My Reels, Reels tab): Edit reel (caption, sport), Edit privacy, Delete (confirm,
+ soft via Reel.deletedAt). Highlights and My Reels show only the signed-in account's reels; the Reels tab lists
+ real reels first, then the demo reels.
+
+## Follows
+- UserFollow (followerId, followingId, createdAt): one-way, unique per pair, no self-follow.
+- Follow and Friendship are separate and never combined. Following needs no approval;
+ friendship needs a request and Accept and drives Friends and Chat.
+- Friendship.blockedById records who blocked whom (set exactly when status is BLOCKED).
+
+## Discover
+Feed filters [All] [Friends] [Clubs], All first.
+- All: Popular Players, Trending Sports, Popular Games, Trending Reels, Nearby GORA Games, Featured Athletes,
+ Popular Clubs, Public Posts.
+- Nearby GORA Games (components/discover/NearbyGamesSection.vue, stores/discovery.ts): [Sport] (All Sports + active
+ sports) and [Distance] (1, 5, 10, 25, 50, 100 km, Any) ARE the header filter (filters store, no duplicate state);
+ Date chips All, Today, Tomorrow, This Week, Custom Date; [Map] [List] show the same results. Distance applies only
+ with a device location (else "Distance needs your location"). Empty: "No GORA games found nearby." / "Try increasing
+ the distance or selecting another date." Search -> sport page Map view hands off to /discover?sport=&date=&view=map.
+- Friends: accepted friends plus followed users. Clubs: clubs the user belongs to (ACTIVE) or follows.
+- No recommendation algorithm yet; placeholder ordering only. Later: Recommended Games.
+Search = user searches; Discover = GORA recommends.
+
+## Clubs
+- Club (owner, unique slug, sport, location, isPublic, isActive), ClubMember (role OWNER/ADMIN/MODERATOR/MEMBER,
+  status PENDING/ACTIVE/REMOVED/BANNED, unique per club+user), ClubFollow (one-way, unique per club+user).
+- The owner's OWNER/ACTIVE membership is trigger-managed; one OWNER per club. Never insert it from app code.
+- Post/Game/Reel.clubId are optional and require an ACTIVE member of an active club. The club never replaces
+  the game host ("Hosted by Louis" + club label).
+- Membership, ClubFollow, Friendship, and UserFollow are separate and never combined.
+- Access: Profile -> My Clubs (/profile/clubs), Settings -> Create Club (/profile/clubs/new; the only Create Club
+  entry), Search -> Clubs, sport page,
+  Discover -> Clubs, club labels on games/posts/reels. Club page at /clubs/:clubId: "24 / 50 Members", "26 slots
+  available" (or FULL), [Join Club] / [Request to Join] / [Accept Invite] / [Club Full] / [Invite Only], [Chat]
+  (ACTIVE only), [Manage Club] (owner/admin), Follow, tabs [Posts] [Games] [Reels] [Members]. Private clubs hide
+  content, rules, schedule, and links from non-members; contact email shows to ACTIVE members only.
+- Create Club (server/src/clubs/clubs.*, POST /clubs): name, @username (= slug, unique, normalized), photo/cover URLs,
+  short description (max 160), about; primary sport + up to 5 additional (ClubSport); country, city, barangay,
+  home court, location name, optional typed coordinates; maxMembers* (presets 10-1000 or custom, 1..CLUB_MAX_MEMBERS_LIMIT,
+  default 1000); membershipType OPEN / APPROVAL_REQUIRED / INVITE_ONLY; Public / Private; rules (ClubRule, max 20);
+  tags (ClubTag, normalized, max 10); informational schedule (never creates games); contact email + website/Facebook/
+  Instagram/TikTok. One transaction: club + OWNER/ACTIVE owner (trigger) + one CLUB chat (trigger), else rollback.
+  Success: "CLUB CREATED!", "You are the Owner.", "Members: 1 / N", [Go to Club] [Open Club Chat].
+- Capacity: currentMembers / availableSlots / isFull are counted from ACTIVE ClubMember rows only, never stored.
+  PENDING and invites use no slot. Join and approve lock the Club row and recount ("Club is currently full.", 409);
+  ClubMember_capacity_guard enforces it in the DB, so 49/50 never becomes 51/50. maxMembers cannot drop below the
+  ACTIVE count (Club_max_members_guard); members are never auto-removed. Separate from Game.requiredPlayers.
+- Join rules are server-side: OPEN joins instantly, APPROVAL_REQUIRED makes PENDING, INVITE_ONLY needs a pending
+  ClubInvite (an invite skips approval). Only the owner edits settings (PATCH /clubs/:clubId); OWNER/ADMIN handle
+  requests, invites, and removals at /clubs/:clubId/manage. Demo (mock) clubs cannot be managed.
+- Demo clubs: a signed-in account starts with NO demo membership/follow/invite/manage rights (asNonMember);
+  only clubs it joins or creates are "its" clubs. The demo user's memberships are never shown as the account's.
+  Actions in the app use session.me (the signed-in account), never the demo user, when someone is signed in.
+- Permissions (server/src/clubs/club-permissions.ts): OWNER manages club/admins/members and disables;
+  ADMIN posts, games, members, content; MODERATOR content, reports, comments; MEMBER views, participates, hosts club games, posts.
+- Full moderation (removal, bans, report review UI) comes later.
+
+## Authentication (Prompt 5)
+- Server: auth/ (register, login, GET /auth/me, JwtStrategy, JwtAuthGuard, @CurrentUser) and users/ (UsersService).
+ Controller -> AuthService -> UsersService -> PrismaService. Argon2id hashing. Always use the safe selects in
+ users/user.types.ts; never return passwordHash, never log passwords or tokens.
+- JWT payload is only { sub, username, role }; JWT_SECRET (min 32 chars) and JWT_EXPIRES_IN (default 7d) come from env.
+ JwtStrategy reloads the user and rejects inactive accounts. Login failures return "Invalid credentials.".
+- Client: stores/auth.ts, services/api-client.ts, services/auth.service.ts, services/token-storage.ts.
+ /login and /register are guestOnly; the tab layout (every tab and sub-page) is requiresAuth. Log Out lives in Settings
+ (not in the avatar dropdown, which keeps its 8 items) and is client-side only.
+- Not built: social login, 2FA, password reset, email verification, admin dashboard, token revocation.
+
+## Database
+- Prisma schema in server/prisma/schema.prisma holds all 42 GORA models (the original 26 plus MusicTrack,
+ UserFollow, PostShare, ReelView, ReelShare, Club, ClubMember, ClubFollow, PostCustomViewer, PostTag, ClubSport, ClubTag,
+ ClubRule, ClubInvite, StoryCustomViewer, ReelCustomViewer). Never reset the database or
+  delete migrations; add new migrations only. 22 migrations so far; the latest is 20260930233100_story_reel_privacy_and_delete.
+  Triggers must write timestamps as timezone('UTC', now()), never CURRENT_TIMESTAMP (the DB is not UTC).
+- Media (videos, images, live streams) live in external storage; PostgreSQL stores URLs and metadata.
+
+## Activity stats
+Games Joined, Games Completed, Games Hosted, Highlights Uploaded, Stories Posted, Friends,
+Sports Participated.
+
+## Badges
+First Game, Getting Started, Active Player, Dedicated Player, Veteran, Game Host, Organizer,
+Team Player, Highlight Creator, Highlight Maker, Social Player, Community Player, Storyteller.
+
+## Game capacity and roster
+- Display PLAYERS as ACTIVE GameParticipant rows / Game.requiredPlayers (the DB guards still count COMPLETED too,
+  which only matters for finished games). Never store a denormalized player count. Never show more players than
+  requiredPlayers (no 13/12).
+- The host is not a player just because they created the game. They count only if they join as a participant.
+- OPEN while ACTIVE players < requiredPlayers; FULL at capacity. The database rejects over-capacity inserts.
+- Game cards (Home, Search, Discover, sport page, Profile / My Games, GamePreviewCard) and Game Details show this count.
+  Game Details also lists one slot per required player: accepted players, then Open slots.
+
+## Game flow (backend-owned)
+Join Game -> Join Request -> Host Accepts -> Participant -> Game Happens -> Game Completed
+-> Activity Updated -> Achievement Checked -> Badge Unlocked -> Notification (top-right bell).
+
+- Only accepted participants of a completed game get activity credit.
+- Activity updates, achievement checks, and badge unlocks run on the server; Vue only displays results.
