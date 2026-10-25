@@ -1,12 +1,24 @@
-import type { UserSummary } from './user';
+import type { UserSummary } from "./user";
 
 export type NotificationType =
-  | 'JOIN_REQUEST'
-  | 'REQUEST_ACCEPTED'
-  | 'GAME_COMPLETED'
-  | 'BADGE_UNLOCKED'
-  | 'FRIEND_REQUEST'
-  | 'REEL_LIKED';
+  | "GAME_JOIN_REQUEST"
+  | "GAME_JOIN_ACCEPTED"
+  | "GAME_JOIN_REJECTED"
+  | "GAME_FULL"
+  | "GAME_CANCELLED"
+  | "GAME_COMPLETED"
+  | "BADGE_UNLOCKED"
+  | "FRIEND_REQUEST"
+  | "FRIEND_ACCEPTED"
+  | "NEW_MESSAGE"
+  | "MESSAGE_REQUEST"
+  | "POST_LIKE"
+  | "POST_COMMENT"
+  | "REEL_LIKE"
+  | "REEL_COMMENT"
+  | "STORY_REPLY"
+  | "LIVE_STARTED"
+  | "NEW_FOLLOWER";
 
 export interface AppNotification {
   id: string;
@@ -19,4 +31,11 @@ export interface AppNotification {
   read: boolean;
   /** In-app route to open, when there is one. */
   link: string | null;
+}
+
+export interface NotificationsPage {
+  items: AppNotification[];
+  unreadCount: number;
+  hasMore: boolean;
+  nextOffset: number;
 }

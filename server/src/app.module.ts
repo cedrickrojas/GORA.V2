@@ -14,6 +14,7 @@ import { StoriesModule } from './stories/stories.module';
 import { UsersModule } from './users/users.module';
 import { DirectChatModule } from './chat/direct-chat.module';
 import { LiveModule } from './live/live.module';
+import { NotificationsModule } from './notifications/notifications.module';
 
 @Module({
   imports: [
@@ -32,6 +33,7 @@ import { LiveModule } from './live/live.module';
     ReelsModule,
     DirectChatModule,
     LiveModule,
+    NotificationsModule,
   ],
 })
 export class AppModule {}

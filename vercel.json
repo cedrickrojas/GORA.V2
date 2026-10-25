@@ -15,7 +15,7 @@
       "root": "server",
       "framework": "nestjs",
       "entrypoint": "main.js",
-      "buildCommand": "npm run build"
+      "buildCommand": "npm run build:vercel"
     }
   },
   "rewrites": [

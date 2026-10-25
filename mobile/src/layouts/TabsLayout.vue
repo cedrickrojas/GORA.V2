@@ -65,6 +65,7 @@ import DesktopShortcuts from '@/components/layout/DesktopShortcuts.vue';
 import DesktopTopNav from '@/components/layout/DesktopTopNav.vue';
 import DirectCallOverlay from '@/components/chat/DirectCallOverlay.vue';
 import { useCreateMenu } from '@/composables/useCreateMenu';
+import { useNotificationPolling } from '@/composables/useNotificationPolling';
 import { useAuthStore } from '@/stores/auth';
 import { useChatStore } from '@/stores/chat';
 import { useClubChatStore } from '@/stores/club-chat';
@@ -78,6 +79,7 @@ const auth = useAuthStore();
 const { openCreateMenu } = useCreateMenu();
 const chatStore = useChatStore();
 const clubChatStore = useClubChatStore();
+useNotificationPolling();
 
 const showSidebars = computed(() => SIDEBAR_PATHS.includes(route.path));
 // Conversation pages keep the composer directly above the keyboard.

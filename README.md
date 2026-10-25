@@ -130,7 +130,7 @@ Use this directory (the `GORA` Git repository containing `mobile/`, `server/`, a
 
 Leave `VITE_API_BASE_URL` unset or empty in Vercel so production and preview builds use their own domain. Remove any existing localhost override. Each service installs and builds independently; the server build generates the ignored Prisma client before compiling NestJS. The JavaScript entrypoint `server/main.js` loads `dist/bootstrap-server.js` from Nest's compiler to preserve decorator metadata required by dependency injection. The server's `postinstall` builds this output for fresh installations and `vercel dev`. After backend edits, run `npm run server:build` and restart `vercel dev`, or use standalone `npm run server` for watch mode.
 
-Set `DATABASE_URL` to an externally hosted PostgreSQL database and `JWT_SECRET` to a random secret of at least 32 characters in the project's Vercel environment settings. Optional server settings are listed in `server/.env.example`. Same-origin web requests need no CORS override; set `CORS_ORIGIN` to explicit allowed origins for separately hosted browser clients. Keep database credentials and JWT/TURN secrets out of all `VITE_*` variables. Apply migrations and seed the target database using the existing Prisma commands before serving application traffic; builds do not migrate or seed databases.
+Set `DATABASE_URL` to an externally hosted PostgreSQL database and `JWT_SECRET` to a random secret of at least 32 characters in the project's Vercel environment settings. Optional server settings are listed in `server/.env.example`. Same-origin web requests need no CORS override; set `CORS_ORIGIN` to explicit allowed origins for separately hosted browser clients. Keep database credentials and JWT/TURN secrets out of all `VITE_*` variables. Apply migrations and seed the target database using the existing Prisma commands before serving application traffic; the Vercel server build applies pending migrations before publishing, and does not seed the database.
 
 Test the combined routing from this directory with a Vercel CLI that supports Services:
 
@@ -202,7 +202,7 @@ Success response (`200 OK`):
 - Post and reel likes are saved through `PUT /api/v1/posts/:id/like` and `PUT /api/v1/reels/:id/like`; `DELETE` on the same routes removes a like. These operations are idempotent and apply the content's privacy rules. Signed-in story and reel feeds use API data; sample media is reserved for signed-out previews.
 - Go Live (`Create → Go Live`) opens a camera/microphone preview, then broadcasts to signed-in members through WebRTC. Live broadcasts appear on Home and under Reels → LIVE. Hosts can mute the mic, disable the camera, and end the broadcast; leaving the page stops devices and ends the live. Each host can run one live with up to 10 viewers. [Live setup and limits](docs/features/live-streaming.md) covers HTTPS, TURN, and network requirements.
 - [TURN setup for calls and Go Live](docs/features/turn-setup.md) walks through a separate coturn VPS, shared-secret authentication, TLS, Vercel settings, and relay verification.
-- General Home/Search game cards still use sample data; Discover's Nearby GORA Games, game details, My Games, join requests, and player management use the API. Following controls, notifications, activity/badge presentation, and reel comments/shares still have demo or placeholder behavior. Avatar photos currently accept external URLs. See [the audit](docs/PROJECT_AUDIT.md) for remaining limitations.
+- General Home/Search game cards still use sample data; Discover's Nearby GORA Games, game details, My Games, join requests, and player management use the API. Following controls, activity/badge presentation, and reel comments/shares still have demo or placeholder behavior. Avatar photos currently accept external URLs. See [the audit](docs/PROJECT_AUDIT.md) for remaining limitations.
 - Useful checks:
 
 ```bash
@@ -210,3 +210,9 @@ npm run typecheck
 npm run mobile:build
 npm run server:build
 ```
+
+## Notifications
+
+The bell uses the authenticated PostgreSQL inbox at `GET /api/v1/notifications`, not demo data. `PATCH /api/v1/notifications/:id/read` and `PATCH /api/v1/notifications/read-all` persist read state. The authenticated layout refreshes every 15 seconds while visible and when returning to the app; account changes clear the previous inbox. Apply `20261025090000_activity_notifications` with `npx prisma migrate deploy` before deploying the API. Activity triggers create alerts in the same transaction as follows, friend requests/acceptance, messages/message requests, post/reel likes and comments, game join requests/decisions/status, and badge unlocks. No past/sample notifications are inserted. The inbox has loading, retry, refresh, empty, and pagination states. These are in-app notifications; background OS/browser push is not implemented.
+
+Verification: `npm run test:e2e --prefix server -- --runInBand notifications.e2e-spec.ts` and `npm run test:unit --prefix mobile -- tests/unit/notifications.spec.ts`. Tests create and clean up their own temporary records.
