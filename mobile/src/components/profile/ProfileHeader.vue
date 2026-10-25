@@ -86,6 +86,8 @@ const coverOpen = ref(false);
 }
 
 .profile-header__cover-edit {
+  /* Keep this control above the identity section that overlaps the cover. */
+  z-index: 2;
   border: 0;
   font-family: inherit;
   cursor: pointer;
