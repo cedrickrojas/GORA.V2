@@ -26,7 +26,7 @@ export function validateEnv(
     ...config,
     NODE_ENV: nodeEnv,
     PORT: port,
-    DATABASE_URL: readString(config.DATABASE_URL),
+    DATABASE_URL: readDatabaseUrl(config.DATABASE_URL),
     JWT_SECRET: readJwtSecret(config.JWT_SECRET),
     JWT_EXPIRES_IN: readJwtExpiresIn(config.JWT_EXPIRES_IN),
     CORS_ORIGIN: readString(config.CORS_ORIGIN),
@@ -35,6 +35,28 @@ export function validateEnv(
     ),
     GAME_TIMEZONE: readGameTimezone(config.GAME_TIMEZONE),
   };
+}
+
+/** Reject malformed .env values without including credentials in the error. */
+export function readDatabaseUrl(value: unknown): string {
+  const connection = readString(value).trim();
+  // Keep the health endpoint available when no database has been configured yet.
+  if (!connection) return '';
+  try {
+    const url = new URL(connection);
+    if (
+      !['postgresql:', 'postgres:'].includes(url.protocol) ||
+      !url.hostname ||
+      url.pathname.length < 2 ||
+      /[\s"'`]/.test(connection)
+    )
+      throw new Error('Invalid PostgreSQL connection string.');
+    return connection;
+  } catch {
+    throw new Error(
+      'DATABASE_URL must be a valid PostgreSQL URL. Check the opening and closing quotes in server/.env.',
+    );
+  }
 }
 
 export function readGameTimezone(value: unknown): string {

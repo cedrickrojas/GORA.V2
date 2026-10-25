@@ -4,10 +4,39 @@ import {
   DEFAULT_GAME_TIMEZONE,
   DEFAULT_JWT_EXPIRES_IN,
   readClubMaxMembersLimit,
+  readDatabaseUrl,
   readGameTimezone,
   readJwtExpiresIn,
   readJwtSecret,
 } from './env.validation';
+
+describe('DATABASE_URL', () => {
+  it('accepts configured PostgreSQL URLs and preserves encoded credentials and TLS options', () => {
+    const url =
+      'postgresql://owner:encoded%40password@db.example.test/neondb?sslmode=require';
+    expect(readDatabaseUrl(` ${url} `)).toBe(url);
+    expect(
+      readDatabaseUrl('postgres://user:password@localhost:5432/gora'),
+    ).toBe('postgres://user:password@localhost:5432/gora');
+    expect(readDatabaseUrl(undefined)).toBe('');
+  });
+  it('rejects unmatched quotes, CLI commands, and other URL schemes before serving requests', () => {
+    for (const value of [
+      '"postgresql://owner:private-password@db.example.test/neondb',
+      'postgresql://owner:private-password@db.example.test/neondb"',
+      "psql 'postgresql://owner:private-password@db.example.test/neondb'",
+      'https://db.example.test/neondb',
+      'postgresql://db.example.test/',
+    ]) {
+      expect(() => readDatabaseUrl(value)).toThrow('DATABASE_URL');
+      try {
+        readDatabaseUrl(value);
+      } catch (error) {
+        expect((error as Error).message).not.toContain('private-password');
+      }
+    }
+  });
+});
 
 describe('GAME_TIMEZONE', () => {
   it('defaults to Asia/Manila and accepts IANA zones', () => {
