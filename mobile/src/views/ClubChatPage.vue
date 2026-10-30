@@ -1,5 +1,5 @@
 <template>
-  <ion-page ref="pageRef" :style="{ bottom: `${keyboardInset}px` }">
+  <ion-page ref="pageRef">
     <ion-header class="ion-no-border">
       <ion-toolbar class="club-chat__toolbar">
         <ion-buttons slot="start">
@@ -126,7 +126,7 @@ const draft = ref('');
 const sending = ref(false);
 const contentRef = ref<InstanceType<typeof IonContent> | null>(null);
 const pageRef = ref<InstanceType<typeof IonPage> | null>(null);
-const { keyboardInset } = useChatKeyboard(pageRef, () => { void scrollToLatest(0); });
+useChatKeyboard(pageRef, () => { void scrollToLatest(0); });
 
 const chat = computed(() => (state.value.status === 'open' ? clubChatStore.getChat(clubId) : undefined));
 const messages = computed(() => clubChatStore.getMessages(clubId));

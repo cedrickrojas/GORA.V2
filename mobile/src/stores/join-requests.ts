@@ -106,7 +106,11 @@ export const useJoinRequestsStore = defineStore('join-requests', () => {
 
     try {
       const note = message?.trim() || null;
-      rememberMine(gameId, await authorized((token) => createJoinRequestCall(token, gameId, note)));
+      const request = await authorized((token) => createJoinRequestCall(token, gameId, note));
+      rememberMine(gameId, request);
+      if (request.status === 'ACCEPTED') {
+        await Promise.all([gamePlayers.fetchMyParticipation(gameId), gamePlayers.refreshGameCount(gameId)]);
+      }
       return { ok: true };
     } catch (caught) {
       if (!isCurrent()) return { ok: false, message: 'The account changed. Try again.' };

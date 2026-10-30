@@ -1,6 +1,15 @@
 import type { ClubSummary } from './club';
 import type { SportsLocation } from './sport';
 import type { UserSummary } from './user';
+import type { ParticipantStatus } from './game-player';
+import type { JoinRequestStatus } from './join-request';
+
+export interface JoinedGame extends ApiGame {
+  participationStatus: ParticipantStatus | null;
+  joinRequestStatus: JoinRequestStatus | null;
+  joinedAt: string | null;
+  requestedAt: string | null;
+}
 
 /** Mirrors the server's GameStatus enum. ACTIVE means the game is in progress. */
 export type GameStatus = 'OPEN' | 'FULL' | 'ACTIVE' | 'COMPLETED' | 'CANCELLED';
@@ -56,6 +65,7 @@ export interface GameDetails extends Game {
  * the venue's "HH:mm", shown exactly as entered. currentPlayers is counted by the server.
  */
 export interface ApiGame {
+  autoAccept: boolean;
   id: string;
   title: string;
   description: string | null;
@@ -92,6 +102,7 @@ export interface ApiGame {
 
 /** POST /games. The host comes from the JWT and a new game is always OPEN. */
 export interface CreateGameInput {
+  autoAccept: boolean;
   sportId: string;
   clubId: string | null;
   title: string;

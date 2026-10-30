@@ -40,6 +40,7 @@ export function gameClubSummary(game: ApiGame): ClubSummary | null {
 }
 
 export interface GameForm {
+  autoAccept: boolean;
   sportId: string;
   /** '' means no club. */
   clubId: string;
@@ -73,6 +74,7 @@ export const GAME_STATUS_LABELS: Record<GameStatus, string> = {
 
 export function emptyGameForm(): GameForm {
   return {
+    autoAccept: false,
     sportId: '',
     clubId: '',
     title: '',
@@ -89,6 +91,7 @@ export function emptyGameForm(): GameForm {
 
 export function gameToForm(game: ApiGame): GameForm {
   return {
+    autoAccept: game.autoAccept ?? false,
     sportId: game.sport.id,
     clubId: game.club?.id ?? '',
     title: game.title,
@@ -256,6 +259,7 @@ export function toCreateGameInput(form: GameForm): CreateGameInput {
   const description = form.description.trim();
 
   return {
+    autoAccept: form.autoAccept,
     sportId: form.sportId,
     clubId: form.clubId || null,
     title: form.title.trim(),
@@ -274,6 +278,7 @@ export function toCreateGameInput(form: GameForm): CreateGameInput {
 export function diffGameInput(game: ApiGame, input: CreateGameInput): UpdateGameInput {
   const current = toCreateGameInput(gameToForm(game));
   const changes: UpdateGameInput = {};
+  if (input.autoAccept !== current.autoAccept) changes.autoAccept = input.autoAccept;
 
   if (input.sportId !== current.sportId) changes.sportId = input.sportId;
   if (input.clubId !== current.clubId) changes.clubId = input.clubId;

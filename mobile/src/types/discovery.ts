@@ -7,6 +7,7 @@ import type { JoinRequestStatus } from './join-request';
  * (ACTIVE GameParticipant rows); the client never recalculates them.
  */
 export interface DiscoveredGame {
+  autoAccept?: boolean;
   id: string;
   title: string;
   sport: ApiGame['sport'];

@@ -54,6 +54,7 @@
         :is-open="joiningGame !== null"
         :game-title="joiningGame?.title ?? ''"
         :host-name="joiningGame?.host.displayName ?? ''"
+        :auto-accept="joiningGame?.autoAccept"
         :is-submitting="busyGameId !== null"
         :error="joinError"
         @close="closeJoin"
@@ -95,14 +96,22 @@ const selectedGameId = ref<string | null>(null);
 
 const { joiningGame, joinError, busyGameId, joinActionOf, openJoin, closeJoin, sendJoin } = useDiscoveryJoin(
   games,
-  (gameId) => {
-    games.value = games.value.map((game) => (game.id === gameId ? { ...game, myJoinRequestStatus: 'PENDING' } : game));
+  (gameId, status, updatedGame) => {
+    games.value = games.value.map((game) => (game.id === gameId ? {
+      ...game,
+      ...(updatedGame ? {
+        isPlayer: updatedGame.isPlayer, currentPlayers: updatedGame.currentPlayers,
+        remainingSlots: updatedGame.remainingSlots, status: updatedGame.status,
+      } : {}),
+      myJoinRequestStatus: status,
+    } : game));
   },
 );
 
 /** The game the user came from, as a map result. Its distance is not measured here. */
 function fromApiGame(game: ApiGame): DiscoveredGame {
   return {
+    autoAccept: game.autoAccept,
     id: game.id,
     title: game.title,
     sport: game.sport,

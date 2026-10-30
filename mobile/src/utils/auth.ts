@@ -1,4 +1,4 @@
-import type { LoginField, LoginInput, RegisterField, RegisterInput } from '@/types/auth';
+import type { LoginField, LoginInput, RegisterField, RegisterInput, UserRole } from '@/types/auth';
 
 export const PASSWORD_MIN_LENGTH = 8;
 export const PASSWORD_MAX_LENGTH = 128;
@@ -131,18 +131,32 @@ export function safeRedirectPath(value: unknown): string {
   return value;
 }
 
+/** Super admins enter their own workspace, including when a login has a stale social-page redirect. */
+export function postLoginPath(redirect: unknown, role?: UserRole): string {
+  return role === 'SUPER_ADMIN' ? '/admin' : safeRedirectPath(redirect);
+}
+
 export interface GuardTarget {
   fullPath: string;
   requiresAuth: boolean;
   guestOnly: boolean;
+  superAdminOnly?: boolean;
 }
 
 export type GuardDecision = true | { path: string; query?: Record<string, string> };
 
-export function resolveAuthNavigation(target: GuardTarget, isAuthenticated: boolean): GuardDecision {
+export function resolveAuthNavigation(target: GuardTarget, isAuthenticated: boolean, role?: UserRole): GuardDecision {
   if (target.requiresAuth && !isAuthenticated) {
     const redirect = safeRedirectPath(target.fullPath);
     return redirect === DEFAULT_AUTHENTICATED_PATH ? { path: '/login' } : { path: '/login', query: { redirect } };
+  }
+
+  if (isAuthenticated && role === 'SUPER_ADMIN' && !target.superAdminOnly) {
+    return { path: '/admin' };
+  }
+
+  if (isAuthenticated && target.superAdminOnly && role !== 'SUPER_ADMIN') {
+    return { path: DEFAULT_AUTHENTICATED_PATH };
   }
 
   if (target.guestOnly && isAuthenticated) {

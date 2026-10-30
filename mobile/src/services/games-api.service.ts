@@ -1,5 +1,5 @@
 import type { GameDiscoveryQuery, GameDiscoveryResponse } from '@/types/discovery';
-import type { ApiGame, CreateGameInput, GameListQuery, UpdateGameInput } from '@/types/game';
+import type { ApiGame, CreateGameInput, GameListQuery, JoinedGame, UpdateGameInput } from '@/types/game';
 import { apiRequest } from './api-client';
 
 function toSearch(query: object): string {
@@ -42,6 +42,10 @@ export function discoverGames(token: string, query: GameDiscoveryQuery = {}): Pr
 
 export function listHostedGames(token: string): Promise<ApiGame[]> {
   return apiRequest<ApiGame[]>('/games/mine', { token });
+}
+
+export function listJoinedGames(token: string): Promise<JoinedGame[]> {
+  return apiRequest<JoinedGame[]>('/games/joined', { token });
 }
 
 /** Games the signed-in user is an ACTIVE player in (not hosted, not left or removed). */

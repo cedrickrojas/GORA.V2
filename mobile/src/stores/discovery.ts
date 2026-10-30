@@ -7,12 +7,7 @@ import {
   describeLocationFailure,
   requestPermission,
 } from '@/services/location.service';
-import type {
-  DiscoveredGame,
-  DiscoveryDateFilter,
-  DiscoveryViewMode,
-  GameDiscoveryQuery,
-} from '@/types/discovery';
+import type { DiscoveredGame, DiscoveryDateFilter, DiscoveryViewMode, GameDiscoveryQuery } from '@/types/discovery';
 import type { JoinRequestStatus } from '@/types/join-request';
 import { describeApiError } from '@/utils/api-errors';
 import type { MapPoint } from '@/utils/location-map';
@@ -63,16 +58,20 @@ export const useDiscoveryStore = defineStore('discovery', () => {
   let requestSeq = 0;
   let permissionChecked = false;
 
-  watch([() => auth.sessionVersion, () => auth.accessToken, () => auth.currentUser?.id], () => {
-    requestSeq++;
-    games.value = [];
-    selectedGameId.value = null;
-    userLocation.value = null;
-    locationStatus.value = 'idle';
-    permissionChecked = false;
-    status.value = 'idle';
-    error.value = null;
-  }, { flush: 'sync' });
+  watch(
+    [() => auth.sessionVersion, () => auth.accessToken, () => auth.currentUser?.id],
+    () => {
+      requestSeq++;
+      games.value = [];
+      selectedGameId.value = null;
+      userLocation.value = null;
+      locationStatus.value = 'idle';
+      permissionChecked = false;
+      status.value = 'idle';
+      error.value = null;
+    },
+    { flush: 'sync' },
+  );
 
   /** The header filter's sport name, resolved to the central Sport id. */
   const selectedSport = computed(() => {
@@ -240,9 +239,26 @@ export const useDiscoveryStore = defineStore('discovery', () => {
   }
 
   /** Keeps a result in step after the viewer sends or cancels a join request from the map. */
-  function applyJoinRequest(gameId: string, requestStatus: JoinRequestStatus | null): void {
+  function applyJoinRequest(
+    gameId: string,
+    requestStatus: JoinRequestStatus | null,
+    updatedGame: Pick<DiscoveredGame, 'isPlayer' | 'currentPlayers' | 'remainingSlots' | 'status'> | null = null,
+  ): void {
     games.value = games.value.map((game) =>
-      game.id === gameId ? { ...game, myJoinRequestStatus: requestStatus } : game,
+      game.id === gameId
+        ? {
+            ...game,
+            ...(updatedGame
+              ? {
+                  isPlayer: updatedGame.isPlayer,
+                  currentPlayers: updatedGame.currentPlayers,
+                  remainingSlots: updatedGame.remainingSlots,
+                  status: updatedGame.status,
+                }
+              : {}),
+            myJoinRequestStatus: requestStatus,
+          }
+        : game,
     );
   }
 

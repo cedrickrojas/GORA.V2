@@ -7,10 +7,17 @@ declare module 'vue-router' {
   interface RouteMeta {
     requiresAuth?: boolean;
     guestOnly?: boolean;
+    superAdminOnly?: boolean;
   }
 }
 
 export const routes: RouteRecordRaw[] = [
+  {
+    path: '/admin',
+    name: 'super-admin',
+    component: () => import('../views/admin/AdminDashboardPage.vue'),
+    meta: { requiresAuth: true, superAdminOnly: true },
+  },
   {
     path: '/',
     name: 'landing',
@@ -257,8 +264,10 @@ router.beforeEach(async (to) => {
       fullPath: to.fullPath,
       requiresAuth: to.matched.some((record) => record.meta.requiresAuth),
       guestOnly: to.matched.some((record) => record.meta.guestOnly),
+      superAdminOnly: to.matched.some((record) => record.meta.superAdminOnly),
     },
     auth.isAuthenticated,
+    auth.currentUser?.role,
   );
 });
 

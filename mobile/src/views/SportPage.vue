@@ -6,8 +6,8 @@
       <p v-if="catalog.isLoaded && !sport" class="sport__missing">This sport is not on GORA yet.</p>
 
       <div v-else-if="sport" class="sport">
-        <header class="sport__hero" :style="{ background: visual.gradient }">
-          <span class="sport__marker" aria-hidden="true">{{ marker }}</span>
+        <header class="sport__hero">
+          <img :src="sportImage" alt="" class="sport__hero-image" decoding="async" />
           <h1 class="sport__name">{{ sport.name }}</h1>
           <p class="sport__stats">
             {{ formatCompactNumber(sport.activePlayers) }} active players · {{ sport.openGames }} open games
@@ -155,7 +155,7 @@ import { rankPopularClubs } from '@/utils/clubs';
 import { isWithinDistance, matchesSport } from '@/utils/filters';
 import { DISCOVERY_DATES, selectSportDiscoveryGames, type DiscoveryDate } from '@/utils/map-discovery';
 import { formatDistanceFilter, matchesSearchQuery } from '@/utils/search';
-import { getSportMarker, getSportVisual, toSportSlug } from '@/utils/sports';
+import { getSportImage, getSportMarker, toSportSlug } from '@/utils/sports';
 import { formatCompactNumber, formatDistanceKm } from '@/utils/time';
 
 type SportView = 'MAP' | 'LIST';
@@ -197,7 +197,7 @@ watch(
   },
 );
 const sportName = computed(() => sport.value?.name ?? 'Sport');
-const visual = computed(() => getSportVisual(sportName.value));
+const sportImage = computed(() => getSportImage(sportName.value));
 const marker = computed(() => getSportMarker(sportName.value));
 
 const dateLabel = computed(() => DISCOVERY_DATES.find((option) => option.id === date.value)?.label ?? '');
@@ -291,17 +291,36 @@ onMounted(() => {
 
 .sport__hero {
   position: relative;
+  display: flex;
+  min-height: 200px;
+  flex-direction: column;
+  justify-content: flex-end;
   overflow: hidden;
   padding: 20px 18px;
   border-radius: 18px;
+  background: var(--gora-surface-raised);
 }
 
-.sport__marker {
+.sport__hero::after {
   position: absolute;
-  top: 10px;
-  right: 14px;
-  font-size: 56px;
-  opacity: 0.9;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.08), rgba(0, 0, 0, 0.85));
+  content: '';
+}
+
+.sport__hero-image {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 35%;
+}
+
+.sport__name,
+.sport__stats {
+  position: relative;
+  z-index: 1;
 }
 
 .sport__name {

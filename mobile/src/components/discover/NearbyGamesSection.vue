@@ -113,6 +113,7 @@
       :is-open="joiningGame !== null"
       :game-title="joiningGame?.title ?? ''"
       :host-name="joiningGame?.host.displayName ?? ''"
+      :auto-accept="joiningGame?.autoAccept"
       :is-submitting="busyGameId !== null"
       :error="joinError"
       @close="closeJoin"
@@ -149,7 +150,7 @@ const filters = useFiltersStore();
 const sportsStore = useSportsStore();
 const { joiningGame, joinError, busyGameId, joinActionOf, openJoin, closeJoin, sendJoin } = useDiscoveryJoin(
   computed(() => discovery.games),
-  (gameId) => discovery.applyJoinRequest(gameId, 'PENDING'),
+  (gameId, status, game) => discovery.applyJoinRequest(gameId, status, game),
 );
 
 // Sport and distance are the header filter; a change from here or from the header refetches once.

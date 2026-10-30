@@ -2,6 +2,7 @@ import {
   basketballOutline,
   bicycleOutline,
   footballOutline,
+  gameControllerOutline,
   medalOutline,
   tennisballOutline,
   walkOutline,
@@ -20,6 +21,10 @@ const DEFAULT_VISUAL: SportVisual = {
 };
 
 const SPORT_VISUALS: Record<string, SportVisual> = {
+  esports: {
+    icon: gameControllerOutline,
+    gradient: 'var(--gora-surface-raised)',
+  },
   basketball: {
     icon: basketballOutline,
     gradient: 'var(--gora-surface-raised)',
@@ -66,7 +71,28 @@ export function getSportVisual(sport: string): SportVisual {
   return SPORT_VISUALS[sport.toLowerCase()] ?? DEFAULT_VISUAL;
 }
 
+const SPORT_IMAGES: Record<string, string> = {
+  basketball: '/images/basketball-action.png',
+  volleyball: '/images/volleyball-action.png',
+  football: '/images/football-action.png',
+  tennis: '/images/tennis-action.png',
+  badminton: '/images/badminton-action.png',
+  pickleball: '/images/pickleball-action.png',
+  running: '/images/running-action.png',
+  swimming: '/images/swimming-action.png',
+  'table tennis': '/images/table-tennis-action.png',
+  cycling: '/images/cycling-action.png',
+  esports: '/images/esports-action.png',
+  other: '/images/other-sports-action.png',
+};
+
+/** The supplied action photo for sport browsing cards and the sport's page header. */
+export function getSportImage(sport: string): string {
+  return SPORT_IMAGES[sport.trim().toLowerCase()] ?? SPORT_IMAGES.other;
+}
+
 const SPORT_MARKERS: Record<string, string> = {
+  esports: '🎮',
   basketball: '🏀',
   volleyball: '🏐',
   football: '⚽',

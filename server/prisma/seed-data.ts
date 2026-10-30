@@ -32,6 +32,7 @@ export const SPORT_SEEDS: readonly SportSeed[] = [
   { name: 'Table Tennis', description: 'Ping pong matches and practice.' },
   { name: 'Swimming', description: 'Laps, open water, and swim training.' },
   { name: 'Cycling', description: 'Road rides, trails, and group spins.' },
+  { name: 'Esports', description: 'Competitive video games, team matches, and tournaments.' },
   { name: 'Other', description: 'Any sport not listed yet.' },
 ];
 

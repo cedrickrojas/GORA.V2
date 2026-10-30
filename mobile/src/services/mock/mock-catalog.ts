@@ -31,6 +31,7 @@ export const mockSports: SportCategory[] = [
   { id: 'sport-swimming', name: 'Swimming', activePlayers: 1870, openGames: 9, trendingScore: 48 },
   { id: 'sport-table-tennis', name: 'Table Tennis', activePlayers: 1540, openGames: 12, trendingScore: 45 },
   { id: 'sport-cycling', name: 'Cycling', activePlayers: 2260, openGames: 8, trendingScore: 42 },
+  { id: 'sport-esports', name: 'Esports', activePlayers: 0, openGames: 0, trendingScore: 0 },
   { id: 'sport-other', name: 'Other', activePlayers: 640, openGames: 5, trendingScore: 20 },
 ];
 

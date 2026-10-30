@@ -1,0 +1,40 @@
+/* The app and its overlays share the visible area above the phone keyboard. */
+html.gora-input-focused ion-app {
+  top: var(--gora-viewport-top, 0px);
+  bottom: auto;
+  height: var(--gora-viewport-height, 100%);
+}
+
+html.gora-keyboard-open {
+  --ion-safe-area-bottom: 0px;
+  --gora-input-safe-bottom: 0px;
+}
+
+html.gora-keyboard-open dialog[open] {
+  top: calc(var(--gora-viewport-top, 0px) + 12px);
+  bottom: auto;
+  margin-block: 0;
+  max-height: calc(var(--gora-viewport-height, 100dvh) - 24px);
+  overflow-y: auto;
+}
+
+@media (any-pointer: coarse) {
+  /* A 16px input prevents iOS focus zoom while preserving manual pinch zoom. */
+  input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']),
+  textarea,
+  [contenteditable]:not([contenteditable='false']),
+  ion-input,
+  ion-textarea,
+  ion-searchbar {
+    font-size: max(16px, 1rem) !important;
+  }
+
+  html.gora-keyboard-open .gora-tab-bar {
+    display: none;
+  }
+
+  html.gora-keyboard-open textarea {
+    max-height: max(44px, calc(var(--gora-viewport-height, 100dvh) * 0.4));
+    overflow-y: auto;
+  }
+}

@@ -2,17 +2,19 @@ import { flushPromises, mount } from '@vue/test-utils';
 import { IonicVue } from '@ionic/vue';
 import { createPinia, setActivePinia } from 'pinia';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
-import { routerKey } from 'vue-router';
+import { routeLocationKey, routerKey } from 'vue-router';
 import { routes } from '@/router';
 import { useAuthStore } from '@/stores/auth';
 import type { RegisterInput } from '@/types/auth';
 import {
   resolveAuthNavigation,
+  postLoginPath,
   safeRedirectPath,
   validateLoginInput,
   validateRegisterInput,
 } from '@/utils/auth';
 import RegisterPage from '@/views/auth/RegisterPage.vue';
+import LoginPage from '@/views/auth/LoginPage.vue';
 
 const TOKEN_KEY = 'gora.accessToken';
 
@@ -136,6 +138,32 @@ describe('route guards', () => {
     expect(safeRedirectPath('/login')).toBe('/home');
     expect(safeRedirectPath(undefined)).toBe('/home');
   });
+
+  test.each(['/', '/login', '/register', '/home', '/profile', '/chat'])('super admins enter the dashboard from %s', (path) => {
+    const target = ['/', '/login', '/register'].includes(path) ? guestPage(path) : protectedPage(path);
+    expect(resolveAuthNavigation(target, true, 'SUPER_ADMIN')).toEqual({ path: '/admin' });
+  });
+
+  test('super admins can navigate dashboard sections without a redirect loop', () => {
+    expect(resolveAuthNavigation({ ...protectedPage('/admin?section=users'), superAdminOnly: true }, true, 'SUPER_ADMIN')).toBe(true);
+  });
+
+  test.each(['USER', 'ADMIN'] as const)('%s accounts cannot enter the super admin dashboard', (role) => {
+    expect(resolveAuthNavigation({ ...protectedPage('/admin'), superAdminOnly: true }, true, role)).toEqual({ path: '/home' });
+  });
+
+  test('a logged-out dashboard request goes through login first', () => {
+    expect(resolveAuthNavigation({ ...protectedPage('/admin'), superAdminOnly: true }, false)).toEqual({ path: '/login', query: { redirect: '/admin' } });
+  });
+
+  test('post-login destinations honor the account role over stale social redirects', () => {
+    for (const redirect of [undefined, '/home', '/profile', '/admin?section=reports', 'https://evil.example']) {
+      expect(postLoginPath(redirect, 'SUPER_ADMIN')).toBe('/admin');
+    }
+    expect(postLoginPath(undefined, 'USER')).toBe('/home');
+    expect(postLoginPath('/profile', 'USER')).toBe('/profile');
+    expect(postLoginPath('https://evil.example', 'USER')).toBe('/home');
+  });
 });
 
 describe('auth store', () => {
@@ -202,6 +230,45 @@ describe('auth store', () => {
     await rejected.initialize();
     expect(rejected.isAuthenticated).toBe(false);
     expect(localStorage.getItem(TOKEN_KEY)).toBeNull();
+  });
+
+  test('a restored super admin session leaves the social home for the dashboard', async () => {
+    localStorage.setItem(TOKEN_KEY, 'saved-admin-token');
+    mockApi(() => jsonResponse(200, { ...ME, role: 'SUPER_ADMIN' }));
+    const auth = useAuthStore();
+    await auth.initialize();
+    expect(resolveAuthNavigation({ fullPath: '/home', requiresAuth: true, guestOnly: false }, auth.isAuthenticated, auth.currentUser?.role)).toEqual({ path: '/admin' });
+  });
+});
+
+describe('LoginPage.vue role routing', () => {
+  test.each([
+    { role: 'SUPER_ADMIN', redirect: undefined, destination: '/admin' },
+    { role: 'SUPER_ADMIN', redirect: '/home', destination: '/admin' },
+    { role: 'SUPER_ADMIN', redirect: '/profile', destination: '/admin' },
+    { role: 'USER', redirect: undefined, destination: '/home' },
+    { role: 'USER', redirect: '/profile', destination: '/profile' },
+  ])('$role login redirects to $destination with redirect=$redirect', async ({ role, redirect, destination }) => {
+    mockApi(url => url.endsWith('/auth/login')
+      ? jsonResponse(200, { user: { ...SAFE_USER, role }, accessToken: 'login-token' })
+      : jsonResponse(200, { ...ME, role }));
+    const replace = vi.fn().mockResolvedValue(undefined);
+    const wrapper = mount(LoginPage, {
+      global: {
+        plugins: [IonicVue, createPinia()],
+        stubs: { RouterLink: { template: '<a><slot /></a>' } },
+        provide: {
+          [routerKey as symbol]: { replace },
+          [routeLocationKey as symbol]: { query: { redirect } },
+        },
+      },
+    });
+    await wrapper.find('#login-email').setValue('louis@example.com');
+    await wrapper.find('#login-password').setValue('correct-horse-9');
+    await wrapper.find('form').trigger('submit');
+    await flushPromises();
+    expect(replace).toHaveBeenCalledWith(destination);
+    wrapper.unmount();
   });
 });
 

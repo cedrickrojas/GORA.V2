@@ -67,6 +67,7 @@ model User {
   reportsReceived         Report[]                  @relation("ReportReportedUser")
   reportsFiled            Report[]                  @relation("ReportReporter")
   reportsResolved         Report[]                  @relation("ReportResolver")
+  adminAuditLogs          AdminAuditLog[]
   stories                 Story[]
   customViewerStories     StoryCustomViewer[]
   storyViews              StoryView[]
@@ -116,6 +117,7 @@ model Game {
   title           String
   description     String?
   requiredPlayers Int
+  autoAccept      Boolean           @default(false)
   gameDate        DateTime          @db.Date
   startTime       DateTime
   endTime         DateTime?
@@ -891,6 +893,19 @@ model Report {
 enum UserRole {
   USER
   ADMIN
+  SUPER_ADMIN
+}
+
+model AdminAuditLog {
+  id        String   @id @default(uuid()) @db.Uuid
+  actorId   String   @db.Uuid
+  action    String
+  targetId  String   @db.Uuid
+  details   Json
+  createdAt DateTime @default(dbgenerated("timezone('UTC', now())"))
+  actor     User     @relation(fields: [actorId], references: [id])
+
+  @@index([createdAt])
 }
 
 enum SkillLevel {

@@ -16,6 +16,7 @@
     </header>
 
     <section class="server-game__facts" aria-label="When and where">
+      <p>{{ game.autoAccept ? 'Auto Accept: join instantly while slots are available.' : 'Manual Accept: the host reviews join requests.' }}</p>
       <p><span aria-hidden="true">📅</span> {{ formatGameDay(game.gameDate) }}</p>
       <p><span aria-hidden="true">⏰</span> {{ formatGameTimeRange(game.startTime, game.endTime) }}</p>
       <router-link
@@ -150,7 +151,7 @@
       <template v-else-if="action.kind === 'request'">
         <p v-if="pastNote" class="server-game__hint">{{ pastNote }}</p>
         <button type="button" class="server-game__primary" :disabled="isSubmitting" @click="openRequestModal">
-          Request to Join
+          {{ game.autoAccept ? 'Join Game' : 'Request to Join' }}
         </button>
       </template>
       <template v-else-if="action.kind === 'pending'">
@@ -174,6 +175,7 @@
       :is-open="isRequestModalOpen"
       :game-title="game.title"
       :host-name="game.host.displayName"
+      :auto-accept="game.autoAccept"
       :is-submitting="isSubmitting"
       :error="requestError"
       @close="isRequestModalOpen = false"
@@ -341,7 +343,9 @@ async function sendRequest(message: string | null): Promise<void> {
 
   if (result.ok) {
     isRequestModalOpen.value = false;
-    void showNotice(`Request sent. ${game.value?.host.displayName ?? 'The host'} will review it.`);
+    void showNotice(myRequest.value?.status === 'ACCEPTED'
+      ? 'You joined the game. Your slot is confirmed.'
+      : `Request sent. ${game.value?.host.displayName ?? 'The host'} will review it.`);
   } else {
     requestError.value = result.message;
   }

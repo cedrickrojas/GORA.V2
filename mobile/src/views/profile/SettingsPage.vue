@@ -9,6 +9,10 @@
       </p>
 
       <ion-list inset>
+        <ion-item v-if="auth.currentUser?.role === 'SUPER_ADMIN'" router-link="/admin" :detail="true">
+          <ion-icon slot="start" :icon="shieldCheckmarkOutline" aria-hidden="true" />
+          <ion-label>Super Admin Dashboard<p>Manage GORA, accounts, and reports</p></ion-label>
+        </ion-item>
         <ion-item router-link="/profile/edit" :detail="true">
           <ion-icon slot="start" :icon="personOutline" aria-hidden="true" />
           <ion-label>Edit Profile</ion-label>
@@ -45,6 +49,7 @@ import {
   logOutOutline,
   notificationsOutline,
   personOutline,
+  shieldCheckmarkOutline,
 } from 'ionicons/icons';
 import SubPageHeader from '@/components/layout/SubPageHeader.vue';
 import { useAuthStore } from '@/stores/auth';

@@ -8,10 +8,11 @@ import {
   getGame,
   listGames,
   listHostedGames,
+  listJoinedGames,
   listPlayingGames,
   updateGame as updateGameRequest,
 } from '@/services/games-api.service';
-import type { ApiGame, CreateGameInput, Game, GameListQuery, UpdateGameInput } from '@/types/game';
+import type { ApiGame, CreateGameInput, Game, GameListQuery, JoinedGame, UpdateGameInput } from '@/types/game';
 import { isNotFound } from '@/utils/api-errors';
 import { canRequestToJoin } from '@/utils/games';
 import { useAuthStore } from './auth';
@@ -49,12 +50,19 @@ export const useGamesStore = defineStore('games', () => {
   const playingIds = ref<string[]>([]);
   const playingStatus = ref<LoadStatus>('idle');
   const playingError = ref<string | null>(null);
+  const joinedEntries = ref<JoinedGame[]>([]);
+  const joinedStatus = ref<LoadStatus>('idle');
+  const joinedError = ref<string | null>(null);
   const isSaving = ref(false);
   const cancellingId = ref<string | null>(null);
 
   const listedGames = computed(() => pick(listIds.value));
   const hostedGames = computed(() => pick(hostedIds.value));
   const playingGames = computed(() => pick(playingIds.value));
+  const joinedGames = computed(() => joinedEntries.value.map((entry) => ({
+    ...entry,
+    ...gamesById.value[entry.id],
+  })));
 
   watch(
     [() => auth.sessionVersion, () => auth.accessToken, () => auth.currentUser?.id],
@@ -71,6 +79,9 @@ export const useGamesStore = defineStore('games', () => {
       playingIds.value = [];
       playingStatus.value = 'idle';
       playingError.value = null;
+      joinedEntries.value = [];
+      joinedStatus.value = 'idle';
+      joinedError.value = null;
       isSaving.value = false;
       cancellingId.value = null;
     },
@@ -219,6 +230,25 @@ export const useGamesStore = defineStore('games', () => {
     playingIds.value = playingIds.value.filter((id) => id !== gameId);
   }
 
+  async function fetchJoinedGames(): Promise<ActionResult> {
+    const isCurrent = captureSession(auth);
+    joinedStatus.value = 'loading';
+    joinedError.value = null;
+
+    try {
+      const list = await authorized(listJoinedGames);
+      list.forEach(remember);
+      joinedEntries.value = list;
+      joinedStatus.value = 'ready';
+      return { ok: true };
+    } catch (caught) {
+      if (!isCurrent()) return { ok: false, message: 'The account changed. Try again.' };
+      joinedStatus.value = 'error';
+      joinedError.value = describeGameError(caught);
+      return { ok: false, message: joinedError.value };
+    }
+  }
+
   async function updateGame(gameId: string, input: UpdateGameInput): Promise<GameActionResult> {
     const isCurrent = captureSession(auth);
     isSaving.value = true;
@@ -275,6 +305,9 @@ export const useGamesStore = defineStore('games', () => {
     playingGames,
     playingStatus,
     playingError,
+    joinedGames,
+    joinedStatus,
+    joinedError,
     isSaving,
     cancellingId,
     gameById,
@@ -283,6 +316,7 @@ export const useGamesStore = defineStore('games', () => {
     fetchGames,
     fetchMyGames,
     fetchPlayingGames,
+    fetchJoinedGames,
     forgetPlaying,
     updateGame,
     cancelGame,

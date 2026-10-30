@@ -8,9 +8,15 @@
   >
     <ion-content class="join-request-content">
       <form class="join-request" @submit.prevent="send">
-        <h2 class="join-request__title">Request to Join</h2>
+        <h2 class="join-request__title">{{ autoAccept ? 'Join Game' : 'Request to Join' }}</h2>
         <p class="join-request__subtitle">
-          {{ hostName }} will see your request for <strong>{{ gameTitle }}</strong> and can accept or decline it.
+          <template v-if="autoAccept"
+            >Join <strong>{{ gameTitle }}</strong> automatically while a player slot is available.</template
+          >
+          <template v-else
+            >{{ hostName }} will see your request for <strong>{{ gameTitle }}</strong> and can accept or decline
+            it.</template
+          >
         </p>
 
         <label class="join-request__label" for="join-request-message">Message to the host (optional)</label>
@@ -31,7 +37,7 @@
             Cancel
           </button>
           <button type="submit" class="join-request__send" :disabled="isSubmitting">
-            {{ isSubmitting ? 'Sending…' : 'Send Request' }}
+            {{ isSubmitting ? 'Sending…' : autoAccept ? 'Join Game' : 'Send Request' }}
           </button>
         </div>
       </form>
@@ -48,6 +54,7 @@ const props = defineProps<{
   isOpen: boolean;
   gameTitle: string;
   hostName: string;
+  autoAccept?: boolean;
   isSubmitting: boolean;
   error: string | null;
 }>();

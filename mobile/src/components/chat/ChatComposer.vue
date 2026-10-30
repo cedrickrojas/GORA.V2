@@ -91,14 +91,14 @@ onMounted(resize);
   max-width: var(--gora-column, 680px);
   box-sizing: border-box;
   margin: 0 auto;
-  padding: 10px max(12px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom))
+  padding: 10px max(12px, env(safe-area-inset-right)) max(10px, var(--gora-input-safe-bottom, env(safe-area-inset-bottom)))
     max(12px, env(safe-area-inset-left));
   background: var(--ion-background-color);
 }
 .chat-composer__input {
   min-width: 0;
   min-height: 44px;
-  max-height: 144px;
+  max-height: min(144px, max(44px, calc(var(--gora-viewport-height, 100dvh) * 0.35)));
   flex: 1;
   box-sizing: border-box;
   resize: none;

@@ -19,6 +19,7 @@ export const GAME_FACTS_SELECT = {
   hostId: true,
   status: true,
   requiredPlayers: true,
+  autoAccept: true,
   gameDate: true,
   startTime: true,
 } as const satisfies Prisma.GameSelect;

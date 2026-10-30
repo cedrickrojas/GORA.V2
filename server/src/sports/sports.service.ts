@@ -13,7 +13,7 @@ const SPORT_SELECT = {
   isActive: true,
 } as const;
 
-/** Read-only: sports are managed by the seed (and a future admin module), never by users. */
+/** User-facing reads; super admin status changes live in the admin module. */
 @Injectable()
 export class SportsService {
   constructor(private readonly prisma: PrismaService) {}

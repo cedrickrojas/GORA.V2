@@ -261,16 +261,11 @@ describe('notifications store', () => {
     setActivePinia(createPinia());
   });
 
-  test('tracks unread notifications for the header bell', async () => {
+  test('keeps the signed-out inbox empty instead of showing sample notifications', async () => {
     const store = useNotificationsStore();
-    await store.load();
-
-    expect(store.unreadCount).toBe(3);
-
-    store.markRead('notif-badge');
-    expect(store.unreadCount).toBe(2);
-
-    store.markAllRead();
+    expect(await store.load()).toBe(false);
+    expect(store.items).toEqual([]);
     expect(store.unreadCount).toBe(0);
+    expect(store.isLoaded).toBe(false);
   });
 });

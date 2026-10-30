@@ -20,7 +20,11 @@ import {
 } from './dto/game.dto';
 import { DiscoverGamesQueryDto } from './dto/discover-games.dto';
 import { GameDiscoveryService } from './game-discovery.service';
-import type { GameDiscoveryResult, GameView } from './game.types';
+import type {
+  GameDiscoveryResult,
+  GameView,
+  JoinedGameView,
+} from './game.types';
 import { GAME_NOT_FOUND_MESSAGE, GamesService } from './games.service';
 
 const gameIdPipe = new ParseUUIDPipe({
@@ -60,6 +64,13 @@ export class GamesController {
   @Get('playing')
   listPlaying(@CurrentUser() viewer: CurrentUserContext): Promise<GameView[]> {
     return this.games.listPlaying(viewer.id);
+  }
+
+  @Get('joined')
+  listJoined(
+    @CurrentUser() viewer: CurrentUserContext,
+  ): Promise<JoinedGameView[]> {
+    return this.games.listJoined(viewer.id);
   }
 
   /** Map and list discovery of real GORA games. Declared before :gameId on purpose. */

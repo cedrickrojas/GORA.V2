@@ -1,60 +1,32 @@
-import { onBeforeUnmount, onMounted, ref, type Ref } from 'vue';
+import { onBeforeUnmount, onMounted, type Ref } from 'vue';
 import { onIonViewDidLeave, onIonViewWillEnter } from '@ionic/vue';
+import { KEYBOARD_VIEWPORT_EVENT } from '@/utils/keyboard-viewport';
 
 type ChatPage = HTMLElement | { $el: HTMLElement };
 
-/** Resize the whole thread, rather than covering messages with a floating composer. */
+/** The app handles resizing once; visible threads only keep their latest messages in view. */
 export function useChatKeyboard(page: Ref<ChatPage | null>, onResize: () => void) {
-  const keyboardInset = ref(0);
   let listening = false;
-  let frame = 0;
-  let viewport: VisualViewport | null = null;
-
-  function measure(): void {
-    frame = 0;
+  function resized(event: Event): void {
     const element = page.value instanceof HTMLElement ? page.value : page.value?.$el;
     if (!element || element.classList.contains('ion-page-hidden')) return;
-    const rect = element.getBoundingClientRect();
-    if (!rect.height) return;
-    // Pinch zoom must remain available; it is not an on-screen keyboard.
-    const visibleBottom = viewport && Math.abs(viewport.scale - 1) < 0.05
-      ? viewport.offsetTop + viewport.height
-      : window.innerHeight;
-    const inset = Math.max(0, Math.round(rect.bottom + keyboardInset.value - visibleBottom));
-    const next = Math.min(inset, Math.max(0, rect.height + keyboardInset.value - 120));
-    if (next !== keyboardInset.value) {
-      keyboardInset.value = next;
-      onResize();
-    }
-  }
-
-  function schedule(): void {
-    cancelAnimationFrame(frame);
-    frame = requestAnimationFrame(measure);
+    const input = (event as CustomEvent<{ input: HTMLElement }>).detail.input;
+    if (element.contains(input) && input.closest('ion-footer')) onResize();
   }
 
   function start(): void {
     if (listening) return;
     listening = true;
-    viewport = window.visualViewport;
-    viewport?.addEventListener('resize', schedule);
-    viewport?.addEventListener('scroll', schedule);
-    window.addEventListener('resize', schedule);
-    schedule();
+    document.addEventListener(KEYBOARD_VIEWPORT_EVENT, resized);
   }
 
   function stop(): void {
     listening = false;
-    cancelAnimationFrame(frame);
-    viewport?.removeEventListener('resize', schedule);
-    viewport?.removeEventListener('scroll', schedule);
-    window.removeEventListener('resize', schedule);
-    keyboardInset.value = 0;
+    document.removeEventListener(KEYBOARD_VIEWPORT_EVENT, resized);
   }
 
   onMounted(start);
   onIonViewWillEnter(start);
   onIonViewDidLeave(stop);
   onBeforeUnmount(stop);
-  return { keyboardInset };
 }

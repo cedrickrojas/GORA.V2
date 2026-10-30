@@ -1,5 +1,5 @@
 <template>
-  <ion-page ref="pageRef" :style="{ bottom: `${keyboardInset}px` }">
+  <ion-page ref="pageRef">
     <SubPageHeader :title="partner?.displayName ?? 'Chat'" back-href="/chat">
       <template v-if="partner" #end>
         <button
@@ -151,7 +151,7 @@ const sending = ref(false);
 const fetching = ref(false);
 const contentRef = ref<InstanceType<typeof IonContent> | null>(null);
 const pageRef = ref<InstanceType<typeof IonPage> | null>(null);
-const { keyboardInset } = useChatKeyboard(pageRef, () => {
+useChatKeyboard(pageRef, () => {
   void scrollToLatest();
 });
 

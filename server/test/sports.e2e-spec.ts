@@ -36,6 +36,7 @@ const SEEDED_SPORTS = [
   'Badminton',
   'Basketball',
   'Cycling',
+  'Esports',
   'Football',
   'Running',
   'Swimming',

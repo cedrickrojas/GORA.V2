@@ -18,8 +18,10 @@ import '@ionic/vue/css/display.css';
 
 import './theme/variables.css';
 import './theme/responsive.css';
+import './theme/keyboard.css';
 
-const app = createApp(App).use(IonicVue).use(createPinia()).use(router);
+// The shared viewport handler also covers native HTML inputs and overlay forms.
+const app = createApp(App).use(IonicVue, { scrollAssist: false, scrollPadding: false }).use(createPinia()).use(router);
 
 router.isReady().then(() => {
   app.mount('#app');

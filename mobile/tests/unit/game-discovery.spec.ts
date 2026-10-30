@@ -23,6 +23,8 @@ import {
 import { addDays, deviceMoment } from '@/utils/game-form';
 import { buildDiscoveryQuery, toDiscoveryDateParam } from '@/utils/map-discovery';
 
+vi.mock('@/utils/notice', () => ({ showNotice: vi.fn(async () => undefined) }));
+
 const VOLLEYBALL = '77777777-7777-4777-8777-777777777777';
 const BASKETBALL = '88888888-8888-4888-8888-888888888888';
 const GAME_A = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
@@ -242,6 +244,31 @@ describe('Nearby GORA Games', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
     removeGeolocation();
+  });
+
+  test('auto acceptance updates the discovery card to a confirmed player with fresh capacity', async () => {
+    fakeApi(() => found([game({ autoAccept: true })]));
+    const previousFetch = vi.mocked(fetch).getMockImplementation()!;
+    vi.mocked(fetch).mockImplementation(async (url, init) => {
+      const path = String(url);
+      if (init?.method === 'POST') return jsonResponse(201, { id: 'request', gameId: GAME_A, status: 'ACCEPTED' });
+      if (path.endsWith('/players/me')) return jsonResponse(200, { gameId: GAME_A, status: 'ACTIVE' });
+      if (path.endsWith('/players')) return jsonResponse(200, { gameId: GAME_A, players: [], currentPlayers: 9 });
+      if (path.endsWith(`/games/${GAME_A}`)) return jsonResponse(200, game({ autoAccept: true, isPlayer: true, currentPlayers: 9, remainingSlots: 3 }));
+      return previousFetch(url, init);
+    });
+    const { wrapper } = mountSection();
+    await flushPromises();
+    useDiscoveryStore().setViewMode('LIST');
+    await flushPromises();
+    await wrapper.get('.found-game__button--primary').trigger('click');
+    const modal = wrapper.findComponent({ name: 'JoinRequestModal' });
+    expect(modal.props('autoAccept')).toBe(true);
+    modal.vm.$emit('send', null);
+    await flushPromises();
+    expect(wrapper.get('.found-game__button--primary').text()).toBe("You're playing");
+    expect(wrapper.text()).toContain('Players: 9/12');
+    expect(useDiscoveryStore().games[0].myJoinRequestStatus).toBe('ACCEPTED');
   });
 
   test('loads real games from the discovery API', async () => {

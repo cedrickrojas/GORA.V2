@@ -356,6 +356,7 @@ import {
   calendarOutline,
   checkmarkCircleOutline,
   footballOutline,
+  gameControllerOutline,
   navigateOutline,
   peopleOutline,
   tennisballOutline,
@@ -365,6 +366,14 @@ import {
 // Rotate an existing icon instead of adding another icon library.
 const arrowUpRight = arrowUpOutline;
 const sports = [
+  {
+    name: 'Esports',
+    icon: gameControllerOutline,
+    title: 'Weekend squad matches',
+    place: 'Online or your local gaming cafe',
+    time: 'Saturday · 7:00 PM',
+    spots: '2 teammates needed',
+  },
   {
     name: 'Basketball',
     icon: basketballOutline,

@@ -18,6 +18,7 @@ interface TestUser {
 
 interface DiscoveredGame {
   id: string;
+  autoAccept: boolean;
   title: string;
   sport: { id: string; name: string };
   host: Record<string, unknown>;
@@ -69,6 +70,7 @@ const HOST_KEYS = [
   'username',
 ];
 const GAME_KEYS = [
+  'autoAccept',
   'club',
   'currentPlayers',
   'distanceKm',

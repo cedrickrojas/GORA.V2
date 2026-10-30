@@ -6,6 +6,7 @@
   "private": true,
   "license": "UNLICENSED",
   "scripts": {
+    "admin:bootstrap": "ts-node scripts/bootstrap-super-admin.ts",
     "build": "prisma generate && nest build",
     "build:vercel": "prisma migrate deploy && npm run build",
     "postinstall": "npm run build",

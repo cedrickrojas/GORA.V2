@@ -1,9 +1,21 @@
-import type { GameStatus, JoinRequestStatus } from '../generated/prisma/client';
+import type {
+  GameStatus,
+  JoinRequestStatus,
+  ParticipantStatus,
+} from '../generated/prisma/client';
 
 export interface GameSportView {
   id: string;
   name: string;
   iconUrl: string | null;
+}
+
+/** The viewer's own participation and request history, including cancelled joins. */
+export interface JoinedGameView extends GameView {
+  participationStatus: ParticipantStatus | null;
+  joinRequestStatus: JoinRequestStatus | null;
+  joinedAt: string | null;
+  requestedAt: string | null;
 }
 
 export interface GameHostView {
@@ -28,6 +40,7 @@ export interface GameClubView {
  * gameDate is "YYYY-MM-DD" and the times are the venue's "HH:mm".
  */
 export interface GameView {
+  autoAccept: boolean;
   id: string;
   title: string;
   description: string | null;
@@ -61,6 +74,7 @@ export interface GameView {
  * requiredPlayers.
  */
 export interface GameCardView {
+  autoAccept: boolean;
   id: string;
   title: string;
   sport: GameSportView;

@@ -1,6 +1,8 @@
 import { createPinia, setActivePinia } from 'pinia';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { useAuthStore } from '@/stores/auth';
+import { useGamesStore } from '@/stores/games';
+import { useGamePlayersStore } from '@/stores/game-players';
 import { useJoinRequestsStore } from '@/stores/join-requests';
 import type { HostJoinRequest, JoinRequest } from '@/types/join-request';
 import {
@@ -169,6 +171,21 @@ describe('join requests store', () => {
     expect(JSON.parse(String(fetchMock.mock.calls[0][1]?.body))).toEqual({ message: 'Point guard' });
     expect(store.myJoinRequest(GAME_ID)?.status).toBe('PENDING');
     expect(store.submittingGameId).toBeNull();
+  });
+
+  test('automatic acceptance refreshes the seated player and server capacity', async () => {
+    mockApi((url, init) => {
+      if (init.method === 'POST') return jsonResponse(201, joinRequest({ status: 'ACCEPTED' }));
+      if (url.endsWith('/players/me')) return jsonResponse(200, { gameId: GAME_ID, status: 'ACTIVE', joinedAt: '2026-10-30T00:00:00Z', completedAt: null });
+      if (url.endsWith('/players')) return jsonResponse(200, { gameId: GAME_ID, players: [], currentPlayers: 12 });
+      return jsonResponse(200, { id: GAME_ID, isPlayer: true, currentPlayers: 12, remainingSlots: 0, status: 'FULL' });
+    });
+    signIn();
+    const store = useJoinRequestsStore();
+    expect(await store.createJoinRequest(GAME_ID, null)).toEqual({ ok: true });
+    expect(store.myJoinRequest(GAME_ID)?.status).toBe('ACCEPTED');
+    expect(useGamePlayersStore().participationOf(GAME_ID)?.status).toBe('ACTIVE');
+    expect(useGamesStore().gameById(GAME_ID)).toMatchObject({ isPlayer: true, currentPlayers: 12, remainingSlots: 0 });
   });
 
   test('a blank message sends an empty body', async () => {

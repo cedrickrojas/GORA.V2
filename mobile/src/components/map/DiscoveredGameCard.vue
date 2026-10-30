@@ -69,6 +69,7 @@ const joinLabel = computed(() => {
   }
 
   const action = props.joinAction;
+  if (action.kind === 'request' && props.game.autoAccept) return 'Join Game';
   return action.kind === 'closed' ? action.label : JOIN_LABELS[action.kind];
 });
 </script>

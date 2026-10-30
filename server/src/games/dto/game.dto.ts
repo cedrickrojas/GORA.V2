@@ -2,6 +2,7 @@ import { applyDecorators } from '@nestjs/common';
 import { Transform, Type } from 'class-transformer';
 import {
   IsDefined,
+  IsBoolean,
   IsIn,
   IsInt,
   IsNotEmpty,
@@ -149,6 +150,10 @@ const OptionalClub = () =>
  * count, and timestamps are never accepted: the global ValidationPipe rejects unknown fields.
  */
 export class CreateGameDto {
+  @whenPresent()
+  @IsBoolean({ message: 'Auto accept must be true or false.' })
+  autoAccept?: boolean;
+
   @SportRules()
   sportId!: string;
 
@@ -188,6 +193,10 @@ export class CreateGameDto {
  * coordinates. Status only changes through cancel (and later the game lifecycle).
  */
 export class UpdateGameDto {
+  @whenPresent()
+  @IsBoolean({ message: 'Auto accept must be true or false.' })
+  autoAccept?: boolean;
+
   @whenPresent()
   @SportRules()
   sportId?: string;

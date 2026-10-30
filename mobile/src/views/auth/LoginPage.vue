@@ -44,7 +44,7 @@ import AuthField from '@/components/auth/AuthField.vue';
 import AuthShell from '@/components/auth/AuthShell.vue';
 import { ApiError } from '@/services/api-client';
 import { useAuthStore } from '@/stores/auth';
-import { PASSWORD_MAX_LENGTH, hasErrors, safeRedirectPath, validateLoginInput } from '@/utils/auth';
+import { PASSWORD_MAX_LENGTH, hasErrors, postLoginPath, validateLoginInput } from '@/utils/auth';
 
 const auth = useAuthStore();
 const route = useRoute();
@@ -76,7 +76,7 @@ async function submit(): Promise<void> {
 
   try {
     await auth.login({ ...form });
-    const destination = safeRedirectPath(route.query.redirect);
+    const destination = postLoginPath(route.query.redirect, auth.currentUser?.role);
     form.email = '';
     resetForm();
     await router.replace(destination);

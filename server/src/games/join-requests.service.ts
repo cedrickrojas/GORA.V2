@@ -111,59 +111,76 @@ export class JoinRequestsService {
     gameId: string,
     dto: CreateJoinRequestDto,
   ): Promise<JoinRequestView> {
-    const game = await this.findVisibleGame(userId, gameId);
-
-    if (game.hostId === userId) {
-      throw new ForbiddenException(JOIN_REQUEST_OWN_GAME_MESSAGE);
-    }
-
-    this.assertJoinable(game);
-
-    const participant = await this.prisma.gameParticipant.findFirst({
-      where: { gameId, userId, status: ACTIVE_PLAYER_STATUS },
-      select: { id: true },
-    });
-
-    if (participant) {
-      throw new ConflictException(ALREADY_PLAYING_MESSAGE);
-    }
-
-    const message = dto.message ?? null;
-    const existing = await this.prisma.joinRequest.findUnique({
-      where: { gameId_userId: { gameId, userId } },
-      select: { id: true, status: true },
-    });
-
-    if (existing) {
-      // ACCEPTED without an ACTIVE seat means the player left or was removed.
-      if (existing.status === 'PENDING' || existing.status === 'REJECTED') {
-        throw new ConflictException(EXISTING_REQUEST_MESSAGES[existing.status]);
-      }
-
-      // One row per player and game: asking again reuses it.
-      const { count } = await this.prisma.joinRequest.updateMany({
-        where: { id: existing.id, status: existing.status },
-        data: {
-          status: 'PENDING',
-          message,
-          respondedAt: null,
-          createdAt: new Date(),
-        },
-      });
-
-      if (count === 0) {
-        throw new ConflictException(JOIN_REQUEST_DUPLICATE_MESSAGE);
-      }
-
-      return toJoinRequestView(await this.findRequest(existing.id));
-    }
-
     try {
-      const created = await this.prisma.joinRequest.create({
-        data: { gameId, userId, message, status: 'PENDING' },
-        select: JOIN_REQUEST_SELECT,
-      });
-      return toJoinRequestView(created);
+      return await withCapacityGuard(() =>
+        this.prisma.$transaction(async (tx) => {
+          // Serialize requests with host acceptances, leaves, and approval-mode edits.
+          const game = await lockGame(tx, gameId);
+          const visible = await tx.game.findFirst({
+            where: { AND: [{ id: gameId }, visibleGamesWhere(userId)] },
+            select: { id: true },
+          });
+          if (!visible) throw new NotFoundException(GAME_NOT_FOUND_MESSAGE);
+          if (game.hostId === userId) {
+            throw new ForbiddenException(JOIN_REQUEST_OWN_GAME_MESSAGE);
+          }
+          this.assertJoinable(game);
+
+          const participant = await tx.gameParticipant.findFirst({
+            where: { gameId, userId, status: ACTIVE_PLAYER_STATUS },
+            select: { id: true },
+          });
+          if (participant) throw new ConflictException(ALREADY_PLAYING_MESSAGE);
+
+          const existing = await tx.joinRequest.findUnique({
+            where: { gameId_userId: { gameId, userId } },
+            select: { id: true, status: true },
+          });
+          if (
+            existing?.status === 'PENDING' ||
+            existing?.status === 'REJECTED'
+          ) {
+            throw new ConflictException(
+              EXISTING_REQUEST_MESSAGES[existing.status],
+            );
+          }
+          if (
+            game.autoAccept &&
+            (await countSeatedPlayers(tx, gameId)) >= game.requiredPlayers
+          ) {
+            throw new ConflictException(GAME_FULL_MESSAGE);
+          }
+
+          const now = new Date();
+          const status = game.autoAccept ? 'ACCEPTED' : 'PENDING';
+          const data = {
+            status,
+            message: dto.message ?? null,
+            respondedAt: game.autoAccept ? now : null,
+          } as const;
+          let request: JoinRequestRow;
+          if (existing) {
+            // Reuse the player's history row when they ask to join again.
+            const { count } = await tx.joinRequest.updateMany({
+              where: { id: existing.id, status: existing.status },
+              data: { ...data, createdAt: now },
+            });
+            if (count === 0)
+              throw new ConflictException(JOIN_REQUEST_DUPLICATE_MESSAGE);
+            request = await tx.joinRequest.findUniqueOrThrow({
+              where: { id: existing.id },
+              select: JOIN_REQUEST_SELECT,
+            });
+          } else {
+            request = await tx.joinRequest.create({
+              data: { gameId, userId, ...data },
+              select: JOIN_REQUEST_SELECT,
+            });
+          }
+          if (game.autoAccept) await this.seatPlayer(tx, gameId, userId, now);
+          return toJoinRequestView(request);
+        }),
+      );
     } catch (error) {
       // Two simultaneous requests can both pass the check above; the unique index decides.
       if (
@@ -303,22 +320,7 @@ export class JoinRequestsService {
           );
         }
 
-        // One participation row per player and game: a player who left or was removed
-        // gets the same row back as ACTIVE, so there is never a second ACTIVE row.
-        await tx.gameParticipant.upsert({
-          where: { gameId_userId: { gameId, userId: request.userId } },
-          create: {
-            gameId,
-            userId: request.userId,
-            status: ACTIVE_PLAYER_STATUS,
-          },
-          update: {
-            status: ACTIVE_PLAYER_STATUS,
-            joinedAt: now,
-            completedAt: null,
-          },
-          select: { id: true },
-        });
+        await this.seatPlayer(tx, gameId, request.userId, now);
       }),
     );
 
@@ -395,10 +397,22 @@ export class JoinRequestsService {
     return game;
   }
 
-  private async findRequest(requestId: string): Promise<JoinRequestRow> {
-    return this.prisma.joinRequest.findUniqueOrThrow({
-      where: { id: requestId },
-      select: JOIN_REQUEST_SELECT,
+  /** Rejoining reactivates the same seat; capacity is enforced inside the transaction. */
+  private async seatPlayer(
+    tx: Prisma.TransactionClient,
+    gameId: string,
+    userId: string,
+    now: Date,
+  ): Promise<void> {
+    await tx.gameParticipant.upsert({
+      where: { gameId_userId: { gameId, userId } },
+      create: { gameId, userId, status: ACTIVE_PLAYER_STATUS },
+      update: {
+        status: ACTIVE_PLAYER_STATUS,
+        joinedAt: now,
+        completedAt: null,
+      },
+      select: { id: true },
     });
   }
 

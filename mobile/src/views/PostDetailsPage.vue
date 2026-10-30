@@ -1,5 +1,5 @@
 <template>
-  <ion-page ref="pageRef" :style="{ bottom: `${keyboardInset}px` }">
+  <ion-page ref="pageRef">
     <SubPageHeader title="Post" back-href="/home" />
     <ion-content ref="contentRef">
       <main class="post-details">
@@ -111,7 +111,7 @@ const post = computed(() => posts.findPost(postId.value));
 const pageRef = ref<InstanceType<typeof IonPage> | null>(null);
 const contentRef = ref<InstanceType<typeof IonContent> | null>(null);
 const composerRef = ref<InstanceType<typeof ChatComposer> | null>(null);
-const { keyboardInset } = useChatKeyboard(pageRef, () => { void showComments(); });
+useChatKeyboard(pageRef, () => { void showComments(); });
 const comments = ref<ApiPostComment[]>([]);
 const nextCursor = ref<string | null>(null);
 const draft = ref('');

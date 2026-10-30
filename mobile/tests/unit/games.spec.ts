@@ -25,6 +25,7 @@ const NOW = { date: '2026-09-30', time: '14:05' };
 
 function apiGame(overrides: Partial<ApiGame> = {}): ApiGame {
   return {
+    autoAccept: false,
     id: GAME_ID,
     title: 'Sunday Pickup Basketball',
     description: 'Friendly 5v5.',
@@ -102,11 +103,20 @@ function signIn(): void {
 }
 
 describe('game form rules', () => {
+  test('approval mode defaults to manual and round-trips through editing', () => {
+    expect(emptyGameForm().autoAccept).toBe(false);
+    const game = apiGame({ autoAccept: true });
+    expect(gameToForm(game).autoAccept).toBe(true);
+    const input = toCreateGameInput(gameToForm(game));
+    expect(diffGameInput(game, input)).toEqual({});
+    expect(diffGameInput(game, { ...input, autoAccept: false })).toEqual({ autoAccept: false });
+  });
   test('a complete form is valid and becomes the create payload', () => {
     const form = validForm({ description: '  ', latitude: '14.55', longitude: '121.05' });
 
     expect(validateGameForm(form, NOW)).toEqual({});
     expect(toCreateGameInput(form)).toEqual({
+      autoAccept: false,
       sportId: SPORT_ID,
       clubId: null,
       title: 'Sunday Pickup Basketball',

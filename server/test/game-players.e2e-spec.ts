@@ -18,6 +18,7 @@ interface TestUser {
 
 interface GameBody {
   id: string;
+  autoAccept: boolean;
   status: string;
   currentPlayers: number;
   requiredPlayers: number;
@@ -102,6 +103,7 @@ describe('Game players (e2e)', () => {
   async function createGame(
     host: TestUser,
     requiredPlayers: number,
+    autoAccept = false,
   ): Promise<GameBody> {
     const response = await http()
       .post('/api/v1/games')
@@ -110,6 +112,7 @@ describe('Game players (e2e)', () => {
         sportId: basketballId,
         title: 'Roster Pickup',
         requiredPlayers,
+        autoAccept,
         gameDate: addDays(now.date, 3),
         startTime: '18:00',
         endTime: '20:00',
@@ -277,6 +280,138 @@ describe('Game players (e2e)', () => {
     for (const { userId } of accepted) {
       expect((await rowOf(game.id, userId))?.status).toBe('ACTIVE');
     }
+  });
+
+  it('approval mode changes are host-only and new games default to manual', async () => {
+    const host = await register('approvalhost');
+    const outsider = await register('approvalother');
+    const game = await createGame(host, 4);
+    expect(game.autoAccept).toBe(false);
+    await http()
+      .patch(`/api/v1/games/${game.id}`)
+      .set(auth(outsider))
+      .send({ autoAccept: true })
+      .expect(403);
+    const enabled = await http()
+      .patch(`/api/v1/games/${game.id}`)
+      .set(auth(host))
+      .send({ autoAccept: true })
+      .expect(200);
+    expect((enabled.body as GameBody).autoAccept).toBe(true);
+    const disabled = await http()
+      .patch(`/api/v1/games/${game.id}`)
+      .set(auth(host))
+      .send({ autoAccept: false })
+      .expect(200);
+    expect((disabled.body as GameBody).autoAccept).toBe(false);
+    for (const invalid of ['true', null, 1]) {
+      await http()
+        .patch(`/api/v1/games/${game.id}`)
+        .set(auth(host))
+        .send({ autoAccept: invalid })
+        .expect(400);
+    }
+  });
+
+  it('auto approval gives the last slot to only one concurrent requester', async () => {
+    const host = await register('autohost');
+    const contenders = await registerMany('autoplayer', 3);
+    const game = await createGame(host, 1, true);
+    const responses = await Promise.all(
+      contenders.map((player) =>
+        http().post(requestsOf(game.id)).set(auth(player)).send({}),
+      ),
+    );
+    expect(responses.map((response) => response.status).sort()).toEqual([
+      201, 409, 409,
+    ]);
+    const accepted = responses.find((response) => response.status === 201)!;
+    expect(
+      accepted.body as { status: string; respondedAt: string | null },
+    ).toMatchObject({ status: 'ACCEPTED' });
+    expect(
+      (accepted.body as { respondedAt: string | null }).respondedAt,
+    ).not.toBeNull();
+    expect(await gameOf(host, game.id)).toMatchObject({
+      currentPlayers: 1,
+      status: 'FULL',
+    });
+    expect(
+      await prisma.joinRequest.count({
+        where: { gameId: game.id, status: 'ACCEPTED' },
+      }),
+    ).toBe(1);
+    expect(
+      await prisma.gameParticipant.count({
+        where: { gameId: game.id, status: 'ACTIVE' },
+      }),
+    ).toBe(1);
+  });
+
+  it('approval mode applies to new requests and keeps pending requests available for manual review', async () => {
+    const host = await register('switchhost');
+    const [waiting, automatic, manual] = await registerMany('switchplayer', 3);
+    const game = await createGame(host, 4);
+    const pendingId = await askToJoin(waiting, game.id);
+    expect(await rowOf(game.id, waiting.id)).toBeNull();
+    await http()
+      .patch(`/api/v1/games/${game.id}`)
+      .set(auth(host))
+      .send({ autoAccept: true })
+      .expect(200);
+    await askToJoin(automatic, game.id);
+    expect((await rowOf(game.id, automatic.id))?.status).toBe('ACTIVE');
+    expect(
+      (await prisma.joinRequest.findUniqueOrThrow({ where: { id: pendingId } }))
+        .status,
+    ).toBe('PENDING');
+    await accept(host, game.id, pendingId).expect(200);
+    await http()
+      .patch(`/api/v1/games/${game.id}`)
+      .set(auth(host))
+      .send({ autoAccept: false })
+      .expect(200);
+    await askToJoin(manual, game.id);
+    expect(await rowOf(game.id, manual.id)).toBeNull();
+    expect(await gameOf(host, game.id)).toMatchObject({ currentPlayers: 2 });
+  });
+
+  it('auto approval preserves cancellation history and reuses a seat when the player rejoins', async () => {
+    const host = await register('reautohost');
+    const player = await register('reautoplayer');
+    const game = await createGame(host, 2, true);
+    const requestId = await askToJoin(player, game.id);
+    await http()
+      .patch(`${playersOf(game.id)}/me/leave`)
+      .set(auth(player))
+      .expect(200);
+    const history = await http()
+      .get('/api/v1/games/joined')
+      .set(auth(player))
+      .expect(200);
+    expect(
+      (history.body as Array<{ id: string; participationStatus: string }>).find(
+        (entry) => entry.id === game.id,
+      ),
+    ).toMatchObject({ participationStatus: 'LEFT', isPlayer: false });
+    expect(await askToJoin(player, game.id)).toBe(requestId);
+    expect((await rowOf(game.id, player.id))?.status).toBe('ACTIVE');
+    expect(
+      await prisma.gameParticipant.count({
+        where: { gameId: game.id, userId: player.id },
+      }),
+    ).toBe(1);
+    await http()
+      .patch(`/api/v1/games/${game.id}/cancel`)
+      .set(auth(host))
+      .expect(200);
+    const late = await register('autocancelled');
+    await http().post(requestsOf(game.id)).set(auth(late)).send({}).expect(409);
+    await http()
+      .patch(`/api/v1/games/${game.id}`)
+      .set(auth(host))
+      .send({ autoAccept: false })
+      .expect(409);
   });
 
   it('returns 3/12 with a roster in join order, everywhere the count is shown', async () => {

@@ -5,7 +5,9 @@
     <ion-content>
       <section v-if="created" class="game-created" aria-live="polite">
         <p class="game-created__badge">GAME CREATED!</p>
-        <p class="game-created__note">Players can find it now. Join requests open in a later update.</p>
+        <p class="game-created__note">
+          {{ created.autoAccept ? 'Players can join automatically while slots are available.' : 'Players can request to join. You decide who to accept.' }}
+        </p>
         <GamePreviewCard :game="created" />
         <button type="button" class="game-created__again" @click="startOver">Create another game</button>
       </section>
@@ -71,6 +73,18 @@
           />
           <p v-if="shown('requiredPlayers')" class="create-game__error">{{ errors.requiredPlayers }}</p>
           <p v-else class="create-game__hint">Everyone who plays, including you if you play. You are not added automatically.</p>
+        </div>
+
+        <div class="create-game__field">
+          <label class="create-game__label" for="game-acceptance">Player approval</label>
+          <select id="game-acceptance" v-model="form.autoAccept" class="create-game__input">
+            <option :value="false">Manual Accept</option>
+            <option :value="true">Auto Accept</option>
+          </select>
+          <p class="create-game__hint">
+            {{ form.autoAccept ? 'New requests are accepted automatically while slots are available.' : 'Review each join request and accept or decline it yourself.' }}
+            Existing pending requests still need your review.
+          </p>
         </div>
 
         <div class="create-game__field" @focusout="touch('gameDate')">

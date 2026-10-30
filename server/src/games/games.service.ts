@@ -32,7 +32,7 @@ import {
   toGameDateTime,
   type GameSchedule,
 } from './game-schedule';
-import type { GameView } from './game.types';
+import type { GameView, JoinedGameView } from './game.types';
 import { visibleGamesWhere } from './game-visibility';
 
 export const GAME_NOT_FOUND_MESSAGE = 'Game not found.';
@@ -53,6 +53,7 @@ const GAME_BASE_SELECT = {
   title: true,
   description: true,
   requiredPlayers: true,
+  autoAccept: true,
   gameDate: true,
   startTime: true,
   endTime: true,
@@ -81,7 +82,7 @@ function gameSelect(viewerId: string) {
     ...GAME_BASE_SELECT,
     participants: {
       where: { userId: viewerId, status: ACTIVE_PLAYER_STATUS },
-      select: { id: true },
+      select: { id: true, status: true, joinedAt: true },
     },
   } satisfies Prisma.GameSelect;
 }
@@ -133,6 +134,7 @@ export class GamesService {
           title: dto.title,
           description: dto.description ?? null,
           requiredPlayers: dto.requiredPlayers,
+          autoAccept: dto.autoAccept ?? false,
           gameDate: toGameDate(dto.gameDate),
           startTime: toGameDateTime(dto.gameDate, dto.startTime),
           endTime: toGameDateTime(dto.gameDate, dto.endTime),
@@ -212,6 +214,44 @@ export class GamesService {
     return games.map((game) => toGameView(game, viewerId));
   }
 
+  /** Own joins and requests, including past, left, removed, and cancelled entries. */
+  async listJoined(viewerId: string): Promise<JoinedGameView[]> {
+    const games = await this.prisma.game.findMany({
+      where: {
+        AND: [
+          visibleGamesWhere(viewerId),
+          { hostId: { not: viewerId } },
+          {
+            OR: [
+              { participants: { some: { userId: viewerId } } },
+              { joinRequests: { some: { userId: viewerId } } },
+            ],
+          },
+        ],
+      },
+      select: {
+        ...gameSelect(viewerId),
+        participants: {
+          where: { userId: viewerId },
+          select: { id: true, status: true, joinedAt: true },
+        },
+        joinRequests: {
+          where: { userId: viewerId },
+          select: { status: true, createdAt: true },
+        },
+      },
+      orderBy: GAME_ORDER,
+    });
+
+    return games.map((game) => ({
+      ...toGameView(game, viewerId),
+      participationStatus: game.participants[0]?.status ?? null,
+      joinRequestStatus: game.joinRequests[0]?.status ?? null,
+      joinedAt: game.participants[0]?.joinedAt.toISOString() ?? null,
+      requestedAt: game.joinRequests[0]?.createdAt.toISOString() ?? null,
+    }));
+  }
+
   async update(
     viewerId: string,
     gameId: string,
@@ -227,6 +267,7 @@ export class GamesService {
     }
 
     const data: Prisma.GameUncheckedUpdateInput = {};
+    if (dto.autoAccept !== undefined) data.autoAccept = dto.autoAccept;
 
     if (dto.title !== undefined) data.title = dto.title;
     if (dto.description !== undefined) data.description = dto.description;
@@ -467,6 +508,7 @@ function toGameView(game: GameRow, viewerId: string): GameView {
     },
     club: game.club,
     requiredPlayers: capacity.requiredPlayers,
+    autoAccept: game.autoAccept,
     currentPlayers: capacity.currentPlayers,
     remainingSlots: capacity.remainingSlots,
     status: game.status,
@@ -477,7 +519,9 @@ function toGameView(game: GameRow, viewerId: string): GameView {
     latitude: game.latitude,
     longitude: game.longitude,
     isHost,
-    isPlayer: game.participants.length > 0,
+    isPlayer: game.participants.some(
+      (player) => player.status === ACTIVE_PLAYER_STATUS,
+    ),
     pendingRequestCount: isHost ? game._count.joinRequests : null,
     canEdit: isHost && EDITABLE_STATUSES.includes(game.status),
     canCancel: isHost && CANCELLABLE_STATUSES.includes(game.status),

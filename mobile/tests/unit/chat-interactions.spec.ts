@@ -1,9 +1,10 @@
 import { mount, type VueWrapper } from '@vue/test-utils';
 import { afterEach, describe, expect, test, vi } from 'vitest';
-import { defineComponent, nextTick, ref } from 'vue';
+import { defineComponent, h, nextTick, ref } from 'vue';
 import ChatComposer from '@/components/chat/ChatComposer.vue';
 import MessageBubble from '@/components/chat/MessageBubble.vue';
 import { useChatKeyboard } from '@/composables/useChatKeyboard';
+import { KEYBOARD_VIEWPORT_EVENT } from '@/utils/keyboard-viewport';
 
 const wrappers: VueWrapper[] = [];
 afterEach(() => {
@@ -132,49 +133,28 @@ describe('chat composer', () => {
   });
 });
 
-describe('keyboard viewport', () => {
-  function viewportHarness() {
-    vi.stubGlobal('innerHeight', 800);
-    const viewport = Object.assign(new EventTarget(), { height: 800, offsetTop: 0, scale: 1 });
-    vi.stubGlobal('visualViewport', viewport);
-    vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => { callback(0); return 1; });
-    vi.stubGlobal('cancelAnimationFrame', vi.fn());
-    let inset = ref(0);
+describe('chat keyboard scrolling', () => {
+  test('only the visible thread with a focused footer follows keyboard layout changes', () => {
+    const onResize = vi.fn();
     const wrapper = mount(defineComponent({
       setup() {
         const page = ref<HTMLElement | null>(null);
-        ({ keyboardInset: inset } = useChatKeyboard(page, vi.fn()));
-        return { page };
+        useChatKeyboard(page, onResize);
+        return () => h('div', { ref: page }, [h('ion-footer', [h('textarea')]), h('input')]);
       },
-      template: '<div ref="page" />',
     }));
     wrappers.push(wrapper);
-    vi.spyOn(wrapper.element, 'getBoundingClientRect').mockImplementation(() => ({
-      top: 0, bottom: 800 - inset.value, height: 800 - inset.value,
-    }) as DOMRect);
-    return { viewport, inset, wrapper };
-  }
-  test('raises the thread above an overlay keyboard without doubling the inset', () => {
-    const { viewport, inset } = viewportHarness();
-    viewport.height = 480;
-    viewport.dispatchEvent(new Event('resize'));
-    expect(inset.value).toBe(320);
-    viewport.dispatchEvent(new Event('scroll'));
-    expect(inset.value).toBe(320);
-    viewport.height = 800;
-    viewport.dispatchEvent(new Event('resize'));
-    expect(inset.value).toBe(0);
-  });
-  test('ignores pinch zoom and removes listeners after unmount', () => {
-    const { viewport, inset, wrapper } = viewportHarness();
-    viewport.height = 400;
-    viewport.scale = 2;
-    viewport.dispatchEvent(new Event('resize'));
-    expect(inset.value).toBe(0);
+    const notify = (input: Element) => document.dispatchEvent(new CustomEvent(KEYBOARD_VIEWPORT_EVENT, { detail: { input } }));
+    notify(wrapper.get('textarea').element);
+    expect(onResize).toHaveBeenCalledTimes(1);
+    notify(wrapper.get('input').element);
+    expect(onResize).toHaveBeenCalledTimes(1);
+    wrapper.element.classList.add('ion-page-hidden');
+    notify(wrapper.get('textarea').element);
+    expect(onResize).toHaveBeenCalledTimes(1);
     wrapper.unmount();
     wrappers.pop();
-    viewport.scale = 1;
-    viewport.dispatchEvent(new Event('resize'));
-    expect(inset.value).toBe(0);
+    notify(document.createElement('textarea'));
+    expect(onResize).toHaveBeenCalledTimes(1);
   });
 });
