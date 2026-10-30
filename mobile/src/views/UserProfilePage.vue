@@ -34,6 +34,10 @@
                 <ion-icon :icon="ellipsisHorizontalOutline" aria-hidden="true" />
               </button>
               <div v-if="profileMenuOpen" class="user-profile__menu" role="menu" aria-label="Profile options">
+                <button type="button" role="menuitem" @click="shareProfile">
+                  <ion-icon :icon="shareSocialOutline" aria-hidden="true" />
+                  Share Profile
+                </button>
                 <button type="button" role="menuitem" @click="openReport">
                   <ion-icon :icon="flagOutline" aria-hidden="true" />
                   Report
@@ -186,6 +190,7 @@ import {
   lockOpenOutline,
   personAddOutline,
   peopleOutline,
+  shareSocialOutline,
   timeOutline,
 } from 'ionicons/icons';
 import ClubRow from '@/components/clubs/ClubRow.vue';
@@ -220,6 +225,7 @@ import { toFeedPost } from '@/utils/post-api';
 import type { OtherProfile, ProfileIdentity, PublicProfile } from '@/types/profile';
 import { formatDisplayName, toUserSummary } from '@/utils/display-name';
 import { showLaterPhaseNotice, showNotice } from '@/utils/notice';
+import { shareLink } from '@/utils/share-link';
 import {
   messageAccessFor,
   profileActionsFor,
@@ -479,6 +485,18 @@ async function message(identity: ProfileIdentity): Promise<void> {
 function openReport(): void {
   if (header.value) reportTarget.value = header.value;
   profileMenuOpen.value = false;
+}
+
+async function shareProfile(): Promise<void> {
+  const identity = header.value;
+  profileMenuOpen.value = false;
+  if (!identity) return;
+  try {
+    const result = await shareLink(`${identity.displayName}'s GORA profile`, `/profile/${encodeURIComponent(identity.username)}`);
+    if (result !== 'cancelled') void showNotice(result === 'copied' ? 'Profile link copied.' : 'Profile shared.');
+  } catch {
+    void showNotice('Could not share this profile. Please try again.');
+  }
 }
 
 async function confirmBlock(): Promise<void> {

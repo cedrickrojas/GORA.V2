@@ -48,6 +48,26 @@
 
     <p v-if="post.body" class="post-card__body">{{ post.body }}</p>
 
+    <router-link
+      v-if="post.sharedPost"
+      :to="`/posts/${encodeURIComponent(post.sharedPost.id)}`"
+      class="post-card__shared"
+      :aria-label="`Shared post by ${post.sharedPost.author.displayName}`"
+    >
+      <span class="post-card__shared-label">Shared post</span>
+      <strong>{{ post.sharedPost.author.displayName }}</strong>
+      <p>{{ post.sharedPost.body || 'Photo or video post' }}</p>
+      <img
+        v-if="post.sharedPost.media.find((item) => item.type === 'image' && item.url)?.url"
+        :src="post.sharedPost.media.find((item) => item.type === 'image' && item.url)?.url ?? undefined"
+        :alt="`Media from ${post.sharedPost.author.displayName}'s shared post`"
+        loading="lazy"
+      />
+    </router-link>
+    <div v-else-if="post.sharedPostId" class="post-card__shared post-card__shared--unavailable">
+      This shared post is no longer available to you.
+    </div>
+
     <p v-if="tagSummary.shown.length > 0" class="post-card__with">
       with
       <span v-for="(person, index) in tagSummary.shown" :key="person.id"
@@ -286,11 +306,17 @@ async function openOptions(): Promise<void> {
         ]
       : []),
   ];
+  const shareOption = {
+    text: 'Share post',
+    icon: arrowRedoOutline,
+    handler: () => emit('share', props.post),
+  };
   const sheet = await actionSheetController.create({
     header: 'Post options',
     cssClass: 'gora-sheet',
     buttons: isOwnPost.value
       ? [
+          shareOption,
           { text: 'Edit post', icon: createOutline, handler: () => void (isEditingPost.value = true) },
           {
             text: 'Edit privacy',
@@ -311,7 +337,7 @@ async function openOptions(): Promise<void> {
           { text: 'Delete post', icon: trashOutline, role: 'destructive', handler: () => void confirmDelete() },
           { text: 'Cancel', role: 'cancel' },
         ]
-      : [...preferences, { text: 'Cancel', role: 'cancel' }],
+      : [...preferences, shareOption, { text: 'Cancel', role: 'cancel' }],
   });
 
   await sheet.present();
@@ -493,6 +519,52 @@ const hiddenMediaCount = computed(() => availableMedia.value.length - visibleMed
   font-size: 0.92rem;
   line-height: 1.45;
   white-space: pre-line;
+}
+
+.post-card__shared {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin: 12px 14px 0;
+  padding: 12px;
+  overflow: hidden;
+  border: 1px solid var(--gora-line);
+  border-radius: 14px;
+  color: var(--ion-text-color);
+  text-decoration: none;
+}
+
+.post-card__shared-label {
+  color: var(--gora-muted);
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.post-card__shared p {
+  display: -webkit-box;
+  margin: 0;
+  overflow: hidden;
+  color: var(--gora-muted);
+  font-size: 0.82rem;
+  line-height: 1.4;
+  white-space: pre-line;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.post-card__shared img {
+  display: block;
+  max-height: 260px;
+  width: 100%;
+  border-radius: 8px;
+  object-fit: cover;
+}
+
+.post-card__shared--unavailable {
+  color: var(--gora-muted);
+  font-size: 0.82rem;
 }
 
 .post-card__with {

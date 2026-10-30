@@ -118,6 +118,11 @@ export const routes: RouteRecordRaw[] = [
         component: () => import('../views/CreateGamePage.vue'),
       },
       {
+        path: 'map/games',
+        name: 'games-map',
+        component: () => import('../views/AllGamesMapPage.vue'),
+      },
+      {
         // Opened by tapping a post or game location; not a tab. ?name= labels the place, ?game= marks the game.
         path: 'map/:lat/:lng',
         name: 'location-map',

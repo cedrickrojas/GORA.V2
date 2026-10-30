@@ -392,6 +392,7 @@ model Post {
   clubId         String?            @db.Uuid
   isAnnouncement Boolean            @default(false)
   sportId        String?            @db.Uuid
+  sharedPostId   String?            @db.Uuid
   latitude       Float?
   locationName   String?
   longitude      Float?
@@ -410,12 +411,15 @@ model Post {
   tags           PostTag[]
   reports        Report[]
   preferences    PostPreference[]
+  sharedPost     Post?              @relation("PostReposts", fields: [sharedPostId], references: [id], onDelete: SetNull)
+  reposts        Post[]             @relation("PostReposts")
 
   @@index([userId, createdAt])
   @@index([userId, archivedAt])
   @@index([createdAt])
   @@index([clubId, createdAt])
   @@index([sportId, createdAt])
+  @@index([sharedPostId])
   @@index([visibility])
   @@index([latitude, longitude])
 }

@@ -15,8 +15,14 @@ export function isServerId(id: string): boolean {
 export const NO_SPORT_LABEL = 'Other';
 
 export function toFeedPost(post: ApiPost): FeedPost {
+  return toFeedPostInternal(post, true);
+}
+
+function toFeedPostInternal(post: ApiPost, includeSharedPost: boolean): FeedPost {
   return {
     id: post.id,
+    sharedPostId: post.sharedPostId ?? null,
+    sharedPost: includeSharedPost && post.sharedPost ? toFeedPostInternal(post.sharedPost, false) : null,
     author: toUserSummary(post.author),
     isAnnouncement: post.isAnnouncement,
     body: post.caption ?? '',

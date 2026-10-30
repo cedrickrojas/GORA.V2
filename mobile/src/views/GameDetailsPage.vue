@@ -13,6 +13,9 @@
             <span aria-hidden="true">{{ marker }}</span>
             {{ details.sport }}
           </span>
+          <button type="button" class="game__share" @click="shareDemoGame">
+            <ion-icon :icon="shareSocialOutline" aria-hidden="true" /> Share
+          </button>
           <h1 class="game__title">{{ details.title }}</h1>
           <router-link
             :to="locationMapPath(details.location, details.id)"
@@ -107,7 +110,7 @@ import { computed, onMounted, ref } from 'vue';
 import { RouterLink, useRoute } from 'vue-router';
 import ClubAvatar from '@/components/clubs/ClubAvatar.vue';
 import { IonContent, IonFooter, IonIcon, IonPage, onIonViewWillEnter } from '@ionic/vue';
-import { chevronForward, locationOutline, timeOutline } from 'ionicons/icons';
+import { chevronForward, locationOutline, shareSocialOutline, timeOutline } from 'ionicons/icons';
 import SectionHeader from '@/components/common/SectionHeader.vue';
 import UserAvatar from '@/components/common/UserAvatar.vue';
 import ServerGameDetails from '@/components/games/ServerGameDetails.vue';
@@ -133,6 +136,8 @@ import { locationMapPath } from '@/utils/location-map';
 import GameLocationPreview from '@/components/map/GameLocationPreview.vue';
 import { getSportMarker, getSportVisual } from '@/utils/sports';
 import { formatStartTime } from '@/utils/time';
+import { showNotice } from '@/utils/notice';
+import { shareLink } from '@/utils/share-link';
 
 // Ionic keeps pages alive, so the id is read once for this page instance.
 const gameId = String(useRoute().params.gameId ?? '');
@@ -163,6 +168,16 @@ const remainingLabel = computed(() => {
 
   return left === 0 ? 'No slots left' : `${left} ${left === 1 ? 'slot' : 'slots'} left`;
 });
+
+async function shareDemoGame(): Promise<void> {
+  if (!details.value) return;
+  try {
+    const result = await shareLink(details.value.title, `/games/${encodeURIComponent(gameId)}`);
+    if (result !== 'cancelled') void showNotice(result === 'copied' ? 'Game link copied.' : 'Game shared.');
+  } catch {
+    void showNotice('Could not share this game. Please try again.');
+  }
+}
 
 /**
  * The roster for everyone; the host also loads the requests on the game, everyone else
@@ -228,7 +243,26 @@ ion-header.game-details-header ion-toolbar {
 }
 
 .game__hero {
+  position: relative;
   padding: 20px 16px 18px;
+}
+
+.game__share {
+  position: absolute;
+  top: 18px;
+  right: 16px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.25);
+  color: #fff;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
 }
 
 .game__sport {
@@ -440,19 +474,19 @@ ion-header.game-details-header ion-toolbar {
 
 @media (min-width: 768px) {
   ion-content.game-details-content {
-    --padding-start: max(24px, calc((100% - 1080px) / 2));
-    --padding-end: max(24px, calc((100% - 1080px) / 2));
+    --padding-start: max(24px, calc((100% - var(--gora-column, 680px)) / 2));
+    --padding-end: max(24px, calc((100% - var(--gora-column, 680px)) / 2));
   }
 
   ion-header.game-details-header ion-toolbar {
-    --padding-start: max(24px, calc((100% - 1080px) / 2));
-    --padding-end: max(24px, calc((100% - 1080px) / 2));
+    --padding-start: max(24px, calc((100% - var(--gora-column, 680px)) / 2));
+    --padding-end: max(24px, calc((100% - var(--gora-column, 680px)) / 2));
   }
 
   .game {
     display: grid;
-    max-width: 1080px;
-    grid-template-columns: minmax(0, 1fr) 320px;
+    max-width: var(--gora-column, 680px);
+    grid-template-columns: minmax(0, 1fr);
     align-items: start;
     column-gap: 24px;
     row-gap: 18px;
@@ -473,8 +507,8 @@ ion-header.game-details-header ion-toolbar {
   }
 
   .game__capacity {
-    grid-column: 2;
-    grid-row: 2;
+    grid-column: 1;
+    grid-row: 3;
     margin: 0;
     padding: 22px;
     border-radius: 20px;

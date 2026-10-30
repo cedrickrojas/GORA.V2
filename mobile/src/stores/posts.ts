@@ -277,6 +277,10 @@ export const usePostsStore = defineStore('posts', () => {
     }
 
     if (!savesToServer.value) {
+      if (draft.sharedPostId) {
+        publishError.value = 'Sign in to share this post.';
+        return null;
+      }
       const post = await publishPost(author, draft);
       posts.value = [post, ...posts.value];
       return post;
@@ -306,6 +310,7 @@ export const usePostsStore = defineStore('posts', () => {
       const created = await authorized((token) =>
         createPostRequest(token, {
           caption: draft.body.trim(),
+          ...(draft.sharedPostId ? { sharedPostId: draft.sharedPostId } : {}),
           ...(photos.length ? { photos } : {}),
           visibility: draft.visibility,
           ...(sportId ? { sportId } : {}),

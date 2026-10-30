@@ -10,6 +10,9 @@
           {{ game.sport.name }}
         </span>
         <GameStatusBadge :status="game.status" />
+        <button type="button" class="server-game__share" @click="shareGame">
+          <ion-icon :icon="shareSocialOutline" aria-hidden="true" /> Share
+        </button>
       </div>
       <h1 class="server-game__title">{{ game.title }}</h1>
       <p v-if="game.description" class="server-game__description">{{ game.description }}</p>
@@ -196,7 +199,7 @@
 import { computed, ref } from 'vue';
 import { RouterLink } from 'vue-router';
 import { IonIcon, alertController } from '@ionic/vue';
-import { chevronForward } from 'ionicons/icons';
+import { chevronForward, shareSocialOutline } from 'ionicons/icons';
 import ClubAvatar from '@/components/clubs/ClubAvatar.vue';
 import SectionHeader from '@/components/common/SectionHeader.vue';
 import UserAvatar from '@/components/common/UserAvatar.vue';
@@ -217,6 +220,7 @@ import { buildRosterSlots } from '@/utils/games';
 import { joinRequestAction, pastParticipationNote, rosterPlayerSummary } from '@/utils/join-requests';
 import { locationMapPath } from '@/utils/location-map';
 import { showNotice } from '@/utils/notice';
+import { shareLink } from '@/utils/share-link';
 import { getSportVisual } from '@/utils/sports';
 import GameStatusBadge from './GameStatusBadge.vue';
 import GameLocationPreview from '@/components/map/GameLocationPreview.vue';
@@ -261,6 +265,17 @@ const remainingLabel = computed(() => {
   const left = game.value?.remainingSlots ?? 0;
   return left === 0 ? 'No slots left' : `${left} ${left === 1 ? 'slot' : 'slots'} left`;
 });
+
+async function shareGame(): Promise<void> {
+  const current = game.value;
+  if (!current) return;
+  try {
+    const result = await shareLink(current.title, `/games/${encodeURIComponent(current.id)}`);
+    if (result !== 'cancelled') void showNotice(result === 'copied' ? 'Game link copied.' : 'Game shared.');
+  } catch {
+    void showNotice('Could not share this game. Please try again.');
+  }
+}
 const mapPath = computed(() => {
   const value = game.value;
 
@@ -424,6 +439,21 @@ async function confirmCancelRequest(): Promise<void> {
   font-size: 0.75rem;
   font-weight: 700;
   text-transform: uppercase;
+}
+
+.server-game__share {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.25);
+  color: #fff;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
 }
 
 .server-game__title {
@@ -733,8 +763,8 @@ async function confirmCancelRequest(): Promise<void> {
 @media (min-width: 768px) {
   .server-game {
     display: grid;
-    max-width: 1080px;
-    grid-template-columns: minmax(0, 1fr) 330px;
+    max-width: var(--gora-column, 680px);
+    grid-template-columns: minmax(0, 1fr);
     align-items: start;
     column-gap: 24px;
     row-gap: 18px;
@@ -783,47 +813,33 @@ async function confirmCancelRequest(): Promise<void> {
   }
 
   .server-game__facts {
-    grid-column: 1;
-    grid-row: 2;
     gap: 12px;
     padding: 22px 24px;
     font-size: 0.95rem;
   }
 
   .server-game__capacity {
-    grid-column: 2;
-    grid-row: 2;
     padding: 22px;
   }
 
   .server-game__notice {
-    grid-column: 1;
-    grid-row: 3;
     align-self: start;
   }
 
   .server-game__section--host {
-    grid-column: 1;
-    grid-row: 4;
     padding: 20px 24px;
   }
 
   .server-game__section--roster {
-    grid-column: 1;
-    grid-row: 5;
     padding: 20px 24px;
   }
 
   .server-game__requests {
-    grid-column: 1;
-    grid-row: 6;
+    display: block;
   }
 
   .server-game__actions {
-    position: sticky;
-    top: 20px;
-    grid-column: 2;
-    grid-row: 3;
+    position: static;
     display: flex;
     flex-direction: column;
     gap: 10px;

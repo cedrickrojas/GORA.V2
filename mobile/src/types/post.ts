@@ -27,6 +27,9 @@ export interface PostLocation {
 
 export interface FeedPost {
   id: string;
+  sharedPostId?: string | null;
+  /** The source post, included only when this viewer is allowed to see it. */
+  sharedPost?: FeedPost | null;
   /** Always the person who wrote it, also for club posts. */
   author: UserSummary;
   /** Set when the post was made in a club (Post.clubId). */
@@ -79,6 +82,8 @@ export interface ApiPostPerson {
 /** GET /posts, GET /posts/:id, and GET /users/:username/posts. */
 export interface ApiPost {
   id: string;
+  sharedPostId?: string | null;
+  sharedPost?: ApiPost | null;
   author: ApiPostPerson;
   caption: string | null;
   location: PostLocation | null;
@@ -111,6 +116,7 @@ export interface ApiPostPage {
 
 export interface CreatePostInput {
   caption: string;
+  sharedPostId?: string;
   photos?: string[];
   visibility: PostVisibility;
   sportId?: string;
@@ -140,6 +146,7 @@ export interface UpdatePostInput {
 
 export interface PostDraft {
   body: string;
+  sharedPostId?: string;
   sport: string;
   visibility: PostVisibility;
   /** Required and non-empty for CUSTOM, empty otherwise. */

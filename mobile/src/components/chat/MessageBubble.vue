@@ -37,7 +37,12 @@
         preload="metadata"
         aria-label="Voice message"
       />
-      <p v-else :class="{ 'message-bubble__unsent': unsent }">{{ body }}</p>
+      <p v-else :class="{ 'message-bubble__unsent': unsent }">
+        <template v-for="(part, index) in bodyParts" :key="index">
+          <a v-if="part.url" :href="part.url" target="_blank" rel="noopener noreferrer">{{ part.text }}</a>
+          <template v-else>{{ part.text }}</template>
+        </template>
+      </p>
       <time :datetime="sentAt">{{ formatTimeAgo(Date.parse(sentAt), now) }}</time>
     </div>
     <button
@@ -161,6 +166,12 @@ const picker = ref<HTMLElement | null>(null);
 const pickerOpen = ref(false);
 const pickerPosition = ref({ top: '16px', left: '16px' });
 const ownReaction = computed(() => props.reactions.find((reaction) => reaction.reacted)?.emoji);
+const bodyParts = computed(() =>
+  props.body.split(/(https?:\/\/[^\s]+)/g).filter(Boolean).map((text) => ({
+    text,
+    url: /^https?:\/\//i.test(text) ? text : null,
+  })),
+);
 let hold: ReturnType<typeof setTimeout> | undefined;
 let startX = 0;
 let startY = 0;
@@ -363,6 +374,11 @@ onIonViewDidLeave(() => {
   font-size: 0.9rem;
   line-height: 1.4;
   white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.message-bubble__content a {
+  color: var(--ion-color-primary);
+  text-decoration: underline;
   overflow-wrap: anywhere;
 }
 .message-bubble__content time {

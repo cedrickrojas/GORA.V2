@@ -25,6 +25,21 @@ let active = true;
 
 function markerContent(item: MapCanvasProps['markers'][number], selected: boolean): HTMLElement {
   const root = document.createElement('div');
+  if (props.fitMarkers) {
+    root.setAttribute('role', 'button');
+    root.setAttribute('tabindex', '0');
+    const pin = document.createElement('span');
+    const state = item.activeCount && item.upcomingCount ? 'mixed' : item.activeCount ? 'active' : 'upcoming';
+    pin.textContent = item.gameCount > 1 ? String(item.gameCount) : item.symbols[0] ?? '●';
+    pin.setAttribute('aria-label', `${item.gameCount} ${item.gameCount === 1 ? 'game' : 'games'} at ${item.label}`);
+    pin.style.cssText = [
+      'display:grid', 'width:25px', 'height:25px', 'place-items:center', 'border:2px solid white',
+      'border-radius:50%', `background:${state === 'active' ? '#df4843' : state === 'upcoming' ? '#ed922b' : '#ed6c27'}`,
+      'color:white', 'font:800 11px/1 system-ui,sans-serif', 'box-shadow:0 1px 5px #0008',
+    ].join(';');
+    root.append(pin);
+    return root;
+  }
   root.setAttribute('role', 'button');
   root.setAttribute('tabindex', '0');
   root.style.cssText = [
@@ -83,9 +98,18 @@ function renderMarkers(): void {
 function updateMap(): void {
   if (!map || !libraries) return;
   const center = googlePoint(props.center);
-  map.setCenter(center);
-  const zoom = props.radiusKm > 0 ? Math.max(8, Math.min(17, Math.round(Math.log2(40075 / (2 * props.radiusKm))))) : 12;
-  map.setZoom(zoom);
+  if (props.fitMarkers && props.markers.length) {
+    const bounds = new libraries.maps.LatLngBounds();
+    // Keep the national shape in view even when current games sit in just one region.
+    bounds.extend({ lat: 4.3, lng: 116 });
+    bounds.extend({ lat: 21.5, lng: 127.5 });
+    for (const item of props.markers) bounds.extend(googlePoint(item));
+    map.fitBounds(bounds, 32);
+  } else {
+    map.setCenter(center);
+    const zoom = props.fitMarkers ? 5 : props.radiusKm > 0 ? Math.max(8, Math.min(17, Math.round(Math.log2(40075 / (2 * props.radiusKm))))) : 12;
+    map.setZoom(zoom);
+  }
   radiusCircle?.setMap(null);
   radiusCircle = props.showRadius
     ? new libraries.maps.Circle({
@@ -139,7 +163,7 @@ onMounted(async () => {
   }
 });
 
-watch(() => [props.center.latitude, props.center.longitude, props.radiusKm, props.showRadius, props.userLocation?.latitude, props.userLocation?.longitude], updateMap);
+watch(() => [props.center.latitude, props.center.longitude, props.radiusKm, props.showRadius, props.userLocation?.latitude, props.userLocation?.longitude, props.fitMarkers, props.markers], updateMap, { deep: true });
 watch(() => [props.markers, props.selectedKey], renderMarkers, { deep: true });
 
 onBeforeUnmount(() => {

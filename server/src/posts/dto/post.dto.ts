@@ -81,6 +81,10 @@ class TaggedUsersDto {
 }
 
 export class CreatePostDto extends PostAudienceDto {
+  @IsOptional()
+  @IsUUID('all', { message: 'sharedPostId must be a post id.' })
+  sharedPostId?: string;
+
   /** A caption or at least one photo is required by the service. */
   @IsOptional()
   @Transform(trim)

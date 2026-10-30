@@ -123,7 +123,7 @@ export function canPublishPost(draft: PostDraft, authorId: string | null = null)
   const caption = draft.body.trim();
 
   return (
-    (caption.length > 0 || draft.photoUrls.length > 0) &&
+    (caption.length > 0 || draft.photoUrls.length > 0 || Boolean(draft.sharedPostId)) &&
     caption.length <= POST_CAPTION_MAX_LENGTH &&
     draft.photoUrls.length <= POST_PHOTO_LIMIT &&
     draft.sport.length > 0 &&

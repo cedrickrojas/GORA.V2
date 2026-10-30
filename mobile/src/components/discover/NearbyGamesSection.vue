@@ -69,6 +69,10 @@
     </div>
 
     <SegmentTabs v-model="viewModel" :options="VIEW_OPTIONS" aria-label="Map or list" />
+    <button type="button" class="nearby__all-map" @click="router.push('/map/games')">
+      View all games on map
+      <span aria-hidden="true">→</span>
+    </button>
 
     <div v-if="discovery.error" class="nearby__error" role="alert">
       <span>{{ discovery.error }}</span>
@@ -270,6 +274,22 @@ onMounted(async () => {
   flex-wrap: wrap;
   align-items: center;
   gap: 6px;
+}
+
+.nearby__all-map {
+  display: flex;
+  min-height: 42px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid var(--gora-line);
+  border-radius: 12px;
+  background: var(--gora-surface);
+  color: var(--ion-color-primary);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.84rem;
+  font-weight: 700;
 }
 
 .nearby__chip {

@@ -36,6 +36,7 @@
 
         <ion-popover :is-open="coverMenuEvent !== null" :event="coverMenuEvent" side="bottom" alignment="end" @did-dismiss="coverMenuEvent = null">
           <nav class="profile-cover-menu__links" aria-label="Profile options">
+            <button type="button" class="profile-cover-menu__link" @click="shareProfile">Share Profile</button>
             <router-link to="/profile/archive" class="profile-cover-menu__link" @click="coverMenuEvent = null">Archive</router-link>
             <router-link to="/profile/saved" class="profile-cover-menu__link" @click="coverMenuEvent = null">Saved Posts</router-link>
           </nav>
@@ -213,6 +214,7 @@ import type { AddSportInput, UserSportEntry } from '@/types/profile';
 import { CLUB_ROLE_LABELS, groupMyClubs } from '@/utils/clubs';
 import { toHighlight } from '@/utils/media-api';
 import { showNotice } from '@/utils/notice';
+import { shareLink } from '@/utils/share-link';
 import { buildProfileSections, splitProfileSections } from '@/utils/profile-sections';
 import { formatCompactNumber } from '@/utils/time';
 
@@ -245,6 +247,18 @@ const moreEvent = ref<Event | null>(null);
 const coverMenuEvent = ref<Event | null>(null);
 /** Every club you are an ACTIVE member of (the same list as My Clubs → Your clubs), owner first. */
 const myClubs = computed(() => groupMyClubs(clubsStore.clubs).joined);
+
+async function shareProfile(): Promise<void> {
+  coverMenuEvent.value = null;
+  const current = profile.value;
+  if (!current) return;
+  try {
+    const result = await shareLink(`${current.displayName}'s GORA profile`, `/profile/${encodeURIComponent(current.username)}`);
+    if (result !== 'cancelled') void showNotice(result === 'copied' ? 'Profile link copied.' : 'Profile shared.');
+  } catch {
+    void showNotice('Could not share this profile. Please try again.');
+  }
+}
 
 /** The 3 newest of your own reels (the demo highlights only when nobody is signed in). */
 const highlights = computed(() =>
@@ -641,10 +655,15 @@ onMounted(() => {
 
 .profile-cover-menu__link {
   padding: 12px;
+  border: 0;
+  background: transparent;
   border-radius: 8px;
   color: var(--gora-text);
+  cursor: pointer;
+  font: inherit;
   font-weight: 600;
   text-decoration: none;
+  text-align: left;
 }
 
 .profile-cover-menu__link:hover {

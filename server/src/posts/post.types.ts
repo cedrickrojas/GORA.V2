@@ -16,6 +16,8 @@ export interface PostLocation {
 
 export interface PostView {
   id: string;
+  sharedPostId: string | null;
+  sharedPost?: PostView | null;
   author: PostAuthor;
   caption: string | null;
   location: PostLocation | null;

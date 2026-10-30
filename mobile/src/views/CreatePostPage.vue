@@ -1,9 +1,9 @@
 <template>
   <ion-page>
-    <SubPageHeader title="Create Post" back-href="/home">
+    <SubPageHeader :title="shareSourceId ? 'Share as post' : 'Create Post'" back-href="/home">
       <template #end>
         <button type="button" class="create-post__publish" :disabled="!canPublish || isPublishing" @click="publish">
-          Post
+          {{ sharedSource ? 'Share' : 'Post' }}
         </button>
       </template>
     </SubPageHeader>
@@ -19,14 +19,26 @@
             </span>
           </div>
 
-          <label class="create-post__label" for="create-post-caption">Caption</label>
+          <article v-if="sharedSource" class="create-post__shared-source" aria-label="Post you are sharing">
+            <span>Shared post preview</span>
+            <strong>{{ sharedSource.author.displayName }}</strong>
+            <p>{{ sharedSource.body || 'Photo or video post' }}</p>
+            <img
+              v-if="sharedSource.media.find((item) => item.type === 'image' && item.url)?.url"
+              :src="sharedSource.media.find((item) => item.type === 'image' && item.url)?.url ?? undefined"
+              :alt="`Media from ${sharedSource.author.displayName}'s post`"
+            />
+            <router-link :to="`/posts/${encodeURIComponent(sharedSource.id)}`">View original post</router-link>
+          </article>
+
+          <label class="create-post__label" for="create-post-caption">{{ sharedSource ? 'Your caption (optional)' : 'Caption' }}</label>
           <textarea
             id="create-post-caption"
             v-model="caption"
             class="create-post__caption"
             rows="4"
             :maxlength="POST_CAPTION_MAX_LENGTH"
-            placeholder="How did the game go?"
+            :placeholder="sharedSource ? 'Add something about this post…' : 'How did the game go?'"
           />
           <span class="create-post__counter">{{ caption.length }}/{{ POST_CAPTION_MAX_LENGTH }}</span>
 
@@ -86,7 +98,7 @@
           <p v-if="postsStore.publishError" class="create-post__error" role="alert">{{ postsStore.publishError }}</p>
 
           <button type="submit" class="create-post__submit" :disabled="!canPublish || isPublishing">
-            {{ isPublishing ? 'Posting…' : 'Publish' }}
+            {{ isPublishing ? 'Posting…' : sharedSource ? 'Share Post' : 'Publish' }}
           </button>
         </fieldset>
       </form>
@@ -104,7 +116,7 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import { useRouter } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import { IonContent, IonIcon, IonPage } from '@ionic/vue';
 import { close, imagesOutline } from 'ionicons/icons';
 import UserAvatar from '@/components/common/UserAvatar.vue';
@@ -117,13 +129,14 @@ import { useFriendsStore } from '@/stores/friends';
 import { usePostsStore } from '@/stores/posts';
 import { useSessionStore } from '@/stores/session';
 import { useSportsStore } from '@/stores/sports';
-import type { PostDraft, PostLocation, PostVisibility } from '@/types/post';
+import type { FeedPost, PostDraft, PostLocation, PostVisibility } from '@/types/post';
 import type { UserSummary } from '@/types/user';
 import { POST_CAPTION_MAX_LENGTH, POST_PHOTO_LIMIT, canPublishPost } from '@/utils/feed';
 import { showNotice } from '@/utils/notice';
 import { validatePostTags } from '@/utils/post-details';
 import { getPrivacyOption, validatePostAudience } from '@/utils/post-privacy';
 import { POST_PHOTO_SOURCE_MAX_BYTES } from '@/utils/post-photos';
+import { isServerId } from '@/utils/post-api';
 
 interface SelectedPhoto {
   url: string;
@@ -131,6 +144,7 @@ interface SelectedPhoto {
 }
 
 const router = useRouter();
+const route = useRoute();
 const session = useSessionStore();
 const catalog = useCatalogStore();
 const sportsStore = useSportsStore();
@@ -150,6 +164,8 @@ const photoError = ref<string | null>(null);
 const isPublishing = ref(false);
 const isTagging = ref(false);
 const isPickingLocation = ref(false);
+const sharedSource = ref<FeedPost | null>(null);
+const shareSourceId = computed(() => (typeof route.query.sharePost === 'string' ? route.query.sharePost : ''));
 
 /** Active sports from the API; the demo catalog only if that list could not load. */
 const sportOptions = computed(() =>
@@ -186,6 +202,7 @@ watch(
 
 const draft = computed<PostDraft>(() => ({
   body: caption.value,
+  ...(sharedSource.value ? { sharedPostId: sharedSource.value.id } : {}),
   sport: sport.value,
   visibility: visibility.value,
   // Kept while switching options, but only a CUSTOM post sends them.
@@ -194,6 +211,28 @@ const draft = computed<PostDraft>(() => ({
   location: location.value,
   photoUrls: photos.value.map((photo) => photo.url),
 }));
+
+async function loadSharedSource(id: string): Promise<void> {
+  sharedSource.value = null;
+  if (!id) return;
+  if (!isServerId(id)) {
+    void showNotice('This post can no longer be shared.');
+    await router.replace('/create/post');
+    return;
+  }
+  try {
+    const source = await postsStore.loadPost(id);
+    if (shareSourceId.value !== id) return;
+    sharedSource.value = source;
+    if (sportOptions.value.includes(source.sport)) sport.value = source.sport;
+  } catch {
+    if (shareSourceId.value !== id) return;
+    void showNotice('This post is no longer available to share.');
+    await router.replace('/create/post');
+  }
+}
+
+watch(shareSourceId, (id) => void loadSharedSource(id), { immediate: true });
 
 const privacy = computed(() => getPrivacyOption(visibility.value));
 const audienceError = computed(() =>
@@ -252,8 +291,9 @@ async function publish(): Promise<void> {
     );
 
     if (post) {
+      if (sharedSource.value) void postsStore.loadPost(sharedSource.value.id);
       resetForm();
-      void showNotice('Posted to your feed.');
+      void showNotice(sharedSource.value ? 'Shared as a post on your feed.' : 'Posted to your feed.');
       await router.replace('/home');
     }
   } finally {
@@ -297,6 +337,49 @@ onBeforeUnmount(() => {
   flex: 1;
   flex-direction: column;
   gap: 6px;
+}
+
+.create-post__shared-source {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px;
+  border: 1px solid var(--gora-line);
+  border-radius: 14px;
+  background: var(--gora-surface);
+}
+
+.create-post__shared-source > span {
+  color: var(--gora-muted);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.create-post__shared-source p {
+  display: -webkit-box;
+  margin: 0;
+  overflow: hidden;
+  color: var(--gora-muted);
+  font-size: 0.84rem;
+  white-space: pre-line;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+}
+
+.create-post__shared-source img {
+  max-height: 220px;
+  width: 100%;
+  border-radius: 8px;
+  object-fit: cover;
+}
+
+.create-post__shared-source a {
+  color: var(--ion-color-primary);
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-decoration: none;
 }
 
 .create-post__privacy {

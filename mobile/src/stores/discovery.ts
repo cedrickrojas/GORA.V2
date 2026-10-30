@@ -251,6 +251,16 @@ export const useDiscoveryStore = defineStore('discovery', () => {
     }
   }
 
+  /** All visible upcoming and active GORA games for the nationwide map (max server limit: 100). */
+  async function discoverAll(limit = 100): Promise<DiscoveryResult> {
+    try {
+      const response = await authorized((token) => discoverGames(token, { limit: Math.min(100, Math.max(1, limit)) }));
+      return { ok: true, games: response.games };
+    } catch (caught) {
+      return { ok: false, message: describeApiError(caught) };
+    }
+  }
+
   /** Keeps a result in step after the viewer sends or cancels a join request from the map. */
   function applyJoinRequest(
     gameId: string,
@@ -303,6 +313,7 @@ export const useDiscoveryStore = defineStore('discovery', () => {
     locate,
     initLocation,
     discoverAround,
+    discoverAll,
     applyJoinRequest,
   };
 });

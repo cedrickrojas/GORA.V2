@@ -26,6 +26,7 @@ function postSelect(viewerId: string) {
   return {
     id: true,
     userId: true,
+    sharedPostId: true,
     caption: true,
     visibility: true,
     sportId: true,
@@ -94,8 +95,9 @@ export class PostsService {
 
   async create(authorId: string, dto: CreatePostDto): Promise<PostView> {
     const media = (dto.photos ?? []).map((photo, index) => this.photos.decode(photo, index));
-    if (!dto.caption?.trim() && media.length === 0)
+    if (!dto.caption?.trim() && media.length === 0 && !dto.sharedPostId)
       throw new BadRequestException('Write something or add a photo to post.');
+    if (dto.sharedPostId) await this.findVisible(authorId, dto.sharedPostId);
     const viewerIds = await this.resolveAudience(authorId, dto.visibility, dto.customViewerIds);
     const taggedIds = await this.resolveTags(authorId, dto.taggedUserIds ?? []);
 
@@ -107,6 +109,7 @@ export class PostsService {
       const created = await tx.post.create({
         data: {
         userId: authorId,
+        sharedPostId: dto.sharedPostId,
         caption: dto.caption?.trim() || null,
         media: media.length ? { create: media } : undefined,
         visibility: dto.visibility,
@@ -119,6 +122,9 @@ export class PostsService {
         },
         select: postSelect(authorId),
       });
+      if (dto.sharedPostId) {
+        await tx.postShare.create({ data: { postId: dto.sharedPostId, userId: authorId } });
+      }
       await this.points.awardInTransaction(tx, authorId, 'POST_CREATED', created.id, 1);
       return created;
     });
@@ -282,7 +288,7 @@ export class PostsService {
       take: 50,
       select: { post: { select: postSelect(viewerId) } },
     });
-    return { posts: entries.map(({ post }) => this.toView(post, viewerId)), nextCursor: null };
+    return { posts: await Promise.all(entries.map(({ post }) => this.toView(post, viewerId))), nextCursor: null };
   }
 
   async archived(viewerId: string) {
@@ -292,7 +298,7 @@ export class PostsService {
       take: 50,
       select: postSelect(viewerId),
     });
-    return { posts: posts.map((post) => this.toView(post, viewerId)), nextCursor: null };
+    return { posts: await Promise.all(posts.map((post) => this.toView(post, viewerId))), nextCursor: null };
   }
 
   async setArchived(viewerId: string, postId: string, archived: boolean): Promise<PostView> {
@@ -479,7 +485,7 @@ export class PostsService {
     const page = posts.slice(0, take);
 
     return {
-      posts: page.map((post) => this.toView(post, viewerId)),
+      posts: await Promise.all(page.map((post) => this.toView(post, viewerId))),
       nextCursor: posts.length > take ? page[page.length - 1].id : null,
     };
   }
@@ -553,10 +559,11 @@ export class PostsService {
     }
   }
 
-  private toView(post: PostRecord, viewerId: string): PostView {
-    const { user, customViewers, userId, tags, locationName, latitude, longitude, _count, likes, ...fields } = post;
+  private async toView(post: PostRecord, viewerId: string, shareDepth = 1): Promise<PostView> {
+    const { user, customViewers, userId, tags, sharedPostId, locationName, latitude, longitude, _count, likes, ...fields } = post;
     const view: PostView = {
       ...fields,
+      sharedPostId: null,
       media: fields.media.map(({ contentType, ...item }) => ({
         ...item,
         mediaUrl: contentType ? this.photos.url(post.id, item.id, viewerId) : item.mediaUrl,
@@ -578,6 +585,17 @@ export class PostsService {
 
     if (userId === viewerId) {
       view.customViewers = customViewers.map((viewer) => viewer.user);
+    }
+
+    if (sharedPostId && shareDepth > 0) {
+      const sharedPost = await this.prisma.post.findFirst({
+        where: { AND: [{ id: sharedPostId }, visiblePostsWhere(viewerId)] },
+        select: postSelect(viewerId),
+      });
+      if (sharedPost) {
+        view.sharedPostId = sharedPost.id;
+        view.sharedPost = await this.toView(sharedPost, viewerId, shareDepth - 1);
+      }
     }
 
     return view;

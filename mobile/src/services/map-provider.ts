@@ -50,6 +50,8 @@ export interface MapCanvasProps {
   radiusKm: number;
   /** Draw the search radius (only when a distance filter applies). */
   showRadius: boolean;
+  /** Fit the map to all game markers (used by the all Philippines map). */
+  fitMarkers?: boolean;
   markers: MapMarker[];
   selectedKey: string | null;
   /** Only used to draw the location marker; Google receives coordinates when its map is enabled. */

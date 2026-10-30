@@ -12,6 +12,7 @@ import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import {
   circle,
   divIcon,
+  latLngBounds,
   map as createMap,
   marker,
   tileLayer,
@@ -39,6 +40,16 @@ function escapeHtml(value: string): string {
 
 function placeIcon(item: MapMarker) {
   const symbols = item.symbols.slice(0, 3).map(escapeHtml).join('');
+  if (props.fitMarkers) {
+    const state = item.activeCount && item.upcomingCount ? 'mixed' : item.activeCount ? 'active' : 'upcoming';
+    const label = item.gameCount > 1 ? item.gameCount : symbols.slice(0, 2);
+    return divIcon({
+      className: 'osm-map-marker osm-map-marker--country',
+      html: `<span class="osm-map-marker__country-pin osm-map-marker__country-pin--${state}">${label}</span>`,
+      iconSize: [28, 28],
+      iconAnchor: [14, 14],
+    });
+  }
   const count = item.gameCount > 1 ? `<span class="osm-map-marker__count">${item.gameCount}</span>` : '';
   const statuses = [
     item.activeCount ? `<span class="osm-map-marker__status osm-map-marker__status--active">${item.activeCount} Active</span>` : '',
@@ -75,8 +86,18 @@ function renderMarkers(): void {
 
 function updateMap(): void {
   if (!map || !isValidPoint(props.center)) return;
-  const zoom = props.radiusKm > 0 ? Math.max(7, Math.min(17, Math.round(Math.log2(40075 / (2 * props.radiusKm))))) : 12;
-  map.setView([props.center.latitude, props.center.longitude], zoom, { animate: false });
+  if (props.fitMarkers && props.markers.length) {
+    // Keep the national shape in view even when current games sit in just one region.
+    const points = [
+      [4.3, 116] as [number, number],
+      [21.5, 127.5] as [number, number],
+      ...props.markers.map((item) => [item.latitude, item.longitude] as [number, number]),
+    ];
+    map.fitBounds(latLngBounds(points), { padding: [32, 32], maxZoom: 8, animate: false });
+  } else {
+    const zoom = props.fitMarkers ? 5 : props.radiusKm > 0 ? Math.max(7, Math.min(17, Math.round(Math.log2(40075 / (2 * props.radiusKm))))) : 12;
+    map.setView([props.center.latitude, props.center.longitude], zoom, { animate: false });
+  }
 
   radius?.remove();
   radius = props.showRadius
@@ -129,7 +150,7 @@ onMounted(() => {
   }
 });
 
-watch(() => [props.center.latitude, props.center.longitude, props.radiusKm, props.showRadius, props.userLocation?.latitude, props.userLocation?.longitude], updateMap);
+watch(() => [props.center.latitude, props.center.longitude, props.radiusKm, props.showRadius, props.userLocation?.latitude, props.userLocation?.longitude, props.fitMarkers, props.markers], updateMap, { deep: true });
 watch(() => [props.markers, props.selectedKey], renderMarkers, { deep: true });
 
 onBeforeUnmount(() => {
@@ -215,6 +236,20 @@ onBeforeUnmount(() => {
   color: #102333;
   font-size: 11px;
 }
+.osm-map-canvas :deep(.osm-map-marker__country-pin) {
+  display: grid;
+  width: 25px;
+  height: 25px;
+  place-items: center;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  color: #fff;
+  font: 800 11px/1 system-ui, sans-serif;
+  box-shadow: 0 1px 5px #0008;
+}
+.osm-map-canvas :deep(.osm-map-marker__country-pin--active) { background: #df4843; }
+.osm-map-canvas :deep(.osm-map-marker__country-pin--upcoming) { background: #ed922b; }
+.osm-map-canvas :deep(.osm-map-marker__country-pin--mixed) { background: #ed6c27; }
 .osm-map-canvas :deep(.osm-map-user) { border: 0; background: transparent; }
 .osm-map-canvas :deep(.osm-map-user span) {
   display: block;

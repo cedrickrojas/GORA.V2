@@ -1,12 +1,13 @@
 <template>
   <section class="discovery-map" aria-label="GORA games map">
-    <div class="discovery-map__frame">
+    <div class="discovery-map__frame" :class="{ 'discovery-map__frame--country': fitMarkers }">
       <component
         :is="canvas"
         v-if="mapCenter && !loading"
         :center="mapCenter"
         :radius-km="visibleRadiusKm"
         :show-radius="radiusKm !== null"
+        :fit-markers="fitMarkers"
         :markers="markers"
         :selected-key="selectedPlace?.key ?? null"
         :user-location="userLocation"
@@ -19,6 +20,10 @@
       <div class="discovery-map__legend" aria-label="Game status legend">
         <span><i class="discovery-map__legend-dot discovery-map__legend-dot--active" /> Active</span>
         <span><i class="discovery-map__legend-dot discovery-map__legend-dot--upcoming" /> Upcoming</span>
+      </div>
+      <div v-if="fitMarkers" class="discovery-map__country-label">
+        <strong>GORA Games · Philippines</strong>
+        <span>{{ activeGameCount }} Active</span>
       </div>
     </div>
 
@@ -93,6 +98,8 @@ const props = withDefaults(
     /** A badge for one game ("Selected game" on the location view). */
     badgeGameId?: string | null;
     badgeText?: string | null;
+    /** Show the all-country map label and fit every marker into view. */
+    fitMarkers?: boolean;
     joinActionOf?: (game: DiscoveredGame) => JoinRequestAction;
   }>(),
   {
@@ -102,6 +109,7 @@ const props = withDefaults(
     busyGameId: null,
     badgeGameId: null,
     badgeText: null,
+    fitMarkers: false,
     joinActionOf: (game: DiscoveredGame) => discoveryJoinAction(game, undefined),
   },
 );
@@ -113,13 +121,14 @@ const canvas = CANVASES[provider.id] ?? PlaceholderMapCanvas;
 
 const places = computed(() => groupGamesByPlace(props.games));
 const unlocatedCount = computed(() => props.games.filter((game) => gamePoint(game) === null).length);
+const activeGameCount = computed(() => props.games.filter((game) => gamePoint(game) !== null).length);
 const mapCenter = computed<MapPoint | null>(() => {
   if (props.center) {
     return props.center;
   }
 
   const first = places.value[0];
-  return first ? { latitude: first.latitude, longitude: first.longitude } : null;
+  return first ? { latitude: first.latitude, longitude: first.longitude } : props.fitMarkers ? { latitude: 12.8797, longitude: 121.774 } : null;
 });
 const visibleRadiusKm = computed(() =>
   mapCenter.value ? mapRadiusKm(props.games, mapCenter.value, props.radiusKm) : 1,
@@ -168,6 +177,12 @@ function selectPlace(key: string): void {
   background: #0b1824;
 }
 
+.discovery-map__frame--country { aspect-ratio: 3 / 4; }
+
+@media (min-width: 900px) {
+  .discovery-map__frame--country { aspect-ratio: 4 / 3; }
+}
+
 .discovery-map__legend {
   position: absolute;
   z-index: 800;
@@ -190,6 +205,37 @@ function selectPlace(key: string): void {
   display: inline-flex;
   align-items: center;
   gap: 5px;
+}
+
+.discovery-map__country-label {
+  position: absolute;
+  z-index: 800;
+  top: 12px;
+  right: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: calc(100% - 24px);
+  padding: 8px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+  color: #202a32;
+  font-size: 0.72rem;
+}
+
+.discovery-map__country-label span {
+  flex: none;
+  padding: 4px 7px;
+  border-radius: 999px;
+  background: #e14a43;
+  color: #fff;
+  font-weight: 800;
+}
+
+@media (max-width: 420px) {
+  .discovery-map__country-label { top: 54px; left: 12px; right: auto; }
 }
 
 .discovery-map__legend-dot {
