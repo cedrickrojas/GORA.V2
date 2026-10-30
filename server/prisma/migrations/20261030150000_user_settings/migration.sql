@@ -1,4 +1,4 @@
-﻿CREATE TYPE "ProfileVisibility" AS ENUM ('PUBLIC', 'FRIENDS');
+CREATE TYPE "ProfileVisibility" AS ENUM ('PUBLIC', 'FRIENDS');
 
 CREATE TABLE "UserSettings" (
     "userId" UUID NOT NULL,
