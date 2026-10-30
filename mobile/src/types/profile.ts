@@ -101,12 +101,13 @@ interface ProfileDetailsBase {
   city: string | null;
   sports: UserSportEntry[];
   createdAt: string;
+  goraPoints: number;
 }
 
 /** What a profile header shows. */
 export type ProfileIdentity = Pick<
   ProfileDetailsBase,
-  'id' | 'username' | 'firstName' | 'lastName' | 'displayName' | 'profileImageUrl' | 'coverImageUrl' | 'bio' | 'city'
+  'id' | 'username' | 'firstName' | 'lastName' | 'displayName' | 'profileImageUrl' | 'coverImageUrl' | 'bio' | 'city' | 'goraPoints'
 >;
 
 /** GET /profiles/me. */

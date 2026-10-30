@@ -206,10 +206,10 @@ describe('discovery rules', () => {
   });
 
   test('the map works without a provider or key and never exposes one', () => {
-    expect(resolveMapProvider({})).toEqual(expect.objectContaining({ id: 'placeholder', hasApiKey: false }));
+    expect(resolveMapProvider({})).toEqual(expect.objectContaining({ id: 'osm', hasApiKey: false }));
     const google = resolveMapProvider({ VITE_MAP_PROVIDER: 'google', VITE_MAP_API_KEY: 'secret-key' });
-    expect(google.id).toBe('placeholder');
-    expect(google.requested).toBe('google');
+    expect(google.id).toBe('google');
+    expect(google.requested).toBeNull();
     expect(JSON.stringify(google)).not.toContain('secret-key');
     expect(resolveMapProvider({ VITE_MAP_PROVIDER: 'mapbox' }).notice).toMatch(/needs VITE_MAP_API_KEY/);
   });

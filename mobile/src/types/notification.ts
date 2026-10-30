@@ -18,7 +18,9 @@ export type NotificationType =
   | "REEL_COMMENT"
   | "STORY_REPLY"
   | "LIVE_STARTED"
-  | "NEW_FOLLOWER";
+  | "NEW_FOLLOWER"
+  | "HELP_REQUEST_RECEIVED"
+  | "HELP_REQUEST_UPDATED";
 
 export interface AppNotification {
   id: string;

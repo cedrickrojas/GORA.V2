@@ -1,0 +1,2 @@
+ALTER TYPE "BadgeCategory" ADD VALUE 'POINTS';
+ALTER TYPE "BadgeRequirement" ADD VALUE 'GORA_POINTS';

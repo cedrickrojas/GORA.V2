@@ -19,6 +19,8 @@ const SELECT = {
   actor: { select: AUTHOR_SELECT },
   game: { select: { title: true } },
   badge: { select: { name: true } },
+  reportId: true,
+  reportStatus: true,
   post: { select: { deletedAt: true } },
   reel: { select: { deletedAt: true } },
   message: {
@@ -50,6 +52,8 @@ const CONTENT = {
   BADGE_UNLOCKED: ['Badge unlocked', 'You earned a new badge.'],
   LIVE_STARTED: ['Live now', 'started a live stream.'],
   NEW_FOLLOWER: ['New follower', 'started following you.'],
+  HELP_REQUEST_RECEIVED: ['New help request', 'sent a message to the admin inbox.'],
+  HELP_REQUEST_UPDATED: ['Help request update', 'An admin updated your help request.'],
 } as const;
 
 /** Both list/count and writes are scoped to the recipient from the verified JWT. */
@@ -62,7 +66,8 @@ export class NotificationsService {
       where: { userId },
       select: { notifyFriends: true, notifyGames: true, notifyMessages: true, notifyContent: true },
     });
-    const enabledTypes: NotificationType[] = [];
+    // Support updates must stay visible even when social/content notifications are off.
+    const enabledTypes: NotificationType[] = ['HELP_REQUEST_RECEIVED', 'HELP_REQUEST_UPDATED'];
     if (!settings || settings.notifyFriends) enabledTypes.push('FRIEND_REQUEST', 'FRIEND_ACCEPTED', 'NEW_FOLLOWER');
     if (!settings || settings.notifyGames) enabledTypes.push(
       'GAME_JOIN_REQUEST', 'GAME_JOIN_ACCEPTED', 'GAME_JOIN_REJECTED', 'GAME_FULL', 'GAME_CANCELLED', 'GAME_COMPLETED',
@@ -155,7 +160,18 @@ function toView(row: Row) {
   const [title, action] = CONTENT[row.type];
   let body: string = `${name} ${action}`;
   let link: string | null = null;
-  if (row.type.startsWith('GAME_')) {
+  if (row.type === 'HELP_REQUEST_RECEIVED') {
+    body = 'A user sent a message to the admin inbox.';
+    if (row.reportId) link = '/admin?section=inbox';
+  } else if (row.type === 'HELP_REQUEST_UPDATED') {
+    body =
+      row.reportStatus === 'REVIEWING'
+        ? 'The admin is reviewing your help request.'
+        : row.reportStatus === 'RESOLVED'
+          ? 'The admin completed the review of your help request.'
+          : 'The admin closed the review of your help request.';
+    if (row.reportId) link = '/profile/help';
+  } else if (row.type.startsWith('GAME_')) {
     const game = row.game?.title || 'this game';
     body =
       row.type === 'GAME_FULL'

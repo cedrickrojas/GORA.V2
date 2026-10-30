@@ -7,7 +7,8 @@ export type BadgeCategory =
   | 'HIGHLIGHTS'
   | 'STORIES'
   | 'SOCIAL'
-  | 'COMMUNITY';
+  | 'COMMUNITY'
+  | 'POINTS';
 
 export type BadgeIcon =
   | 'flag'
@@ -25,7 +26,7 @@ export type BadgeIcon =
   | 'globe';
 
 export interface BadgeRequirement {
-  metric: ActivityMetric;
+  metric: ActivityMetric | 'goraPoints';
   text: string;
   unit: {
     singular: string;

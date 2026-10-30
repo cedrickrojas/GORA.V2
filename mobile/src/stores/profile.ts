@@ -158,15 +158,14 @@ export const useProfileStore = defineStore('profile', () => {
   const isLoaded = ref(false);
 
   async function load(): Promise<void> {
-    if (isLoaded.value) {
-      return;
-    }
-
-    const [demoProfile, stats, userBadges] = await Promise.all([
+    const [demoProfile, stats, latestProfile] = await Promise.all([
       fetchCurrentProfile(),
       fetchActivityStats(),
-      fetchBadges(),
+      auth.accessToken ? authorized(getMyProfile).catch(() => null) : Promise.resolve(null),
     ]);
+
+    if (latestProfile) currentProfile.value = latestProfile;
+    const userBadges = await fetchBadges(latestProfile?.goraPoints ?? currentProfile.value?.goraPoints ?? 0);
 
     profile.value = demoProfile;
     activityStats.value = stats;

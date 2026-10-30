@@ -367,6 +367,7 @@ const header = computed<ProfileIdentity | null>(() => {
         coverImageUrl: demo.coverImageUrl,
         bio: isBlocked.value ? null : demo.bio,
         city: demo.city,
+        goraPoints: 0,
       }
     : null;
 });

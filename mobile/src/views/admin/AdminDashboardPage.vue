@@ -59,6 +59,14 @@
               <span class="breadcrumb">/ {{ currentSection.label }}</span></span
             >
             <div class="topbar-account">
+              <router-link
+                to="/notifications"
+                class="admin-notifications"
+                :aria-label="unreadNotifications > 0 ? `Notifications, ${unreadNotifications} unread` : 'Notifications'"
+              >
+                <ion-icon :icon="notificationsOutline" aria-hidden="true" />
+                <span v-if="unreadNotifications > 0">{{ unreadNotifications > 9 ? '9+' : unreadNotifications }}</span>
+              </router-link>
               <span class="access-badge"
                 ><ion-icon
                   :icon="shieldCheckmarkOutline"
@@ -598,6 +606,7 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import { storeToRefs } from 'pinia';
 import {
   IonContent,
   IonIcon,
@@ -615,6 +624,7 @@ import {
   footballOutline,
   informationCircleOutline,
   mailOutline,
+  notificationsOutline,
   peopleOutline,
   refreshOutline,
   searchOutline,
@@ -633,6 +643,7 @@ import {
   type ReportStatus,
 } from '@/services/admin.service';
 import { useAuthStore } from '@/stores/auth';
+import { useNotificationsStore } from '@/stores/notifications';
 import type { UserRole } from '@/types/auth';
 
 const sections = [
@@ -682,6 +693,8 @@ const sections = [
 ] as const;
 type Section = (typeof sections)[number]['id'];
 const auth = useAuthStore();
+const notificationsStore = useNotificationsStore();
+const { unreadCount: unreadNotifications } = storeToRefs(notificationsStore);
 const route = useRoute();
 const router = useRouter();
 const isLoggingOut = ref(false);
@@ -707,6 +720,7 @@ const error = ref('');
 const notice = ref('');
 const accessDenied = ref(false);
 let generation = 0;
+let notificationPoll: number | null = null;
 const reportStatuses: ReportStatus[] = [
   'PENDING',
   'REVIEWING',
@@ -952,8 +966,16 @@ watch(
 );
 onIonViewWillEnter(() => {
   void load();
+  void notificationsStore.load(true);
+  if (notificationPoll === null) {
+    notificationPoll = window.setInterval(() => {
+      if (document.visibilityState === 'visible') void notificationsStore.load(true);
+    }, 15_000);
+  }
 });
 onIonViewWillLeave(() => {
+  if (notificationPoll !== null) window.clearInterval(notificationPoll);
+  notificationPoll = null;
   generation++;
   loading.value = false;
   clearData();
@@ -1165,6 +1187,32 @@ ion-icon {
   display: flex;
   align-items: center;
   gap: 14px;
+}
+.admin-notifications {
+  position: relative;
+  display: inline-flex;
+  width: 36px;
+  height: 36px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--admin-border);
+  border-radius: 50%;
+  color: #e6e7e9;
+  font-size: 18px;
+  text-decoration: none;
+}
+.admin-notifications span {
+  position: absolute;
+  top: -5px;
+  right: -6px;
+  min-width: 17px;
+  padding: 2px 4px;
+  border-radius: 999px;
+  background: #ff642e;
+  color: #fff;
+  font-size: 9px;
+  font-weight: 800;
+  text-align: center;
 }
 .mobile-logout {
   display: none;

@@ -1,11 +1,19 @@
 <template>
   <div class="location-map-picker">
     <p class="location-map-picker__hint">Tap the map or drag the pin to choose a location.</p>
-    <div ref="container" class="location-map-picker__canvas" aria-label="Choose a location on the map" />
-    <p v-if="tilesUnavailable" class="location-map-picker__error" role="status">
-      Street tiles could not load. Check your connection or choose a place from the list.
-    </p>
-    <button type="button" class="location-map-picker__center" @click="selectCenter">Use map center</button>
+    <GoogleLocationMapPicker
+      v-if="provider.id === 'google'"
+      :center="center"
+      :point="point"
+      @select="emit('select', $event)"
+    />
+    <template v-else>
+      <div ref="container" class="location-map-picker__canvas" aria-label="Choose a location on the map" />
+      <p v-if="tilesUnavailable" class="location-map-picker__error" role="status">
+        Street tiles could not load. Check your connection or choose a place from the list.
+      </p>
+      <button type="button" class="location-map-picker__center" @click="selectCenter">Use map center</button>
+    </template>
   </div>
 </template>
 
@@ -21,10 +29,13 @@ import {
   type LeafletMouseEvent,
 } from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import { resolveMapProvider } from '@/services/map-provider';
 import { isValidPoint, type MapPoint } from '@/utils/location-map';
+import GoogleLocationMapPicker from './GoogleLocationMapPicker.vue';
 
 const props = defineProps<{ center: MapPoint; point: MapPoint | null }>();
 const emit = defineEmits<{ select: [point: MapPoint] }>();
+const provider = resolveMapProvider();
 const container = ref<HTMLElement | null>(null);
 const tilesUnavailable = ref(false);
 let map: LeafletMap | null = null;

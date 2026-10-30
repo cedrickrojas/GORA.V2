@@ -16,6 +16,10 @@
         <ion-skeleton-text :animated="true" class="discovery-map__skeleton" />
       </div>
       <p v-else class="discovery-map__blank">No game on this list has a map position yet.</p>
+      <div class="discovery-map__legend" aria-label="Game status legend">
+        <span><i class="discovery-map__legend-dot discovery-map__legend-dot--active" /> Active</span>
+        <span><i class="discovery-map__legend-dot discovery-map__legend-dot--upcoming" /> Upcoming</span>
+      </div>
     </div>
 
     <p v-if="error" class="discovery-map__error" role="alert">{{ error }}</p>
@@ -63,11 +67,15 @@ import type { JoinRequestAction } from '@/utils/join-requests';
 import { type MapPoint, gamePoint, groupGamesByPlace, placeMarkers } from '@/utils/location-map';
 import { getSportMarker } from '@/utils/sports';
 import DiscoveredGameCard from './DiscoveredGameCard.vue';
+import GoogleMapCanvas from './GoogleMapCanvas.vue';
+import OsmMapCanvas from './OsmMapCanvas.vue';
 import PlaceholderMapCanvas from './PlaceholderMapCanvas.vue';
 
-/** Provider adapters. A Google, Mapbox, or OpenStreetMap canvas plugs in here with the same props. */
+/** Provider adapters share one map and marker contract. */
 const CANVASES: Partial<Record<MapProviderId, Component>> = {
   placeholder: PlaceholderMapCanvas,
+  google: GoogleMapCanvas,
+  osm: OsmMapCanvas,
 };
 
 const props = withDefaults(
@@ -124,6 +132,8 @@ const markers = computed<MapMarker[]>(() =>
     longitude: place.longitude,
     symbols: placeMarkers(place),
     gameCount: place.games.length,
+    activeCount: place.games.filter((game) => game.status === 'ACTIVE').length,
+    upcomingCount: place.games.filter((game) => game.status === 'OPEN' || game.status === 'FULL').length,
   })),
 );
 const selectedPlace = computed(
@@ -157,6 +167,39 @@ function selectPlace(key: string): void {
   aspect-ratio: 4 / 3;
   background: #0b1824;
 }
+
+.discovery-map__legend {
+  position: absolute;
+  z-index: 800;
+  top: 12px;
+  left: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 8px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+  background: rgba(11, 24, 36, 0.9);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+  color: #fff;
+  font-size: 0.72rem;
+  pointer-events: none;
+}
+
+.discovery-map__legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.discovery-map__legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.discovery-map__legend-dot--active { background: #22c55e; }
+.discovery-map__legend-dot--upcoming { background: #f47820; }
 
 .discovery-map__loading {
   position: absolute;

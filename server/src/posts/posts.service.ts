@@ -6,6 +6,7 @@ import { RelationshipService } from '../social/relationship.service';
 import { AUTHOR_SELECT } from '../users/user.types';
 import { UsersService } from '../users/users.service';
 import { PostPhotosService } from './post-photos.service';
+import { GoraPointsService } from '../gora-points/gora-points.service';
 import type {
   CreatePostDto,
   ListPostsQueryDto,
@@ -88,6 +89,7 @@ export class PostsService {
     private readonly relationships: RelationshipService,
     private readonly audience: AudienceService,
     private readonly photos: PostPhotosService,
+    private readonly points: GoraPointsService,
   ) {}
 
   async create(authorId: string, dto: CreatePostDto): Promise<PostView> {
@@ -101,8 +103,9 @@ export class PostsService {
       await this.assertSportExists(dto.sportId);
     }
 
-    const post = await this.prisma.post.create({
-      data: {
+    const post = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.post.create({
+        data: {
         userId: authorId,
         caption: dto.caption?.trim() || null,
         media: media.length ? { create: media } : undefined,
@@ -113,8 +116,11 @@ export class PostsService {
         longitude: dto.location?.longitude,
         customViewers: viewerIds ? { createMany: { data: viewerIds.map((userId) => ({ userId })) } } : undefined,
         tags: taggedIds.length > 0 ? { createMany: { data: taggedIds.map((userId) => ({ userId })) } } : undefined,
-      },
-      select: postSelect(authorId),
+        },
+        select: postSelect(authorId),
+      });
+      await this.points.awardInTransaction(tx, authorId, 'POST_CREATED', created.id, 1);
+      return created;
     });
 
     return this.toView(post, authorId);

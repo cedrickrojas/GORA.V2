@@ -13,6 +13,7 @@ import { hasClubPermission } from '../clubs/club-permissions';
 import { CLUB_INACTIVE_MESSAGE } from '../clubs/clubs.service';
 import { readGameTimezone } from '../config/env.validation';
 import { PrismaService } from '../prisma/prisma.service';
+import { GoraPointsService } from '../gora-points/gora-points.service';
 import { SPORT_NOT_FOUND_MESSAGE } from '../sports/user-sports.service';
 import { formatDisplayName } from '../users/display-name';
 import { AUTHOR_SELECT } from '../users/user.types';
@@ -109,6 +110,7 @@ export class GamesService {
   constructor(
     private readonly prisma: PrismaService,
     config: ConfigService,
+    private readonly points?: GoraPointsService,
   ) {
     this.timeZone = readGameTimezone(config.get<unknown>('GAME_TIMEZONE'));
   }
@@ -126,7 +128,8 @@ export class GamesService {
     }
 
     const game = await withGameGuards(() =>
-      this.prisma.game.create({
+      this.prisma.$transaction(async (tx) => {
+        const created = await tx.game.create({
         data: {
           hostId,
           sportId: dto.sportId,
@@ -143,7 +146,10 @@ export class GamesService {
           longitude,
           status: 'OPEN',
         },
-        select: gameSelect(hostId),
+          select: gameSelect(hostId),
+        });
+        if (this.points) await this.points.awardInTransaction(tx, hostId, 'GAME_CREATED', created.id, 1);
+        return created;
       }),
     );
 
@@ -401,7 +407,7 @@ export class GamesService {
   private async autoCancelExpiredUnfilled(): Promise<void> {
     const today = localMoment(this.timeZone).date;
     const expiredGames = await this.prisma.game.findMany({
-      where: { status: { in: ['OPEN', 'FULL'] }, gameDate: { lt: toGameDate(today) } },
+      where: { status: { in: ['OPEN', 'FULL', 'ACTIVE'] }, gameDate: { lt: toGameDate(today) } },
       select: {
         id: true,
         requiredPlayers: true,
@@ -411,15 +417,33 @@ export class GamesService {
     const unfilledIds = expiredGames
       .filter((game) => game._count.participants < game.requiredPlayers)
       .map((game) => game.id);
-    if (unfilledIds.length === 0) return;
-    await this.prisma.game.updateMany({
-      where: {
-        id: { in: unfilledIds },
-        status: { in: ['OPEN', 'FULL'] },
-        gameDate: { lt: toGameDate(today) },
-      },
-      data: { status: 'CANCELLED' },
-    });
+    const completedIds = expiredGames
+      .filter((game) => game._count.participants >= game.requiredPlayers)
+      .map((game) => game.id);
+    if (unfilledIds.length > 0) {
+      await this.prisma.game.updateMany({
+        where: { id: { in: unfilledIds }, status: { in: ['OPEN', 'FULL', 'ACTIVE'] }, gameDate: { lt: toGameDate(today) } },
+        data: { status: 'CANCELLED' },
+      });
+    }
+    for (const gameId of completedIds) {
+      await this.prisma.$transaction(async (tx) => {
+        const result = await tx.game.updateMany({
+          where: { id: gameId, status: { in: ['OPEN', 'FULL', 'ACTIVE'] }, gameDate: { lt: toGameDate(today) } },
+          data: { status: 'COMPLETED' },
+        });
+        if (!result.count) return null;
+        await tx.gameParticipant.updateMany({ where: { gameId, status: 'ACTIVE' }, data: { status: 'COMPLETED', completedAt: new Date() } });
+        const completedGame = await tx.game.findUnique({ where: { id: gameId }, select: { hostId: true, participants: { where: { status: 'COMPLETED' }, select: { userId: true } } } });
+        if (!completedGame) return null;
+        if (!this.points) return completedGame;
+        await this.points.awardInTransaction(tx, completedGame.hostId, 'GAME_COMPLETED_HOST', gameId, 3);
+        for (const player of completedGame.participants) {
+          await this.points.awardInTransaction(tx, player.userId, 'GAME_COMPLETED_PLAYER', gameId, 3);
+        }
+        return completedGame;
+      });
+    }
   }
 
   private assertSchedule(schedule: GameSchedule): void {

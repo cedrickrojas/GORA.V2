@@ -3,9 +3,7 @@ import type { MapPoint } from '@/utils/location-map';
 /**
  * Which map draws the discovery markers. The discovery rules (which games, where, how
  * far) never depend on it: a provider only draws markers and reports taps. Choose one
- * with VITE_MAP_PROVIDER (and its key in VITE_MAP_API_KEY); nothing is hardcoded. Until
- * a provider adapter is added, every choice falls back to the built-in preview, which
- * needs no key and no network.
+ * with VITE_MAP_PROVIDER. OSM works without a key; Google Maps is an optional keyed provider.
  */
 
 export type MapProviderId = 'placeholder' | 'google' | 'mapbox' | 'osm';
@@ -17,8 +15,8 @@ export const MAP_PROVIDER_LABELS: Record<MapProviderId, string> = {
   osm: 'OpenStreetMap',
 };
 
-/** Providers with an adapter in this build. Add 'google' | 'mapbox' | 'osm' with theirs. */
-export const IMPLEMENTED_MAP_PROVIDERS: readonly MapProviderId[] = ['placeholder'];
+/** Providers with an adapter in this build. */
+export const IMPLEMENTED_MAP_PROVIDERS: readonly MapProviderId[] = ['placeholder', 'google', 'osm'];
 
 /** OpenStreetMap tiles need no key; the others do. */
 const KEYLESS_PROVIDERS: readonly MapProviderId[] = ['placeholder', 'osm'];
@@ -41,6 +39,8 @@ export interface MapMarker extends MapPoint {
   /** One emoji per sport at the place, from getSportMarker. */
   symbols: string[];
   gameCount: number;
+  activeCount: number;
+  upcomingCount: number;
 }
 
 /** The contract every provider adapter component implements. */
@@ -52,7 +52,7 @@ export interface MapCanvasProps {
   showRadius: boolean;
   markers: MapMarker[];
   selectedKey: string | null;
-  /** Shown as "You are here"; never sent to the provider as an account location. */
+  /** Only used to draw the location marker; Google receives coordinates when its map is enabled. */
   userLocation: MapPoint | null;
 }
 
@@ -75,7 +75,9 @@ export function resolveMapProvider(env: MapProviderEnv = import.meta.env): MapPr
   const requested = readProvider(env.VITE_MAP_PROVIDER);
   const hasApiKey = (env.VITE_MAP_API_KEY?.trim() ?? '') !== '';
 
-  if (requested === null || requested === 'placeholder') {
+  if (requested === null) return { id: 'osm', requested: null, hasApiKey, notice: null };
+
+  if (requested === 'placeholder') {
     return {
       id: 'placeholder',
       requested: null,

@@ -186,7 +186,10 @@
               <p v-if="shown('longitude')" class="create-game__error">{{ errors.longitude }}</p>
             </div>
           </div>
-          <p class="create-game__hint">Optional. Add both coordinates to show the game on the map.</p>
+          <button type="button" class="create-game__pick-location" @click="locationPickerOpen = true">
+            {{ selectedGameLocation ? 'Change location on map' : 'Choose location on map' }}
+          </button>
+          <p class="create-game__hint">Select a point on the map to save the location and coordinates with this game.</p>
         </section>
 
         <section v-if="isReview" class="create-game__step create-game__review" aria-label="Game review">
@@ -264,6 +267,12 @@
         </button>
       </div>
     </ion-footer>
+    <LocationPickerModal
+      :is-open="locationPickerOpen"
+      :current="selectedGameLocation"
+      @close="locationPickerOpen = false"
+      @confirm="applyGameLocation"
+    />
   </ion-page>
 </template>
 
@@ -272,12 +281,15 @@ import { computed, nextTick, onMounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { IonContent, IonFooter, IonPage, onIonViewDidLeave, onIonViewWillEnter } from '@ionic/vue';
 import GamePreviewCard from '@/components/games/GamePreviewCard.vue';
+import LocationPickerModal from '@/components/feed/LocationPickerModal.vue';
 import SubPageHeader from '@/components/layout/SubPageHeader.vue';
 import { useClubsStore } from '@/stores/clubs';
 import { useGamesStore } from '@/stores/games';
 import { useSportsStore } from '@/stores/sports';
 import type { ApiGame } from '@/types/game';
+import type { PostLocation } from '@/types/post';
 import { isServerClubId } from '@/utils/club-chat';
+import { isValidPoint } from '@/utils/location-map';
 import {
   GAME_DESCRIPTION_MAX,
   GAME_LOCATION_MAX,
@@ -316,6 +328,7 @@ const stepMessage = ref<string | null>(null);
 const formRef = ref<HTMLFormElement | null>(null);
 const stepHeading = ref<HTMLElement | null>(null);
 const contentRef = ref<InstanceType<typeof IonContent> | null>(null);
+const locationPickerOpen = ref(false);
 
 const GAME_STEPS: readonly { title: string; hint: string; fields: readonly GameFormField[] }[] = [
   {
@@ -374,6 +387,13 @@ const selectedSportName = computed(
   () => sportOptions.value.find((sport) => sport.id === form.value.sportId)?.name ?? '',
 );
 const selectedClubName = computed(() => clubOptions.value.find((club) => club.id === form.value.clubId)?.name ?? '');
+const selectedGameLocation = computed<PostLocation | null>(() => {
+  const latitude = Number(String(form.value.latitude).trim());
+  const longitude = Number(String(form.value.longitude).trim());
+  const point = { latitude, longitude };
+  const name = form.value.locationName.trim();
+  return name && isValidPoint(point) ? { name, ...point } : null;
+});
 
 const editBlocker = computed(() => {
   const status = editId ? gamesStore.detailStatus[editId] : undefined;
@@ -387,6 +407,16 @@ const editBlocker = computed(() => {
 
 function touch(field: GameFormField): void {
   touched.value = new Set(touched.value).add(field);
+}
+
+function applyGameLocation(location: PostLocation): void {
+  form.value.locationName = location.name;
+  form.value.latitude = location.latitude.toFixed(6);
+  form.value.longitude = location.longitude.toFixed(6);
+  locationPickerOpen.value = false;
+  touch('locationName');
+  touch('latitude');
+  touch('longitude');
 }
 
 function shown(field: GameFormField): boolean {
@@ -671,6 +701,20 @@ textarea.create-game__input {
   margin: -6px 0 0;
   color: #7d8a93;
   font-size: 0.72rem;
+}
+
+.create-game__pick-location {
+  align-self: flex-start;
+  min-height: 42px;
+  padding: 9px 14px;
+  border: 1px solid var(--ion-color-primary);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ion-color-primary);
+  cursor: pointer;
+  font: inherit;
+  font-size: .84rem;
+  font-weight: 700;
 }
 
 .create-game__field .create-game__hint {

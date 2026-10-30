@@ -1,5 +1,5 @@
-import type { Badge } from '@/types/achievement';
-import type { ActivityStats } from '@/types/activity';
+import type { Badge, BadgeCategory, BadgeIcon } from '@/types/achievement';
+import type { ActivityMetric, ActivityStats } from '@/types/activity';
 import type { FollowSummary, UserProfile } from '@/types/profile';
 import { mockCurrentUser, mockUsers } from './mock-users';
 
@@ -42,6 +42,47 @@ export const mockActivityStats: ActivityStats = {
 };
 
 const games = { singular: 'game', plural: 'games' };
+
+const additionalBadgeSpecs: Array<{
+  id: string;
+  name: string;
+  description: string;
+  icon: BadgeIcon;
+  category: BadgeCategory;
+  metric: ActivityMetric | 'goraPoints';
+  target: number;
+  text: string;
+  singular: string;
+  plural: string;
+}> = [
+  { id: 'court-regular', name: 'Court Regular', description: 'Join 10 sports games.', icon: 'calendar', category: 'GAMES', metric: 'gamesJoined', target: 10, text: 'Join 10 games', singular: 'game', plural: 'games' },
+  { id: 'first-team', name: 'First Team', description: 'Join 25 sports games.', icon: 'people', category: 'GAMES', metric: 'gamesJoined', target: 25, text: 'Join 25 games', singular: 'game', plural: 'games' },
+  { id: 'pickup-legend', name: 'Pickup Legend', description: 'Join 100 sports games.', icon: 'trophy', category: 'GAMES', metric: 'gamesJoined', target: 100, text: 'Join 100 games', singular: 'game', plural: 'games' },
+  { id: 'reliable-finisher', name: 'Reliable Finisher', description: 'Complete your first sports game.', icon: 'flag', category: 'COMPLETION', metric: 'gamesCompleted', target: 1, text: 'Complete 1 game', singular: 'game', plural: 'games' },
+  { id: 'consistent-player', name: 'Consistent Player', description: 'Complete 25 sports games.', icon: 'flash', category: 'COMPLETION', metric: 'gamesCompleted', target: 25, text: 'Complete 25 games', singular: 'game', plural: 'games' },
+  { id: 'century-club', name: 'Century Club', description: 'Complete 100 sports games.', icon: 'medal', category: 'COMPLETION', metric: 'gamesCompleted', target: 100, text: 'Complete 100 games', singular: 'game', plural: 'games' },
+  { id: 'iron-athlete', name: 'Iron Athlete', description: 'Complete 250 sports games.', icon: 'rocket', category: 'COMPLETION', metric: 'gamesCompleted', target: 250, text: 'Complete 250 games', singular: 'game', plural: 'games' },
+  { id: 'weekend-captain', name: 'Weekend Captain', description: 'Host 5 games for your community.', icon: 'megaphone', category: 'HOSTING', metric: 'gamesHosted', target: 5, text: 'Host 5 games', singular: 'game', plural: 'games' },
+  { id: 'community-captain', name: 'Community Captain', description: 'Host 10 games for your community.', icon: 'people', category: 'HOSTING', metric: 'gamesHosted', target: 10, text: 'Host 10 games', singular: 'game', plural: 'games' },
+  { id: 'league-builder', name: 'League Builder', description: 'Host 50 games for your community.', icon: 'calendar', category: 'HOSTING', metric: 'gamesHosted', target: 50, text: 'Host 50 games', singular: 'game', plural: 'games' },
+  { id: 'clip-collector', name: 'Clip Collector', description: 'Upload 10 game highlights.', icon: 'film', category: 'HIGHLIGHTS', metric: 'highlightsUploaded', target: 10, text: 'Upload 10 highlights', singular: 'highlight', plural: 'highlights' },
+  { id: 'highlight-pro', name: 'Highlight Pro', description: 'Upload 25 game highlights.', icon: 'videocam', category: 'HIGHLIGHTS', metric: 'highlightsUploaded', target: 25, text: 'Upload 25 highlights', singular: 'highlight', plural: 'highlights' },
+  { id: 'highlight-legend', name: 'Highlight Legend', description: 'Upload 100 game highlights.', icon: 'trophy', category: 'HIGHLIGHTS', metric: 'highlightsUploaded', target: 100, text: 'Upload 100 highlights', singular: 'highlight', plural: 'highlights' },
+  { id: 'story-starter', name: 'Story Starter', description: 'Post your first game story.', icon: 'book', category: 'STORIES', metric: 'storiesPosted', target: 1, text: 'Post 1 story', singular: 'story', plural: 'stories' },
+  { id: 'game-day-reporter', name: 'Game Day Reporter', description: 'Post 25 game stories.', icon: 'film', category: 'STORIES', metric: 'storiesPosted', target: 25, text: 'Post 25 stories', singular: 'story', plural: 'stories' },
+  { id: 'daily-storyteller', name: 'Daily Storyteller', description: 'Post 100 game stories.', icon: 'flash', category: 'STORIES', metric: 'storiesPosted', target: 100, text: 'Post 100 stories', singular: 'story', plural: 'stories' },
+  { id: 'friendly-face', name: 'Friendly Face', description: 'Make your first friend on GORA.', icon: 'heart', category: 'SOCIAL', metric: 'friendsCount', target: 1, text: 'Make 1 friend', singular: 'friend', plural: 'friends' },
+  { id: 'team-networker', name: 'Team Networker', description: 'Make 100 friends on GORA.', icon: 'people', category: 'SOCIAL', metric: 'friendsCount', target: 100, text: 'Make 100 friends', singular: 'friend', plural: 'friends' },
+  { id: 'everyones-teammate', name: "Everyone's Teammate", description: 'Make 250 friends on GORA.', icon: 'globe', category: 'SOCIAL', metric: 'friendsCount', target: 250, text: 'Make 250 friends', singular: 'friend', plural: 'friends' },
+  { id: 'multi-sport-athlete', name: 'Multi-Sport Athlete', description: 'Play 3 different sports.', icon: 'flash', category: 'COMMUNITY', metric: 'sportsParticipated', target: 3, text: 'Play 3 sports', singular: 'sport', plural: 'sports' },
+  { id: 'all-rounder', name: 'All-Rounder', description: 'Play 7 different sports.', icon: 'globe', category: 'COMMUNITY', metric: 'sportsParticipated', target: 7, text: 'Play 7 sports', singular: 'sport', plural: 'sports' },
+  { id: 'sports-explorer', name: 'Sports Explorer', description: 'Play 10 different sports.', icon: 'rocket', category: 'COMMUNITY', metric: 'sportsParticipated', target: 10, text: 'Play 10 sports', singular: 'sport', plural: 'sports' },
+  { id: 'torch-spark', name: 'Torch Spark', description: 'Earn 10 GORA Points.', icon: 'flash', category: 'POINTS', metric: 'goraPoints', target: 10, text: 'Earn 10 points', singular: 'point', plural: 'points' },
+  { id: 'first-flame', name: 'First Flame', description: 'Earn 50 GORA Points.', icon: 'flag', category: 'POINTS', metric: 'goraPoints', target: 50, text: 'Earn 50 points', singular: 'point', plural: 'points' },
+  { id: 'burning-bright', name: 'Burning Bright', description: 'Earn 150 GORA Points.', icon: 'flash', category: 'POINTS', metric: 'goraPoints', target: 150, text: 'Earn 150 points', singular: 'point', plural: 'points' },
+  { id: 'torchbearer', name: 'Torchbearer', description: 'Earn 300 GORA Points.', icon: 'trophy', category: 'POINTS', metric: 'goraPoints', target: 300, text: 'Earn 300 points', singular: 'point', plural: 'points' },
+  { id: 'eternal-flame', name: 'Eternal Flame', description: 'Earn 1,000 GORA Points.', icon: 'medal', category: 'POINTS', metric: 'goraPoints', target: 1000, text: 'Earn 1,000 points', singular: 'point', plural: 'points' },
+];
 
 export const mockBadges: Badge[] = [
   {
@@ -207,4 +248,22 @@ export const mockBadges: Badge[] = [
     progress: 3,
     target: 5,
   },
+  ...additionalBadgeSpecs.map((badge) => {
+    const progress = badge.metric === 'goraPoints' ? 0 : mockActivityStats[badge.metric];
+    return {
+      id: `badge-${badge.id}`,
+      name: badge.name,
+      description: badge.description,
+      icon: badge.icon,
+      category: badge.category,
+      requirement: {
+        metric: badge.metric,
+        text: badge.text,
+        unit: { singular: badge.singular, plural: badge.plural },
+      },
+      unlocked: progress >= badge.target,
+      progress,
+      target: badge.target,
+    };
+  }),
 ];

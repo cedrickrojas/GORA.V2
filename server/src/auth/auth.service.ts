@@ -2,6 +2,7 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as argon2 from 'argon2';
 import { UsersService } from '../users/users.service';
+import { GoraPointsService } from '../gora-points/gora-points.service';
 import type { CurrentUser, SafeUser } from '../users/user.types';
 import type { LoginDto } from './dto/login.dto';
 import type { RegisterDto } from './dto/register.dto';
@@ -27,6 +28,7 @@ export class AuthService {
   constructor(
     private readonly usersService: UsersService,
     private readonly jwtService: JwtService,
+    private readonly points: GoraPointsService,
   ) {}
 
   async register(dto: RegisterDto): Promise<AuthResponse> {
@@ -40,6 +42,8 @@ export class AuthService {
       city: dto.city,
       dateOfBirth: dto.dateOfBirth ? new Date(dto.dateOfBirth) : undefined,
     });
+    await this.points.award(user.id, 'ACCOUNT_CREATED', user.id, 1);
+    await this.awardDailyLogin(user.id);
 
     return this.issue(user);
   }
@@ -64,11 +68,18 @@ export class AuthService {
       throw new UnauthorizedException(INACTIVE_ACCOUNT_MESSAGE);
     }
 
+    await this.awardDailyLogin(user.id);
+
     return this.issue(user);
   }
 
   getCurrentUser(user: CurrentUser): CurrentUser {
     return user;
+  }
+
+  private async awardDailyLogin(userId: string): Promise<void> {
+    const manilaDay = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Manila' }).format(new Date());
+    await this.points.award(userId, 'DAILY_LOGIN', manilaDay, 1);
   }
 
   private async issue(user: SafeUser): Promise<AuthResponse> {

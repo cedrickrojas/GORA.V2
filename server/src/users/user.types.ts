@@ -60,6 +60,7 @@ export const PROFILE_USER_SELECT = {
   city: true,
   dateOfBirth: true,
   createdAt: true,
+  goraPoints: true,
 } as const;
 
 /** Internal only: used to verify a login. Must never leave AuthService. */

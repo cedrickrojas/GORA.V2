@@ -6,8 +6,10 @@ import { GamesController } from './games.controller';
 import { GamesService } from './games.service';
 import { JoinRequestsController } from './join-requests.controller';
 import { JoinRequestsService } from './join-requests.service';
+import { GoraPointsModule } from '../gora-points/gora-points.module';
 
 @Module({
+  imports: [GoraPointsModule],
   controllers: [GamesController, JoinRequestsController, GamePlayersController],
   providers: [
     GamesService,

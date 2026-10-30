@@ -220,6 +220,11 @@ export class AdminService {
       await lockAdminAccounts(tx);
       await this.assertActor(tx, actorId);
       const closed = body.status === 'RESOLVED' || body.status === 'DISMISSED';
+      const report = await tx.report.findUnique({
+        where: { id },
+        select: { reporterId: true, reason: true },
+      });
+      if (!report) throw new NotFoundException('Report not found.');
       const result = await tx.report.updateMany({
         where: { id, status: body.expectedStatus },
         data: {
@@ -243,6 +248,20 @@ export class AdminService {
           details: { before: body.expectedStatus, after: body.status },
         },
       });
+      if (
+        report.reason === 'HELP_REQUEST' &&
+        body.status !== body.expectedStatus &&
+        ['REVIEWING', 'RESOLVED', 'DISMISSED'].includes(body.status)
+      ) {
+        await tx.notification.create({
+          data: {
+            userId: report.reporterId,
+            type: 'HELP_REQUEST_UPDATED',
+            reportId: id,
+            reportStatus: body.status,
+          },
+        });
+      }
       return { id, status: body.status };
     });
   }

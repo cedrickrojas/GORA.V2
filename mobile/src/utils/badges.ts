@@ -40,6 +40,7 @@ export const BADGE_CATEGORY_LABELS: Record<BadgeCategory, string> = {
   STORIES: 'Stories',
   SOCIAL: 'Friends',
   COMMUNITY: 'Community',
+  POINTS: 'GORA Points',
 };
 
 const CATEGORY_ORDER: readonly BadgeCategory[] = [
@@ -50,6 +51,7 @@ const CATEGORY_ORDER: readonly BadgeCategory[] = [
   'STORIES',
   'SOCIAL',
   'COMMUNITY',
+  'POINTS',
 ];
 
 export function isBadgeUnlocked(badge: Badge): boolean {

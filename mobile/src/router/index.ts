@@ -181,6 +181,11 @@ export const routes: RouteRecordRaw[] = [
         component: () => import('../views/profile/FriendsPage.vue'),
       },
       {
+        path: 'profile/help',
+        name: 'my-help-requests',
+        component: () => import('../views/profile/HelpRequestsPage.vue'),
+      },
+      {
         path: 'profile/clubs',
         name: 'my-clubs',
         component: () => import('../views/profile/MyClubsPage.vue'),

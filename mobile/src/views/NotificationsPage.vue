@@ -117,6 +117,7 @@ import {
   trophyOutline,
   notificationsOutline,
   chatbubbleOutline,
+  mailOutline,
   closeCircleOutline,
   peopleOutline,
 } from "ionicons/icons";
@@ -146,6 +147,8 @@ const NOTIFICATION_ICONS: Record<NotificationType, string> = {
   STORY_REPLY: chatbubbleOutline,
   LIVE_STARTED: notificationsOutline,
   NEW_FOLLOWER: personAddOutline,
+  HELP_REQUEST_RECEIVED: mailOutline,
+  HELP_REQUEST_UPDATED: checkmarkCircleOutline,
 };
 
 const router = useRouter();

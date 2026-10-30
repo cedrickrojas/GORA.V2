@@ -4,11 +4,13 @@ import { fetchFollowSummary, setFollowing } from '@/services/profile.service';
 import type { FollowSummary } from '@/types/profile';
 import { applyFollowChange, canFollow } from '@/utils/follows';
 import { useSessionStore } from './session';
+import { useAuthStore } from './auth';
 
 const EMPTY_SUMMARY: FollowSummary = { followersCount: 0, followingCount: 0, followingIds: [] };
 
 export const useFollowsStore = defineStore('follows', () => {
   const session = useSessionStore();
+  const auth = useAuthStore();
   const summary = ref<FollowSummary>(EMPTY_SUMMARY);
   const isLoaded = ref(false);
 
@@ -41,7 +43,7 @@ export const useFollowsStore = defineStore('follows', () => {
     summary.value = applyFollowChange(previous, userId, next);
 
     try {
-      await setFollowing(userId, next);
+      await setFollowing(userId, next, auth.accessToken);
     } catch {
       summary.value = previous;
     }

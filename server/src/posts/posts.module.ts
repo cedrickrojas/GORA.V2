@@ -5,9 +5,10 @@ import { PostsController } from './posts.controller';
 import { PostsService } from './posts.service';
 import { PostPhotosController } from './post-photos.controller';
 import { PostPhotosService } from './post-photos.service';
+import { GoraPointsModule } from '../gora-points/gora-points.module';
 
 @Module({
-  imports: [UsersModule, SocialModule],
+  imports: [UsersModule, SocialModule, GoraPointsModule],
   controllers: [PostsController, PostPhotosController],
   providers: [PostsService, PostPhotosService],
 })

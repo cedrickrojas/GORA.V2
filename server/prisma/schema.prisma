@@ -11,7 +11,8 @@ datasource db {
 }
 
 model User {
-  cloudMediaUploads        CloudMediaUpload[]
+  cloudMediaUploads       CloudMediaUpload[]
+  goraPoints              Int                       @default(0)
   id                      String                    @id @default(uuid()) @db.Uuid
   username                String                    @unique
   email                   String                    @unique
@@ -58,7 +59,7 @@ model User {
   postLikes               PostLike[]
   postShares              PostShare[]
   postTags                PostTag[]
-  postPreferences          PostPreference[]
+  postPreferences         PostPreference[]
   reels                   Reel[]
   reelComments            ReelComment[]
   customViewerReels       ReelCustomViewer[]
@@ -77,8 +78,22 @@ model User {
   followers               UserFollow[]              @relation("UserFollowFollowing")
   sports                  UserSport[]
   settings                UserSettings?
+  pointEvents             GoraPointEvent[]
 
   @@index([isActive])
+}
+
+model GoraPointEvent {
+  id        String          @id @default(uuid()) @db.Uuid
+  userId    String          @db.Uuid
+  reason    GoraPointReason
+  sourceKey String
+  points    Int
+  createdAt DateTime        @default(now())
+  user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, reason, sourceKey])
+  @@index([userId, createdAt])
 }
 
 model Sport {
@@ -113,16 +128,16 @@ model UserSport {
 }
 
 model UserSettings {
-  userId               String           @id @db.Uuid
-  notifyFriends        Boolean           @default(true)
-  notifyGames          Boolean           @default(true)
-  notifyMessages       Boolean           @default(true)
-  notifyContent        Boolean           @default(true)
-  profileVisibility    ProfileVisibility @default(PUBLIC)
-  defaultDistanceKm    Int?
-  useDeviceLocation    Boolean           @default(true)
-  updatedAt            DateTime          @updatedAt
-  user                 User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId            String            @id @db.Uuid
+  notifyFriends     Boolean           @default(true)
+  notifyGames       Boolean           @default(true)
+  notifyMessages    Boolean           @default(true)
+  notifyContent     Boolean           @default(true)
+  profileVisibility ProfileVisibility @default(PUBLIC)
+  defaultDistanceKm Int?
+  useDeviceLocation Boolean           @default(true)
+  updatedAt         DateTime          @updatedAt
+  user              User              @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Game {
@@ -394,7 +409,7 @@ model Post {
   shares         PostShare[]
   tags           PostTag[]
   reports        Report[]
-  preferences     PostPreference[]
+  preferences    PostPreference[]
 
   @@index([userId, createdAt])
   @@index([userId, archivedAt])
@@ -406,15 +421,15 @@ model Post {
 }
 
 model PostPreference {
-  id         String       @id @default(uuid()) @db.Uuid
-  userId     String       @db.Uuid
-  postId     String       @db.Uuid
-  feedback   PostFeedback?
-  savedAt    DateTime?
-  createdAt  DateTime     @default(now())
-  updatedAt  DateTime     @updatedAt
-  user       User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  post       Post         @relation(fields: [postId], references: [id], onDelete: Cascade)
+  id        String        @id @default(uuid()) @db.Uuid
+  userId    String        @db.Uuid
+  postId    String        @db.Uuid
+  feedback  PostFeedback?
+  savedAt   DateTime?
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post      Post          @relation(fields: [postId], references: [id], onDelete: Cascade)
 
   @@unique([userId, postId])
   @@index([userId, savedAt])
@@ -685,6 +700,8 @@ model Notification {
   messageId     String?          @db.Uuid
   joinRequestId String?          @db.Uuid
   badgeId       String?          @db.Uuid
+  reportId      String?          @db.Uuid
+  reportStatus  ReportStatus?
   isRead        Boolean          @default(false)
   createdAt     DateTime         @default(now())
   actor         User?            @relation("NotificationActor", fields: [actorId], references: [id])
@@ -694,6 +711,7 @@ model Notification {
   joinRequest   JoinRequest?     @relation(fields: [joinRequestId], references: [id])
   message       Message?         @relation(fields: [messageId], references: [id])
   post          Post?            @relation(fields: [postId], references: [id])
+  report        Report?          @relation("NotificationHelpReport", fields: [reportId], references: [id], onDelete: Cascade)
   reel          Reel?            @relation(fields: [reelId], references: [id])
   story         Story?           @relation(fields: [storyId], references: [id])
   user          User             @relation("NotificationRecipient", fields: [userId], references: [id], onDelete: Cascade)
@@ -701,6 +719,7 @@ model Notification {
   @@index([userId, isRead, createdAt])
   @@index([userId, createdAt])
   @@index([actorId])
+  @@index([reportId])
 }
 
 model Badge {
@@ -767,24 +786,24 @@ model ConversationParticipant {
 }
 
 model Message {
-  id             String         @id @default(uuid()) @db.Uuid
-  conversationId String         @db.Uuid
-  senderId       String         @db.Uuid
+  id             String            @id @default(uuid()) @db.Uuid
+  conversationId String            @db.Uuid
+  senderId       String            @db.Uuid
   content        String
-  messageType    MessageType    @default(TEXT)
-  createdAt      DateTime       @default(now())
-  updatedAt      DateTime       @updatedAt
+  messageType    MessageType       @default(TEXT)
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
   readAt         DateTime?
   deletedAt      DateTime?
-  conversation   Conversation   @relation(fields: [conversationId], references: [id])
-  sender         User           @relation(fields: [senderId], references: [id])
+  conversation   Conversation      @relation(fields: [conversationId], references: [id])
+  sender         User              @relation(fields: [senderId], references: [id])
   notifications  Notification[]
   reports        Report[]
   reactions      MessageReaction[]
   attachmentData Bytes?
   attachmentType String?
   pinnedAt       DateTime?
-  isForwarded    Boolean        @default(false)
+  isForwarded    Boolean           @default(false)
 
   @@index([conversationId, createdAt])
   @@index([senderId])
@@ -810,9 +829,9 @@ model DirectCall {
   caller           User         @relation("CallCaller", fields: [callerId], references: [id], onDelete: Cascade)
   callee           User         @relation("CallCallee", fields: [calleeId], references: [id], onDelete: Cascade)
 
+  @@unique([conversationId], map: "DirectCall_one_active", where: raw("(status IN ('RINGING', 'ACTIVE'))"))
   @@index([calleeId, status])
   @@index([callerId, status])
-  @@unique([conversationId], map: "DirectCall_one_active", where: raw("(status IN ('RINGING', 'ACTIVE'))"))
 }
 
 model MessageReaction {
@@ -866,10 +885,10 @@ model LiveStream {
   host         User             @relation(fields: [hostId], references: [id])
   viewers      LiveViewer[]
 
+  @@unique([hostId], map: "LiveStream_one_active_host", where: raw("(status = 'LIVE'::\"LiveStreamStatus\")"))
   @@index([hostId])
   @@index([gameId])
   @@index([status])
-  @@unique([hostId], map: "LiveStream_one_active_host", where: raw("(status = 'LIVE'::\"LiveStreamStatus\")"))
 }
 
 model LiveViewer {
@@ -879,8 +898,8 @@ model LiveViewer {
   joinedAt     DateTime   @default(now())
   leftAt       DateTime?
   lastSeenAt   DateTime   @default(now())
-  offer        String?   @db.Text
-  answer       String?   @db.Text
+  offer        String?    @db.Text
+  answer       String?    @db.Text
   liveStream   LiveStream @relation(fields: [liveStreamId], references: [id], onDelete: Cascade)
   user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -889,34 +908,35 @@ model LiveViewer {
 }
 
 model Report {
-  id             String       @id @default(uuid()) @db.Uuid
-  reporterId     String       @db.Uuid
-  reportedUserId String?      @db.Uuid
-  postId         String?      @db.Uuid
-  reelId         String?      @db.Uuid
-  postCommentId  String?      @db.Uuid
-  reelCommentId  String?      @db.Uuid
-  gameId         String?      @db.Uuid
-  storyId        String?      @db.Uuid
-  messageId      String?      @db.Uuid
+  id             String         @id @default(uuid()) @db.Uuid
+  reporterId     String         @db.Uuid
+  reportedUserId String?        @db.Uuid
+  postId         String?        @db.Uuid
+  reelId         String?        @db.Uuid
+  postCommentId  String?        @db.Uuid
+  reelCommentId  String?        @db.Uuid
+  gameId         String?        @db.Uuid
+  storyId        String?        @db.Uuid
+  messageId      String?        @db.Uuid
   reason         ReportReason
   description    String?
-  status         ReportStatus @default(PENDING)
-  resolvedById   String?      @db.Uuid
-  createdAt      DateTime     @default(now())
+  status         ReportStatus   @default(PENDING)
+  resolvedById   String?        @db.Uuid
+  createdAt      DateTime       @default(now())
   resolvedAt     DateTime?
-  clubId         String?      @db.Uuid
-  club           Club?        @relation(fields: [clubId], references: [id])
-  game           Game?        @relation(fields: [gameId], references: [id])
-  message        Message?     @relation(fields: [messageId], references: [id])
-  postComment    PostComment? @relation(fields: [postCommentId], references: [id])
-  post           Post?        @relation(fields: [postId], references: [id])
-  reelComment    ReelComment? @relation(fields: [reelCommentId], references: [id])
-  reel           Reel?        @relation(fields: [reelId], references: [id])
-  reportedUser   User?        @relation("ReportReportedUser", fields: [reportedUserId], references: [id])
-  reporter       User         @relation("ReportReporter", fields: [reporterId], references: [id])
-  resolvedBy     User?        @relation("ReportResolver", fields: [resolvedById], references: [id])
-  story          Story?       @relation(fields: [storyId], references: [id])
+  clubId         String?        @db.Uuid
+  club           Club?          @relation(fields: [clubId], references: [id])
+  game           Game?          @relation(fields: [gameId], references: [id])
+  message        Message?       @relation(fields: [messageId], references: [id])
+  postComment    PostComment?   @relation(fields: [postCommentId], references: [id])
+  post           Post?          @relation(fields: [postId], references: [id])
+  reelComment    ReelComment?   @relation(fields: [reelCommentId], references: [id])
+  reel           Reel?          @relation(fields: [reelId], references: [id])
+  reportedUser   User?          @relation("ReportReportedUser", fields: [reportedUserId], references: [id])
+  reporter       User           @relation("ReportReporter", fields: [reporterId], references: [id])
+  resolvedBy     User?          @relation("ReportResolver", fields: [resolvedById], references: [id])
+  story          Story?         @relation(fields: [storyId], references: [id])
+  notifications  Notification[] @relation("NotificationHelpReport")
 
   @@index([status, createdAt])
   @@index([reporterId])
@@ -955,6 +975,16 @@ enum GameStatus {
   ACTIVE
   COMPLETED
   CANCELLED
+}
+
+enum GoraPointReason {
+  ACCOUNT_CREATED
+  DAILY_LOGIN
+  GAME_CREATED
+  FOLLOWER_GAINED
+  POST_CREATED
+  GAME_COMPLETED_HOST
+  GAME_COMPLETED_PLAYER
 }
 
 enum ParticipantStatus {
@@ -1021,6 +1051,8 @@ enum NotificationType {
   BADGE_UNLOCKED
   LIVE_STARTED
   NEW_FOLLOWER
+  HELP_REQUEST_RECEIVED
+  HELP_REQUEST_UPDATED
 }
 
 enum ProfileVisibility {
@@ -1036,6 +1068,7 @@ enum BadgeCategory {
   STORIES
   SOCIAL
   COMMUNITY
+  POINTS
 }
 
 enum BadgeRequirement {
@@ -1046,6 +1079,7 @@ enum BadgeRequirement {
   STORIES_POSTED
   FRIENDS
   SPORTS_PARTICIPATED
+  GORA_POINTS
 }
 
 enum ConversationType {
@@ -1137,14 +1171,15 @@ enum ReportStatus {
 }
 
 model CloudMediaUpload {
-  id String @id @db.Uuid
-  userId String @db.Uuid
-  resource String
+  id          String    @id @db.Uuid
+  userId      String    @db.Uuid
+  resource    String
   contentType String
-  size Int
-  expiresAt DateTime
-  claimedAt DateTime?
-  createdAt DateTime @default(now())
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  size        Int
+  expiresAt   DateTime
+  claimedAt   DateTime?
+  createdAt   DateTime  @default(now())
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@index([userId, claimedAt, expiresAt])
 }

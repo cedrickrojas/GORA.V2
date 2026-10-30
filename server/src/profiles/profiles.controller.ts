@@ -46,6 +46,11 @@ export class ProfilesController {
     return this.profiles.sendHelpRequest(viewer.id, dto.message);
   }
 
+  @Get('me/help')
+  listMyHelpRequests(@CurrentUser() viewer: CurrentUserContext) {
+    return this.profiles.listMyHelpRequests(viewer.id);
+  }
+
   @Get('me/settings')
   getMySettings(@CurrentUser() viewer: CurrentUserContext) {
     return this.profiles.getSettings(viewer.id);
@@ -121,5 +126,15 @@ export class ProfilesController {
     @Body() dto: ReportProfileDto,
   ) {
     return this.profiles.reportUser(viewer.id, username, dto.reason, dto.description);
+  }
+
+  @Put('id/:userId/follow')
+  followUserById(@CurrentUser() viewer: CurrentUserContext, @Param('userId') userId: string) {
+    return this.profiles.setFollowing(viewer.id, userId, true);
+  }
+
+  @Delete('id/:userId/follow')
+  unfollowUserById(@CurrentUser() viewer: CurrentUserContext, @Param('userId') userId: string) {
+    return this.profiles.setFollowing(viewer.id, userId, false);
   }
 }

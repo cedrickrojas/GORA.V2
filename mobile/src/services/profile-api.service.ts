@@ -1,4 +1,5 @@
 import type { OtherProfile, OwnProfile, ProfileUpdateInput } from '@/types/profile';
+import type { HelpRequestsResponse } from '@/types/help-request';
 import { apiRequest } from './api-client';
 import { getApiBaseUrl } from './api-config';
 
@@ -46,4 +47,8 @@ export async function reportUser(token: string, username: string, reason: string
 
 export async function sendHelpRequest(token: string, message: string): Promise<void> {
   await apiRequest('/profiles/help', { method: 'POST', body: { message }, token });
+}
+
+export function getMyHelpRequests(token: string): Promise<HelpRequestsResponse> {
+  return apiRequest<HelpRequestsResponse>('/profiles/me/help', { token });
 }

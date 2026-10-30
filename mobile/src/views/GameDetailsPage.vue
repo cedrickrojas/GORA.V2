@@ -1,8 +1,8 @@
 <template>
   <ion-page>
-    <SubPageHeader :title="pageTitle" back-href="/home" />
+    <SubPageHeader class="game-details-header" :title="pageTitle" back-href="/home" />
 
-    <ion-content :fullscreen="true">
+    <ion-content class="game-details-content" :fullscreen="true">
       <ServerGameDetails v-if="isServerGame" :game-id="gameId" />
 
       <p v-else-if="isLoaded && !details" class="game__missing">This game is not available.</p>
@@ -28,6 +28,13 @@
             {{ formatStartTime(Date.parse(details.startsAt), now) }} · {{ details.skillLevel }}
           </p>
         </header>
+
+        <GameLocationPreview
+          :name="details.location.name"
+          :latitude="details.location.latitude"
+          :longitude="details.location.longitude"
+          :map-path="locationMapPath(details.location, details.id)"
+        />
 
         <section class="game__capacity" aria-label="Player capacity">
           <p class="game__count">
@@ -123,6 +130,7 @@ import {
   getSpotsLeft,
 } from '@/utils/games';
 import { locationMapPath } from '@/utils/location-map';
+import GameLocationPreview from '@/components/map/GameLocationPreview.vue';
 import { getSportMarker, getSportVisual } from '@/utils/sports';
 import { formatStartTime } from '@/utils/time';
 
@@ -201,6 +209,16 @@ onMounted(async () => {
 <style scoped>
 .game {
   padding-bottom: 24px;
+}
+
+ion-content.game-details-content {
+  --padding-start: 0;
+  --padding-end: 0;
+}
+
+ion-header.game-details-header ion-toolbar {
+  --padding-start: max(8px, calc((100% - var(--gora-column)) / 2));
+  --padding-end: max(8px, calc((100% - var(--gora-column)) / 2));
 }
 
 .game__missing {
@@ -418,5 +436,53 @@ onMounted(async () => {
   background: transparent;
   color: var(--gora-muted);
   cursor: default;
+}
+
+@media (min-width: 768px) {
+  ion-content.game-details-content {
+    --padding-start: max(24px, calc((100% - 1080px) / 2));
+    --padding-end: max(24px, calc((100% - 1080px) / 2));
+  }
+
+  ion-header.game-details-header ion-toolbar {
+    --padding-start: max(24px, calc((100% - 1080px) / 2));
+    --padding-end: max(24px, calc((100% - 1080px) / 2));
+  }
+
+  .game {
+    display: grid;
+    max-width: 1080px;
+    grid-template-columns: minmax(0, 1fr) 320px;
+    align-items: start;
+    column-gap: 24px;
+    row-gap: 18px;
+    margin-inline: auto;
+  }
+
+  .game__hero {
+    grid-column: 1 / -1;
+    padding: 34px 38px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 24px;
+    box-shadow: 0 18px 44px rgba(0, 0, 0, 0.16);
+  }
+
+  .game__title {
+    max-width: 760px;
+    font-size: clamp(2rem, 4vw, 3rem);
+  }
+
+  .game__capacity {
+    grid-column: 2;
+    grid-row: 2;
+    margin: 0;
+    padding: 22px;
+    border-radius: 20px;
+  }
+
+  .game__section {
+    grid-column: 1;
+    padding: 0 4px;
+  }
 }
 </style>

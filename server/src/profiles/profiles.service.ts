@@ -3,6 +3,7 @@ import { Prisma, ReportReason } from '../generated/prisma/client';
 import { visiblePostsWhere } from '../posts/post-visibility';
 import { visibleGamesWhere } from '../games/game-visibility';
 import { PrismaService } from '../prisma/prisma.service';
+import { GoraPointsService } from '../gora-points/gora-points.service';
 import { visibleReelsWhere } from '../reels/reel-visibility';
 import { canSendFriendRequest, messageAccessFor, type RelationshipState } from '../social/relationship';
 import { RelationshipService } from '../social/relationship.service';
@@ -34,6 +35,7 @@ export class ProfilesService {
     private readonly relationships: RelationshipService,
     private readonly userSports: UserSportsService,
     private readonly covers: ProfileCoverService,
+    private readonly points: GoraPointsService,
   ) {}
 
   async getSettings(userId: string) {
@@ -109,11 +111,44 @@ export class ProfilesService {
   async sendHelpRequest(viewerId: string, message: string) {
     const content = message.trim();
     if (!content) throw new BadRequestException('Write a message before sending.');
-    const request = await this.prisma.report.create({
-      data: { reporterId: viewerId, reason: 'HELP_REQUEST', description: content },
-      select: { id: true, createdAt: true },
+    const request = await this.prisma.$transaction(async (tx) => {
+      const report = await tx.report.create({
+        data: { reporterId: viewerId, reason: 'HELP_REQUEST', description: content },
+        select: { id: true, createdAt: true },
+      });
+      const admins = await tx.user.findMany({
+        where: { role: 'SUPER_ADMIN', isActive: true },
+        select: { id: true },
+      });
+      if (admins.length) {
+        await tx.notification.createMany({
+          data: admins.map(({ id }) => ({
+            userId: id,
+            type: 'HELP_REQUEST_RECEIVED' as const,
+            reportId: report.id,
+            reportStatus: 'PENDING' as const,
+          })),
+        });
+      }
+      return report;
     });
     return { sent: true, id: request.id, createdAt: request.createdAt.toISOString() };
+  }
+
+  async listMyHelpRequests(userId: string) {
+    const items = await this.prisma.report.findMany({
+      where: { reporterId: userId, reason: 'HELP_REQUEST' },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      take: 100,
+      select: { id: true, description: true, status: true, createdAt: true, resolvedAt: true },
+    });
+    return {
+      items: items.map((item) => ({
+        ...item,
+        createdAt: item.createdAt.toISOString(),
+        resolvedAt: item.resolvedAt?.toISOString() ?? null,
+      })),
+    };
   }
 
   async getOwn(userId: string): Promise<OwnProfileView> {
@@ -234,6 +269,26 @@ export class ProfilesService {
     return this.getOwn(userId);
   }
 
+  async setFollowing(viewerId: string, targetId: string, following: boolean) {
+    const target = await this.findActiveUser({ id: targetId });
+    if (!target || target.id === viewerId) throw new NotFoundException(PROFILE_NOT_FOUND_MESSAGE);
+    const relation = await this.relationships.between(viewerId, target.id);
+    if (relation === 'BLOCKED' || relation === 'BLOCKED_BY_THEM') throw new NotFoundException(PROFILE_NOT_FOUND_MESSAGE);
+
+    if (following) {
+      await this.prisma.$transaction(async (tx) => {
+        const inserted = await tx.userFollow.createMany({
+          data: [{ followerId: viewerId, followingId: target.id }],
+          skipDuplicates: true,
+        });
+        if (inserted.count) await this.points.awardInTransaction(tx, target.id, 'FOLLOWER_GAINED', viewerId, 1);
+      });
+    } else {
+      await this.prisma.userFollow.deleteMany({ where: { followerId: viewerId, followingId: target.id } });
+    }
+    return { following };
+  }
+
   private listSports(userId: string): Promise<UserSportView[]> {
     return this.userSports.list(userId);
   }
@@ -330,6 +385,7 @@ export class ProfilesService {
       city: user.city,
       sports,
       createdAt: user.createdAt.toISOString(),
+      goraPoints: user.goraPoints,
     };
   }
 }

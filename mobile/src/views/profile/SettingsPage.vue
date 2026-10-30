@@ -38,6 +38,13 @@
             <p>Send a message to the GORA admin team</p>
           </ion-label>
         </ion-item>
+        <ion-item router-link="/profile/help" :detail="true">
+          <ion-icon slot="start" :icon="helpCircleOutline" aria-hidden="true" />
+          <ion-label>
+            My Help Requests
+            <p>Check the admin review status of your messages</p>
+          </ion-label>
+        </ion-item>
         <ion-item
           v-for="item in SETTINGS_ITEMS"
           :key="item.label"

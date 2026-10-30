@@ -47,7 +47,8 @@
 
     <div class="nearby__location">
       <template v-if="discovery.locationStatus === 'granted'">
-        <span>📍 Distances are from your current location (never shared or saved).</span>
+        <span v-if="mapProvider.id === 'google'">📍 Google Maps receives your current coordinates to center the map; GORA does not save them.</span>
+        <span v-else>📍 Distances are from your current location (not saved by GORA).</span>
       </template>
       <template v-else-if="!settings.values.useDeviceLocation">
         <span>Device location is turned off in your settings.</span>
@@ -139,6 +140,7 @@ import { useDiscoveryStore } from '@/stores/discovery';
 import { useFiltersStore } from '@/stores/filters';
 import { useSportsStore } from '@/stores/sports';
 import { useSettingsStore } from '@/stores/settings';
+import { resolveMapProvider } from '@/services/map-provider';
 import type { DiscoveryDateFilter, DiscoveryViewMode } from '@/types/discovery';
 import { DISCOVERY_DATE_FILTERS } from '@/utils/map-discovery';
 import { DISTANCE_FILTERS, type DistanceFilter, formatDistanceFilter } from '@/utils/search';
@@ -153,6 +155,7 @@ const discovery = useDiscoveryStore();
 const filters = useFiltersStore();
 const sportsStore = useSportsStore();
 const settings = useSettingsStore();
+const mapProvider = resolveMapProvider();
 const { joiningGame, joinError, busyGameId, joinActionOf, openJoin, closeJoin, sendJoin } = useDiscoveryJoin(
   computed(() => discovery.games),
   (gameId, status, game) => discovery.applyJoinRequest(gameId, status, game),

@@ -35,6 +35,7 @@ interface ProfileBase {
   city: string | null;
   sports: UserSportView[];
   createdAt: string;
+  goraPoints: number;
 }
 
 export interface OwnProfileView extends ProfileBase {

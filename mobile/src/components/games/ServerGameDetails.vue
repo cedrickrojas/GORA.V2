@@ -34,6 +34,14 @@
       </router-link>
     </section>
 
+    <GameLocationPreview
+      v-if="mapPath && game.latitude !== null && game.longitude !== null"
+      :name="game.locationName"
+      :latitude="game.latitude"
+      :longitude="game.longitude"
+      :map-path="mapPath"
+    />
+
     <p v-if="game.status === 'CANCELLED'" class="server-game__notice server-game__notice--cancelled">
       The host cancelled this game.
     </p>
@@ -56,7 +64,7 @@
       </div>
     </section>
 
-    <section class="server-game__section">
+    <section class="server-game__section server-game__section--host">
       <SectionHeader title="Host" />
       <router-link :to="`/profile/${game.host.username}`" class="server-game__host">
         <UserAvatar :user="gameHostSummary(game)" :size="44" />
@@ -74,7 +82,7 @@
       </router-link>
     </section>
 
-    <section class="server-game__section" aria-label="Player roster">
+    <section class="server-game__section server-game__section--roster" aria-label="Player roster">
       <SectionHeader title="Player Roster" />
       <p v-if="rosterStatus === 'error' && !roster" class="server-game__hint" role="alert">
         {{ rosterError }}
@@ -107,7 +115,7 @@
       </ol>
     </section>
 
-    <HostJoinRequests v-if="game.isHost" :game="game" />
+    <HostJoinRequests v-if="game.isHost" class="server-game__requests" :game="game" />
 
     <div class="server-game__actions">
       <template v-if="game.isHost">
@@ -211,6 +219,7 @@ import { locationMapPath } from '@/utils/location-map';
 import { showNotice } from '@/utils/notice';
 import { getSportVisual } from '@/utils/sports';
 import GameStatusBadge from './GameStatusBadge.vue';
+import GameLocationPreview from '@/components/map/GameLocationPreview.vue';
 import HostJoinRequests from './HostJoinRequests.vue';
 import JoinRequestModal from './JoinRequestModal.vue';
 
@@ -376,6 +385,16 @@ async function confirmCancelRequest(): Promise<void> {
 <style scoped>
 .server-game {
   padding-bottom: 32px;
+}
+
+.server-game__section--host,
+.server-game__section--roster {
+  margin-bottom: 18px;
+}
+
+.server-game__requests {
+  display: block;
+  margin: 0 16px 18px;
 }
 
 .server-game__missing {
@@ -709,5 +728,128 @@ async function confirmCancelRequest(): Promise<void> {
 .server-game__danger:disabled {
   opacity: 0.6;
   cursor: default;
+}
+
+@media (min-width: 768px) {
+  .server-game {
+    display: grid;
+    max-width: 1080px;
+    grid-template-columns: minmax(0, 1fr) 330px;
+    align-items: start;
+    column-gap: 24px;
+    row-gap: 18px;
+    margin-inline: auto;
+    padding: 20px 0 48px;
+  }
+
+  .server-game__hero {
+    grid-column: 1 / -1;
+    grid-row: 1;
+    min-height: 230px;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    padding: 30px 38px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 24px;
+    box-shadow: 0 20px 48px rgba(0, 0, 0, 0.18);
+  }
+
+  .server-game__title {
+    max-width: 780px;
+    font-size: clamp(2rem, 4vw, 3rem);
+    line-height: 1.1;
+  }
+
+  .server-game__description {
+    max-width: 720px;
+    font-size: 1rem;
+    line-height: 1.55;
+  }
+
+  .server-game__facts,
+  .server-game__capacity,
+  .server-game__section--host,
+  .server-game__section--roster,
+  .server-game__requests,
+  .server-game__actions,
+  .server-game__notice {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 20px;
+    border: 1px solid var(--gora-line);
+    border-radius: 20px;
+    background: var(--gora-surface);
+  }
+
+  .server-game__facts {
+    grid-column: 1;
+    grid-row: 2;
+    gap: 12px;
+    padding: 22px 24px;
+    font-size: 0.95rem;
+  }
+
+  .server-game__capacity {
+    grid-column: 2;
+    grid-row: 2;
+    padding: 22px;
+  }
+
+  .server-game__notice {
+    grid-column: 1;
+    grid-row: 3;
+    align-self: start;
+  }
+
+  .server-game__section--host {
+    grid-column: 1;
+    grid-row: 4;
+    padding: 20px 24px;
+  }
+
+  .server-game__section--roster {
+    grid-column: 1;
+    grid-row: 5;
+    padding: 20px 24px;
+  }
+
+  .server-game__requests {
+    grid-column: 1;
+    grid-row: 6;
+  }
+
+  .server-game__actions {
+    position: sticky;
+    top: 20px;
+    grid-column: 2;
+    grid-row: 3;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 18px;
+  }
+
+  .server-game__host {
+    min-height: 52px;
+  }
+
+  .server-game__club {
+    margin: 14px 0 0;
+  }
+
+  .server-game__slot {
+    min-height: 52px;
+  }
+
+  .server-game__slot-number {
+    width: 34px;
+  }
+
+  .server-game__primary,
+  .server-game__secondary,
+  .server-game__danger {
+    width: 100%;
+  }
 }
 </style>
