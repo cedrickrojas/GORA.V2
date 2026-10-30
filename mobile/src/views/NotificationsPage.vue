@@ -91,7 +91,7 @@
               {{ actionBusyId === item.id ? 'Accepting…' : 'Accept' }}
             </button>
             <button
-              v-else-if="item.type === 'GAME_JOIN_REQUEST'"
+              v-else-if="item.type === 'GAME_JOIN_REQUEST' && !gameActionStatus[item.id]"
               type="button"
               class="notification__action notification__action--primary"
               :disabled="isMarkingAll || !!actionBusyId"
@@ -99,11 +99,16 @@
             >
               {{ actionBusyId === item.id ? 'Accepting…' : 'Accept Join Request' }}
             </button>
+            <span v-else-if="item.type === 'GAME_JOIN_REQUEST' && gameActionStatus[item.id]" class="notification__action-status">Request Accepted</span>
             <template v-else-if="item.type === 'GAME_LEAVE_REQUEST'">
-              <button type="button" class="notification__action notification__action--primary" :disabled="isMarkingAll || !!actionBusyId" @click="respondToLeave(item, 'approve')">
-                {{ actionBusyId === item.id ? 'Removing…' : 'Approve & Remove Player' }}
-              </button>
-              <button type="button" class="notification__action" :disabled="isMarkingAll || !!actionBusyId" @click="respondToLeave(item, 'reject')">Decline Request</button>
+              <span v-if="gameActionStatus[item.id] === 'leave-approved'" class="notification__action-status">Player Removed</span>
+              <span v-else-if="gameActionStatus[item.id] === 'leave-rejected'" class="notification__action-status">Request Declined</span>
+              <template v-else>
+                <button type="button" class="notification__action notification__action--primary" :disabled="isMarkingAll || !!actionBusyId" @click="respondToLeave(item, 'approve')">
+                  {{ actionBusyId === item.id ? 'Removing…' : 'Approve & Remove Player' }}
+                </button>
+                <button type="button" class="notification__action" :disabled="isMarkingAll || !!actionBusyId" @click="respondToLeave(item, 'reject')">Decline Request</button>
+              </template>
             </template>
             <button
               v-else-if="item.type === 'GAME_JOIN_REJECTED'"
@@ -204,6 +209,21 @@ const gamesStore = useGamesStore();
 const joinRequestsStore = useJoinRequestsStore();
 const gamePlayersStore = useGamePlayersStore();
 const actionBusyId = ref<string | null>(null);
+type GameNotificationAction = 'join-accepted' | 'leave-approved' | 'leave-rejected';
+const GAME_ACTION_STORAGE_KEY = 'gora:completed-game-notification-actions';
+function loadGameActionStatus(): Record<string, GameNotificationAction> {
+  try {
+    const saved = sessionStorage.getItem(GAME_ACTION_STORAGE_KEY);
+    return saved ? JSON.parse(saved) as Record<string, GameNotificationAction> : {};
+  } catch {
+    return {};
+  }
+}
+const gameActionStatus = ref(loadGameActionStatus());
+function rememberGameAction(itemId: string, action: GameNotificationAction): void {
+  gameActionStatus.value = { ...gameActionStatus.value, [itemId]: action };
+  try { sessionStorage.setItem(GAME_ACTION_STORAGE_KEY, JSON.stringify(gameActionStatus.value)); } catch { /* the disabled state still works for this view */ }
+}
 const {
   items,
   unreadCount,
@@ -286,7 +306,10 @@ async function acceptGameRequest(item: AppNotification): Promise<void> {
       return;
     }
     const result = await joinRequestsStore.acceptJoinRequest(gameId, request.id);
-    if (result.ok) await completeNotificationAction(item, `${actor.displayName} joined the game.`);
+    if (result.ok) {
+      rememberGameAction(item.id, 'join-accepted');
+      await completeNotificationAction(item, `${actor.displayName} joined the game.`);
+    }
     else void showNotice(result.message);
   } finally {
     actionBusyId.value = null;
@@ -300,7 +323,10 @@ async function respondToLeave(item: AppNotification, action: 'approve' | 'reject
   actionBusyId.value = item.id;
   try {
     const result = await gamePlayersStore.respondToLeaveRequest(gameId, actor.id, action);
-    if (result.ok) await completeNotificationAction(item, action === 'approve' ? `${actor.displayName} was removed from the game. 1 GORA point was deducted.` : 'Leave request declined. The player remains in the game.');
+    if (result.ok) {
+      rememberGameAction(item.id, action === 'approve' ? 'leave-approved' : 'leave-rejected');
+      await completeNotificationAction(item, action === 'approve' ? `${actor.displayName} was removed from the game. 1 GORA point was deducted.` : 'Leave request declined. The player remains in the game.');
+    }
     else void showNotice(result.message);
   } finally {
     actionBusyId.value = null;
@@ -437,6 +463,19 @@ onMounted(() => {
 }
 
 .notification__action:disabled { cursor: progress; opacity: 0.6; }
+.notification__action-status {
+  display: inline-flex;
+  min-height: 36px;
+  align-items: center;
+  padding: 8px 14px;
+  border-color: #52565b;
+  background: #3d4146;
+  color: #c1c5ca;
+  border: 1px solid #52565b;
+  border-radius: 999px;
+  font-size: .78rem;
+  font-weight: 700;
+}
 
 .notification--unread {
   background: rgba(214, 242, 92, 0.06);
