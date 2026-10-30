@@ -4,6 +4,7 @@ import { fetchClubMembers, fetchClubs, setClubFollow, setClubMembership } from '
 import {
   approveServerClubRequest,
   createServerClub,
+  getClubFeed,
   getMyServerClubs,
   getServerClub,
   getServerClubInvites,
@@ -58,6 +59,7 @@ export const useClubsStore = defineStore('clubs', () => {
 
   const demoClubs = ref<Club[]>([]);
   const serverClubs = ref<Club[]>([]);
+  const feedClubs = ref<Club[]>([]);
   const members = ref<Record<string, ClubMemberEntry[]>>({});
   const isLoaded = ref(false);
   const serverError = ref<string | null>(null);
@@ -69,6 +71,7 @@ export const useClubsStore = defineStore('clubs', () => {
     [() => auth.sessionVersion, () => auth.accessToken, () => auth.currentUser?.id],
     () => {
       serverClubs.value = [];
+      feedClubs.value = [];
       demoClubs.value = [];
       members.value = {};
       isLoaded.value = false;
@@ -98,7 +101,18 @@ export const useClubsStore = defineStore('clubs', () => {
       isLoaded.value = true;
     }
 
-    await refreshMine();
+    await Promise.all([refreshMine(), refreshFeedClubs()]);
+  }
+
+  async function refreshFeedClubs(): Promise<void> {
+    if (!auth.accessToken) return;
+    const isCurrent = captureSession(auth);
+    try {
+      const list = (await authorized(getClubFeed)).map(toClub);
+      if (isCurrent()) feedClubs.value = list;
+    } catch (caught) {
+      if (isCurrent()) serverError.value = describeApiError(caught);
+    }
   }
 
   async function refreshMine(): Promise<void> {
@@ -167,6 +181,7 @@ export const useClubsStore = defineStore('clubs', () => {
   async function create(input: ClubCreateInput): Promise<ClubCreateResult> {
     try {
       const club = upsertServer(toClub(await authorized((token) => createServerClub(token, input))));
+      feedClubs.value = [club, ...feedClubs.value.filter((item) => item.id !== club.id)];
       return { ok: true, club };
     } catch (caught) {
       return { ok: false, message: describeClubError(caught) };
@@ -176,6 +191,7 @@ export const useClubsStore = defineStore('clubs', () => {
   async function update(clubId: string, input: ClubUpdateInput): Promise<ClubCreateResult> {
     try {
       const club = upsertServer(toClub(await authorized((token) => updateServerClub(token, clubId, input))));
+      feedClubs.value = [club, ...feedClubs.value.filter((item) => item.id !== club.id)];
       return { ok: true, club };
     } catch (caught) {
       return { ok: false, message: describeClubError(caught) };
@@ -339,12 +355,14 @@ export const useClubsStore = defineStore('clubs', () => {
 
   return {
     clubs,
+    feedClubs,
     members,
     isLoaded,
     serverError,
     feedClubIds,
     load,
     refreshMine,
+    refreshFeedClubs,
     loadClub,
     byId,
     loadMembers,

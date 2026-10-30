@@ -55,6 +55,12 @@ export class ClubsController {
     return this.clubs.listMine(viewer.id);
   }
 
+  /** Recent clubs visible to the viewer for Home and Discover feeds. */
+  @Get('feed')
+  listFeed(@CurrentUser() viewer: CurrentUserContext): Promise<ClubView[]> {
+    return this.clubs.listFeed(viewer.id);
+  }
+
   @Get(':clubId')
   get(
     @CurrentUser() viewer: CurrentUserContext,

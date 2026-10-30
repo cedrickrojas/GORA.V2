@@ -115,6 +115,7 @@ import SectionHeader from '@/components/common/SectionHeader.vue';
 import UserAvatar from '@/components/common/UserAvatar.vue';
 import ServerGameDetails from '@/components/games/ServerGameDetails.vue';
 import SubPageHeader from '@/components/layout/SubPageHeader.vue';
+import { useGameShare } from '@/composables/useGameShare';
 import { useJoinGame } from '@/composables/useJoinGame';
 import { useNow } from '@/composables/useNow';
 import { fetchGameDetails } from '@/services/game.service';
@@ -136,8 +137,6 @@ import { locationMapPath } from '@/utils/location-map';
 import GameLocationPreview from '@/components/map/GameLocationPreview.vue';
 import { getSportMarker, getSportVisual } from '@/utils/sports';
 import { formatStartTime } from '@/utils/time';
-import { showNotice } from '@/utils/notice';
-import { shareLink } from '@/utils/share-link';
 
 // Ionic keeps pages alive, so the id is read once for this page instance.
 const gameId = String(useRoute().params.gameId ?? '');
@@ -148,6 +147,7 @@ const gamesStore = useGamesStore();
 const joinRequestsStore = useJoinRequestsStore();
 const gamePlayersStore = useGamePlayersStore();
 const sessionStore = useSessionStore();
+const { shareGame: openGameShare } = useGameShare();
 const { joinGame } = useJoinGame();
 const now = useNow();
 const details = ref<GameDetails | null>(null);
@@ -171,12 +171,13 @@ const remainingLabel = computed(() => {
 
 async function shareDemoGame(): Promise<void> {
   if (!details.value) return;
-  try {
-    const result = await shareLink(details.value.title, `/games/${encodeURIComponent(gameId)}`);
-    if (result !== 'cancelled') void showNotice(result === 'copied' ? 'Game link copied.' : 'Game shared.');
-  } catch {
-    void showNotice('Could not share this game. Please try again.');
-  }
+  await openGameShare({
+    id: gameId,
+    title: details.value.title,
+    sport: details.value.sport,
+    locationName: details.value.location.name,
+    when: formatStartTime(Date.parse(details.value.startsAt), now.value),
+  });
 }
 
 /**

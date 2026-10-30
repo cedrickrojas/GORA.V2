@@ -26,9 +26,9 @@
           Nothing in {{ sport.name }} matches “{{ query.trim() }}”.
         </p>
 
-        <section v-if="!isSearching || games.length" class="sport__section">
+        <section v-if="!isSearching || visibleGameCount > 0 || mapLoading" class="sport__section">
           <SectionHeader title="Games">
-            <span class="sport__meta">{{ games.length }} {{ games.length === 1 ? 'game' : 'games' }} · {{ distanceLabel }}</span>
+            <span class="sport__meta">{{ visibleGameCount }} {{ visibleGameCount === 1 ? 'game' : 'games' }} · {{ distanceLabel }}</span>
           </SectionHeader>
 
           <div class="sport__chips" role="group" aria-label="Date">
@@ -47,14 +47,22 @@
 
           <SegmentTabs v-model="view" :options="VIEW_OPTIONS" class="sport__views" />
 
-          <div v-if="view === 'MAP'" class="sport__map">
-            <p class="sport__map-markers" aria-hidden="true">{{ marker }}</p>
-            <strong>{{ sport.name }} games on the GORA map</strong>
-            <span>
-              The map shows real {{ sport.name.toLowerCase() }} games created on GORA, filtered by date and distance.
-            </span>
-            <button type="button" class="sport__map-list" @click="openDiscoveryMap">Open the {{ sport.name }} map</button>
-          </div>
+          <GameDiscoveryMap
+            v-if="view === 'MAP'"
+            :games="sportMapGames"
+            :center="discovery.userLocation"
+            :radius-km="discovery.userLocation ? filters.maxDistanceKm : null"
+            :selected-game-id="selectedMapGameId"
+            :loading="mapLoading"
+            :error="mapError"
+            :user-location="discovery.userLocation"
+            :fit-markers="true"
+            :busy-game-id="busyGameId"
+            :join-action-of="joinActionOf"
+            @select="selectedMapGameId = $event"
+            @view="viewGame"
+            @join="openJoin"
+          />
 
           <template v-else>
             <p v-if="games.length === 0" class="sport__empty">
@@ -125,6 +133,16 @@
           </div>
         </section>
       </div>
+      <JoinRequestModal
+        :is-open="joiningGame !== null"
+        :game-title="joiningGame?.title ?? ''"
+        :host-name="joiningGame?.host.displayName ?? ''"
+        :auto-accept="joiningGame?.autoAccept"
+        :is-submitting="busyGameId !== null"
+        :error="joinError"
+        @close="closeJoin"
+        @send="sendJoin"
+      />
     </ion-content>
   </ion-page>
 </template>
@@ -137,25 +155,34 @@ import { locationOutline } from 'ionicons/icons';
 import ClubRow from '@/components/clubs/ClubRow.vue';
 import SectionHeader from '@/components/common/SectionHeader.vue';
 import SegmentTabs from '@/components/common/SegmentTabs.vue';
+import JoinRequestModal from '@/components/games/JoinRequestModal.vue';
 import PlayerRow from '@/components/discover/PlayerRow.vue';
 import PostCard from '@/components/feed/PostCard.vue';
 import GameCard from '@/components/games/GameCard.vue';
+import GameDiscoveryMap from '@/components/map/GameDiscoveryMap.vue';
 import AppHeader from '@/components/layout/AppHeader.vue';
 import ReelThumb from '@/components/reels/ReelThumb.vue';
+import { useDiscoveryJoin } from '@/composables/useDiscoveryJoin';
 import { useJoinGame } from '@/composables/useJoinGame';
 import { useNow } from '@/composables/useNow';
 import { usePostActions } from '@/composables/usePostActions';
 import { useCatalogStore } from '@/stores/catalog';
 import { useClubsStore } from '@/stores/clubs';
+import { useAuthStore } from '@/stores/auth';
+import { useDiscoveryStore } from '@/stores/discovery';
 import { useFiltersStore } from '@/stores/filters';
 import { useGamesStore } from '@/stores/games';
 import { usePostsStore } from '@/stores/posts';
 import { useReelsStore } from '@/stores/reels';
+import { discoverGames } from '@/services/games-api.service';
+import { createAuthorizedCall } from '@/stores/authorized';
+import type { DiscoveredGame } from '@/types/discovery';
+import { describeApiError } from '@/utils/api-errors';
 import { rankPopularClubs } from '@/utils/clubs';
 import { isWithinDistance, matchesSport } from '@/utils/filters';
-import { DISCOVERY_DATES, selectSportDiscoveryGames, type DiscoveryDate } from '@/utils/map-discovery';
+import { DISCOVERY_DATES, buildDiscoveryQuery, selectSportDiscoveryGames, type DiscoveryDate } from '@/utils/map-discovery';
 import { formatDistanceFilter, matchesSearchQuery } from '@/utils/search';
-import { getSportImage, getSportMarker, toSportSlug } from '@/utils/sports';
+import { getSportImage, toSportSlug } from '@/utils/sports';
 import { formatCompactNumber, formatDistanceKm } from '@/utils/time';
 
 type SportView = 'MAP' | 'LIST';
@@ -175,13 +202,21 @@ const gamesStore = useGamesStore();
 const postsStore = usePostsStore();
 const reelsStore = useReelsStore();
 const filters = useFiltersStore();
+const auth = useAuthStore();
+const discovery = useDiscoveryStore();
+const authorized = createAuthorizedCall(auth);
 const { joinGame } = useJoinGame();
 const { likePost, commentOnPost, sharePost } = usePostActions();
 const now = useNow();
 
 const date = ref<DiscoveryDate>('ALL');
-const view = ref<SportView>('LIST');
+const view = ref<SportView>('MAP');
 const query = ref('');
+const mapGames = ref<DiscoveredGame[]>([]);
+const mapLoading = ref(false);
+const mapError = ref<string | null>(null);
+const selectedMapGameId = ref<string | null>(null);
+let mapRequest = 0;
 const isSearching = computed(() => query.value.trim().length > 0);
 const matches = (...fields: string[]): boolean => matchesSearchQuery(query.value, ...fields);
 
@@ -198,18 +233,69 @@ watch(
 );
 const sportName = computed(() => sport.value?.name ?? 'Sport');
 const sportImage = computed(() => getSportImage(sportName.value));
-const marker = computed(() => getSportMarker(sportName.value));
 
 const dateLabel = computed(() => DISCOVERY_DATES.find((option) => option.id === date.value)?.label ?? '');
 
-/** Search -> sport -> date -> Discover's map of real games, with this sport and date. */
-function openDiscoveryMap(): void {
-  const params = new URLSearchParams({ sport: sportName.value, date: date.value, view: 'map' });
-  void router.push(`/discover?${params.toString()}`);
-}
+const sportMapGames = computed(() => mapGames.value.filter((game) =>
+  matches(game.title, game.locationName, game.host.displayName),
+));
+const visibleGameCount = computed(() => view.value === 'MAP' ? sportMapGames.value.length : games.value.length);
 const distanceLabel = computed(() =>
   filters.maxDistanceKm === null ? 'Any distance' : `Within ${formatDistanceFilter(filters.maxDistanceKm)}`,
 );
+
+const { joiningGame, joinError, busyGameId, joinActionOf, openJoin, closeJoin, sendJoin } = useDiscoveryJoin(
+  sportMapGames,
+  (gameId, status, updatedGame) => {
+    mapGames.value = mapGames.value.map((game) => game.id === gameId ? {
+      ...game,
+      ...(updatedGame ? {
+        isPlayer: updatedGame.isPlayer,
+        currentPlayers: updatedGame.currentPlayers,
+        remainingSlots: updatedGame.remainingSlots,
+        status: updatedGame.status,
+      } : {}),
+      myJoinRequestStatus: status,
+    } : game);
+  },
+);
+
+async function refreshSportMap(): Promise<void> {
+  const selected = sport.value;
+  if (!selected) return;
+  const request = ++mapRequest;
+  mapLoading.value = true;
+  mapError.value = null;
+  try {
+    const query = buildDiscoveryQuery({
+      sportId: selected.id,
+      dateFilter: date.value,
+      customDate: null,
+      distanceKm: filters.maxDistanceKm,
+      userLocation: discovery.userLocation,
+    });
+    const response = await authorized((token) => discoverGames(token, query));
+    if (request !== mapRequest) return;
+    mapGames.value = response.games;
+    if (!response.games.some((game) => game.id === selectedMapGameId.value)) selectedMapGameId.value = null;
+  } catch (caught) {
+    if (request === mapRequest) mapError.value = describeApiError(caught);
+  } finally {
+    if (request === mapRequest) mapLoading.value = false;
+  }
+}
+
+function viewGame(gameId: string): void {
+  void router.push(`/games/${gameId}`);
+}
+
+watch([date, () => filters.maxDistanceKm, () => discovery.userLocation], () => {
+  if (view.value === 'MAP') void refreshSportMap();
+}, { deep: true });
+
+watch(view, (selectedView) => {
+  if (selectedView === 'MAP' && !mapGames.value.length && !mapLoading.value) void refreshSportMap();
+});
 
 const games = computed(() =>
   selectSportDiscoveryGames(
@@ -261,7 +347,7 @@ const locations = computed(() =>
 );
 const resultCount = computed(
   () =>
-    games.value.length +
+    visibleGameCount.value +
     players.value.length +
     clubs.value.length +
     reels.value.length +
@@ -269,13 +355,19 @@ const resultCount = computed(
     locations.value.length,
 );
 
-onMounted(() => {
-  void catalog.load();
-  void clubsStore.load();
-  void gamesStore.load();
-  void postsStore.load();
-  void reelsStore.load();
-});
+onMounted(() => void loadSportPage());
+
+async function loadSportPage(): Promise<void> {
+  await auth.initialize();
+  await Promise.all([catalog.load(), discovery.initLocation()]);
+  await Promise.all([
+    clubsStore.load(),
+    gamesStore.load(),
+    postsStore.load(),
+    reelsStore.load(),
+  ]);
+  await refreshSportMap();
+}
 </script>
 
 <style scoped>
@@ -383,42 +475,6 @@ onMounted(() => {
 
 .sport__views {
   margin: 12px 0;
-}
-
-.sport__map {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  padding: 28px 16px;
-  border: 1px dashed var(--gora-line);
-  border-radius: 16px;
-  background: var(--gora-surface);
-  text-align: center;
-}
-
-.sport__map-markers {
-  margin: 0 0 6px;
-  font-size: 28px;
-  letter-spacing: 6px;
-}
-
-.sport__map span {
-  color: var(--gora-muted);
-  font-size: 0.8rem;
-}
-
-.sport__map-list {
-  margin-top: 10px;
-  padding: 7px 16px;
-  border: 1px solid var(--ion-color-primary);
-  border-radius: 10px;
-  background: transparent;
-  color: var(--ion-color-primary);
-  cursor: pointer;
-  font: inherit;
-  font-size: 0.8rem;
-  font-weight: 600;
 }
 
 .sport__empty {

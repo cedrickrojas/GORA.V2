@@ -273,6 +273,8 @@ const feed = computed(() =>
 const sources = computed<HomeFeedSources>(() => ({
   posts: postsStore.visiblePosts,
   games: gamesStore.games,
+  serverGames: gamesStore.listedGames,
+  clubs: clubsStore.feedClubs,
   reels: reelsStore.feedReels,
   activities: catalog.activities,
 }));
@@ -299,15 +301,21 @@ function openSportSearch(sport: SportCategory): void {
 }
 
 onMounted(() => {
-  void session.load();
-  void catalog.load();
-  void gamesStore.load();
-  void reelsStore.load();
-  void postsStore.load();
-  void clubsStore.load();
-  void friendsStore.load();
-  void followsStore.load();
+  void loadDiscoverData();
 });
+
+async function loadDiscoverData(): Promise<void> {
+  await session.load();
+  await Promise.all([
+    catalog.load(),
+    gamesStore.load(),
+    reelsStore.load(),
+    postsStore.load(),
+    clubsStore.load(),
+    friendsStore.load(),
+    followsStore.load(),
+  ]);
+}
 </script>
 
 <style scoped>

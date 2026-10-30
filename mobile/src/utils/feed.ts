@@ -1,5 +1,6 @@
 import type { FeedActivity, HomeFeedItem } from '@/types/feed';
-import type { Game } from '@/types/game';
+import type { ApiGame, Game } from '@/types/game';
+import type { Club } from '@/types/club';
 import type { FeedPost, PostDraft } from '@/types/post';
 import type { Reel } from '@/types/reel';
 import { getNearbyRadiusKm } from './discover';
@@ -13,6 +14,8 @@ export const POST_PHOTO_LIMIT = 10;
 export interface HomeFeedSources {
   posts: readonly FeedPost[];
   games: readonly Game[];
+  serverGames?: readonly ApiGame[];
+  clubs?: readonly Club[];
   reels: readonly Reel[];
   activities: readonly FeedActivity[];
 }
@@ -41,7 +44,8 @@ export function buildHomeFeed(
   const radiusKm = getNearbyRadiusKm(filters);
   const bySport = <T extends { sport: string }>(item: T): boolean => matchesSport(item.sport, filters.sport);
 
-  const posts: HomeFeedItem[] = sources.posts.filter(bySport).map((post) => ({
+  // Feed posts stay visible even when the viewer has a sport filter selected for games.
+  const posts: HomeFeedItem[] = sources.posts.map((post) => ({
     type: 'POST',
     id: `post:${post.id}`,
     at: Date.parse(post.createdAt),
@@ -51,6 +55,17 @@ export function buildHomeFeed(
   const games: HomeFeedItem[] = sources.games
     .filter((game) => isFeedGame(game) && game.location.distanceKm <= radiusKm && bySport(game))
     .map((game) => ({ type: 'GAME', id: `game:${game.id}`, at: Date.parse(game.createdAt), game }));
+
+  const serverGames: HomeFeedItem[] = (sources.serverGames ?? [])
+    .filter((game) => game.status !== 'CANCELLED' && game.status !== 'COMPLETED')
+    .map((game) => ({ type: 'SERVER_GAME', id: `server-game:${game.id}`, at: Date.parse(game.createdAt), game }));
+
+  const clubs: HomeFeedItem[] = (sources.clubs ?? []).map((club) => ({
+    type: 'CLUB',
+    id: `club:${club.id}`,
+    at: Date.parse(club.createdAt),
+    club,
+  }));
 
   const reels: HomeFeedItem[] = [...sources.reels]
     .filter(bySport)
@@ -65,7 +80,7 @@ export function buildHomeFeed(
     activity,
   }));
 
-  return [...posts, ...games, ...reels, ...activities].sort((a, b) => b.at - a.at);
+  return [...posts, ...games, ...serverGames, ...clubs, ...reels, ...activities].sort((a, b) => b.at - a.at);
 }
 
 const ALL_REELS: HomeFeedLimits = { reels: Number.POSITIVE_INFINITY };
@@ -86,6 +101,8 @@ export function buildFriendsFeed(
     {
       posts: sources.posts.filter((post) => circle.has(post.author.id)),
       games: sources.games.filter((game) => circle.has(game.host.id)),
+      serverGames: (sources.serverGames ?? []).filter((game) => circle.has(game.host.id)),
+      clubs: (sources.clubs ?? []).filter((club) => circle.has(club.owner.id)),
       reels: sources.reels.filter((reel) => circle.has(reel.author.id)),
       activities: sources.activities.filter((activity) => circle.has(activity.actor.id)),
     },
@@ -107,6 +124,8 @@ export function buildClubsFeed(
     {
       posts: sources.posts.filter(inClubs),
       games: sources.games.filter(inClubs),
+      serverGames: (sources.serverGames ?? []).filter(inClubs),
+      clubs: (sources.clubs ?? []).filter((club) => clubs.has(club.id)),
       reels: sources.reels.filter(inClubs),
       activities: [],
     },

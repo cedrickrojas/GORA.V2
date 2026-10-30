@@ -13,6 +13,8 @@ import { readClubMaxMembersLimit } from '../config/env.validation';
 import { PrismaService } from '../prisma/prisma.service';
 import { formatDisplayName } from '../users/display-name';
 import { AUTHOR_SELECT } from '../users/user.types';
+import { friendshipWithViewer } from '../posts/post-visibility';
+import { visibleClubContentWhere } from '../social/club-visibility';
 import { CLUB_NOT_FOUND_MESSAGE } from './club-chat.service';
 import { minutesOfDay } from './club-fields';
 import {
@@ -239,6 +241,23 @@ export class ClubsService {
       },
       select: CLUB_DETAIL_SELECT,
       orderBy: { name: 'asc' },
+    });
+
+    return Promise.all(clubs.map((club) => this.buildView(viewerId, club)));
+  }
+
+  /** Recent public clubs and private clubs the viewer belongs to, with blocked owners omitted. */
+  async listFeed(viewerId: string): Promise<ClubView[]> {
+    const clubs = await this.prisma.club.findMany({
+      where: {
+        AND: [
+          visibleClubContentWhere(viewerId),
+          { owner: { isActive: true, NOT: friendshipWithViewer(viewerId, 'BLOCKED') } },
+        ],
+      },
+      select: CLUB_DETAIL_SELECT,
+      orderBy: { createdAt: 'desc' },
+      take: 50,
     });
 
     return Promise.all(clubs.map((club) => this.buildView(viewerId, club)));

@@ -20,6 +20,10 @@ export function getMyServerClubs(token: string): Promise<ClubApiView[]> {
   return apiRequest<ClubApiView[]>('/clubs/mine', { token });
 }
 
+export function getClubFeed(token: string): Promise<ClubApiView[]> {
+  return apiRequest<ClubApiView[]>('/clubs/feed', { token });
+}
+
 export function getServerClub(token: string, clubId: string): Promise<ClubApiView> {
   return apiRequest<ClubApiView>(clubPath(clubId), { token });
 }

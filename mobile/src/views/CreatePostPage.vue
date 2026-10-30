@@ -1,9 +1,9 @@
 <template>
   <ion-page>
-    <SubPageHeader :title="shareSourceId ? 'Share as post' : 'Create Post'" back-href="/home">
+    <SubPageHeader :title="shareSourceId || shareGameId ? 'Share as post' : 'Create Post'" back-href="/home">
       <template #end>
         <button type="button" class="create-post__publish" :disabled="!canPublish || isPublishing" @click="publish">
-          {{ sharedSource ? 'Share' : 'Post' }}
+          {{ sharedSource || sharedGame ? 'Share' : 'Post' }}
         </button>
       </template>
     </SubPageHeader>
@@ -30,15 +30,21 @@
             />
             <router-link :to="`/posts/${encodeURIComponent(sharedSource.id)}`">View original post</router-link>
           </article>
+          <article v-else-if="sharedGame" class="create-post__shared-source" aria-label="Game you are sharing">
+            <span>GORA game</span>
+            <strong>{{ sharedGame.title }}</strong>
+            <p>{{ sharedGame.sport }} · {{ sharedGame.locationName }} · {{ sharedGame.when }}</p>
+            <router-link :to="`/games/${encodeURIComponent(sharedGame.id)}`">View game</router-link>
+          </article>
 
-          <label class="create-post__label" for="create-post-caption">{{ sharedSource ? 'Your caption (optional)' : 'Caption' }}</label>
+          <label class="create-post__label" for="create-post-caption">{{ sharedSource || sharedGame ? 'Your caption (optional)' : 'Caption' }}</label>
           <textarea
             id="create-post-caption"
             v-model="caption"
             class="create-post__caption"
             rows="4"
             :maxlength="POST_CAPTION_MAX_LENGTH"
-            :placeholder="sharedSource ? 'Add something about this post…' : 'How did the game go?'"
+            :placeholder="sharedSource ? 'Add something about this post…' : sharedGame ? 'Add something about this game…' : 'How did the game go?'"
           />
           <span class="create-post__counter">{{ caption.length }}/{{ POST_CAPTION_MAX_LENGTH }}</span>
 
@@ -98,7 +104,7 @@
           <p v-if="postsStore.publishError" class="create-post__error" role="alert">{{ postsStore.publishError }}</p>
 
           <button type="submit" class="create-post__submit" :disabled="!canPublish || isPublishing">
-            {{ isPublishing ? 'Posting…' : sharedSource ? 'Share Post' : 'Publish' }}
+            {{ isPublishing ? 'Posting…' : sharedSource || sharedGame ? 'Share Post' : 'Publish' }}
           </button>
         </fieldset>
       </form>
@@ -126,6 +132,7 @@ import TagPeopleModal from '@/components/feed/TagPeopleModal.vue';
 import SubPageHeader from '@/components/layout/SubPageHeader.vue';
 import { useCatalogStore } from '@/stores/catalog';
 import { useFriendsStore } from '@/stores/friends';
+import { useGamesStore } from '@/stores/games';
 import { usePostsStore } from '@/stores/posts';
 import { useSessionStore } from '@/stores/session';
 import { useSportsStore } from '@/stores/sports';
@@ -137,6 +144,7 @@ import { validatePostTags } from '@/utils/post-details';
 import { getPrivacyOption, validatePostAudience } from '@/utils/post-privacy';
 import { POST_PHOTO_SOURCE_MAX_BYTES } from '@/utils/post-photos';
 import { isServerId } from '@/utils/post-api';
+import { formatGameDay, formatGameTimeRange } from '@/utils/game-form';
 
 interface SelectedPhoto {
   url: string;
@@ -149,6 +157,7 @@ const session = useSessionStore();
 const catalog = useCatalogStore();
 const sportsStore = useSportsStore();
 const friendsStore = useFriendsStore();
+const gamesStore = useGamesStore();
 const postsStore = usePostsStore();
 /** Posts are written by the signed-in account, so they show on its Profile. */
 const author = computed(() => postsStore.me);
@@ -166,6 +175,8 @@ const isTagging = ref(false);
 const isPickingLocation = ref(false);
 const sharedSource = ref<FeedPost | null>(null);
 const shareSourceId = computed(() => (typeof route.query.sharePost === 'string' ? route.query.sharePost : ''));
+const shareGameId = computed(() => (typeof route.query.shareGame === 'string' ? route.query.shareGame : ''));
+const sharedGame = ref<{ id: string; title: string; sport: string; locationName: string; when: string } | null>(null);
 
 /** Active sports from the API; the demo catalog only if that list could not load. */
 const sportOptions = computed(() =>
@@ -193,7 +204,9 @@ async function setTags(ids: string[]): Promise<string | null> {
 watch(
   sportOptions,
   (options) => {
-    if (!options.includes(sport.value) && options.length > 0) {
+    if (sharedGame.value && options.includes(sharedGame.value.sport)) {
+      sport.value = sharedGame.value.sport;
+    } else if (!options.includes(sport.value) && options.length > 0) {
       sport.value = options[0];
     }
   },
@@ -233,6 +246,47 @@ async function loadSharedSource(id: string): Promise<void> {
 }
 
 watch(shareSourceId, (id) => void loadSharedSource(id), { immediate: true });
+
+async function loadSharedGame(id: string): Promise<void> {
+  sharedGame.value = null;
+  if (!id) return;
+
+  const title = typeof route.query.gameTitle === 'string' ? route.query.gameTitle : '';
+  const gameSport = typeof route.query.gameSport === 'string' ? route.query.gameSport : '';
+  const locationName = typeof route.query.gameLocation === 'string' ? route.query.gameLocation : '';
+  const when = typeof route.query.gameWhen === 'string' ? route.query.gameWhen : '';
+
+  if (title && gameSport && locationName && when) {
+    sharedGame.value = { id, title, sport: gameSport, locationName, when };
+  } else if (isServerId(id)) {
+    const result = await gamesStore.fetchGame(id);
+    const game = result.ok ? gamesStore.gameById(id) : null;
+    if (!game || shareGameId.value !== id) {
+      void showNotice('This game is no longer available to share.');
+      await router.replace('/create/post');
+      return;
+    }
+    sharedGame.value = {
+      id,
+      title: game.title,
+      sport: game.sport.name,
+      locationName: game.locationName,
+      when: `${formatGameDay(game.gameDate)} · ${formatGameTimeRange(game.startTime, game.endTime)}`,
+    };
+  } else {
+    void showNotice('This game is no longer available to share.');
+    await router.replace('/create/post');
+    return;
+  }
+
+  if (sportOptions.value.includes(sharedGame.value.sport)) sport.value = sharedGame.value.sport;
+  if (!caption.value.trim()) {
+    const url = new URL(`/games/${encodeURIComponent(id)}`, window.location.origin).href;
+    caption.value = `Check out this ${sharedGame.value.sport} game: ${sharedGame.value.title}\n${sharedGame.value.locationName} · ${sharedGame.value.when}\n${url}`;
+  }
+}
+
+watch(shareGameId, (id) => void loadSharedGame(id), { immediate: true });
 
 const privacy = computed(() => getPrivacyOption(visibility.value));
 const audienceError = computed(() =>
@@ -293,7 +347,7 @@ async function publish(): Promise<void> {
     if (post) {
       if (sharedSource.value) void postsStore.loadPost(sharedSource.value.id);
       resetForm();
-      void showNotice(sharedSource.value ? 'Shared as a post on your feed.' : 'Posted to your feed.');
+      void showNotice(sharedSource.value || sharedGame.value ? 'Shared as a post on your feed.' : 'Posted to your feed.');
       await router.replace('/home');
     }
   } finally {

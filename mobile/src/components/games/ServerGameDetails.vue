@@ -204,6 +204,7 @@ import ClubAvatar from '@/components/clubs/ClubAvatar.vue';
 import SectionHeader from '@/components/common/SectionHeader.vue';
 import UserAvatar from '@/components/common/UserAvatar.vue';
 import SportIcon from '@/components/sports/SportIcon.vue';
+import { useGameShare } from '@/composables/useGameShare';
 import { useAuthStore } from '@/stores/auth';
 import { useGamePlayersStore } from '@/stores/game-players';
 import { useGamesStore } from '@/stores/games';
@@ -220,7 +221,6 @@ import { buildRosterSlots } from '@/utils/games';
 import { joinRequestAction, pastParticipationNote, rosterPlayerSummary } from '@/utils/join-requests';
 import { locationMapPath } from '@/utils/location-map';
 import { showNotice } from '@/utils/notice';
-import { shareLink } from '@/utils/share-link';
 import { getSportVisual } from '@/utils/sports';
 import GameStatusBadge from './GameStatusBadge.vue';
 import GameLocationPreview from '@/components/map/GameLocationPreview.vue';
@@ -233,6 +233,7 @@ const auth = useAuthStore();
 const gamesStore = useGamesStore();
 const joinRequests = useJoinRequestsStore();
 const gamePlayers = useGamePlayersStore();
+const { shareGame: openGameShare } = useGameShare();
 const isRequestModalOpen = ref(false);
 const isManaging = ref(false);
 const requestError = ref<string | null>(null);
@@ -269,12 +270,13 @@ const remainingLabel = computed(() => {
 async function shareGame(): Promise<void> {
   const current = game.value;
   if (!current) return;
-  try {
-    const result = await shareLink(current.title, `/games/${encodeURIComponent(current.id)}`);
-    if (result !== 'cancelled') void showNotice(result === 'copied' ? 'Game link copied.' : 'Game shared.');
-  } catch {
-    void showNotice('Could not share this game. Please try again.');
-  }
+  await openGameShare({
+    id: current.id,
+    title: current.title,
+    sport: current.sport.name,
+    locationName: current.locationName,
+    when: `${formatGameDay(current.gameDate)} · ${formatGameTimeRange(current.startTime, current.endTime)}`,
+  });
 }
 const mapPath = computed(() => {
   const value = game.value;

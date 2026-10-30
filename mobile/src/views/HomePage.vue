@@ -58,7 +58,7 @@
           {{
             scope === 'FRIENDS'
               ? 'Posts from you and your mutual friends · Newest first'
-              : `${filters.sport ?? 'All sports'} · Nearby games within ${nearbyRadiusKm} km`
+              : `Posts from your community · ${filters.sport ? `${filters.sport} games` : 'All games'} within ${nearbyRadiusKm} km`
           }}
         </p>
         <div v-if="postsStore.serverError || friendsStore.error" class="home__error" role="alert">
@@ -136,6 +136,7 @@ import { useJoinGame } from '@/composables/useJoinGame';
 import { useNow } from '@/composables/useNow';
 import { usePostActions } from '@/composables/usePostActions';
 import { useCatalogStore } from '@/stores/catalog';
+import { useClubsStore } from '@/stores/clubs';
 import { useFiltersStore } from '@/stores/filters';
 import { useFriendsStore } from '@/stores/friends';
 import { useGamesStore } from '@/stores/games';
@@ -145,7 +146,7 @@ import { useSessionStore } from '@/stores/session';
 import { useStoriesStore } from '@/stores/stories';
 import type { StoryGroup } from '@/types/story';
 import { getNearbyRadiusKm } from '@/utils/discover';
-import { buildHomeFeed } from '@/utils/feed';
+import { buildFriendsFeed, buildHomeFeed, type HomeFeedSources } from '@/utils/feed';
 
 const router = useRouter();
 const liveVisible = ref(true);
@@ -155,6 +156,7 @@ const postsStore = usePostsStore();
 const gamesStore = useGamesStore();
 const reelsStore = useReelsStore();
 const catalog = useCatalogStore();
+const clubsStore = useClubsStore();
 const filters = useFiltersStore();
 const friendsStore = useFriendsStore();
 const scope = ref<'ALL' | 'FRIENDS'>('ALL');
@@ -173,23 +175,28 @@ const nearbyRadiusKm = computed(() => getNearbyRadiusKm(activeFilters.value));
 
 const feed = computed(() => {
   if (scope.value === 'FRIENDS') {
-    const posts = postsStore.savesToServer
-      ? postsStore.friendPosts
-      : postsStore.visiblePosts.filter(
-          (post) => friendsStore.friendIds.has(post.author.id) || post.author.id === postsStore.me?.id,
-        );
-    return buildHomeFeed({ posts, games: [], reels: [], activities: [] });
+    const circleIds = new Set([...friendsStore.friendIds, ...(postsStore.me ? [postsStore.me.id] : [])]);
+    return buildFriendsFeed(
+      {
+        ...feedSources.value,
+        posts: postsStore.savesToServer
+          ? postsStore.friendPosts
+          : postsStore.visiblePosts.filter((post) => circleIds.has(post.author.id)),
+      },
+      [...circleIds],
+      activeFilters.value,
+    );
   }
-  return buildHomeFeed(
-    {
-      posts: postsStore.visiblePosts,
-      games: gamesStore.games,
-      reels: reelsStore.feedReels,
-      activities: catalog.activities,
-    },
-    activeFilters.value,
-  );
+  return buildHomeFeed({ ...feedSources.value, posts: postsStore.visiblePosts }, activeFilters.value);
 });
+const feedSources = computed<HomeFeedSources>(() => ({
+  posts: [],
+  games: gamesStore.games,
+  serverGames: gamesStore.listedGames,
+  clubs: clubsStore.feedClubs,
+  reels: reelsStore.feedReels,
+  activities: catalog.activities,
+}));
 
 const storyFeed = computed(() => storiesStore.getFeedAt(now.value));
 
@@ -213,8 +220,12 @@ function closeStories(): void {
 
 /** Coming back to Home picks up posts and stories added or deleted since the last visit. */
 async function refreshFeed(): Promise<void> {
-  await friendsStore.refresh();
-  await postsStore.refresh();
+  await Promise.all([
+    friendsStore.refresh(),
+    postsStore.refresh(),
+    gamesStore.refreshFeedGames(),
+    clubsStore.refreshFeedClubs(),
+  ]);
   if (storiesStore.isLoaded) void storiesStore.refresh();
 }
 
@@ -235,13 +246,20 @@ onIonViewDidLeave(() => { liveVisible.value = false; stopRefreshing(); });
 onUnmounted(stopRefreshing);
 
 onMounted(() => {
-  void session.load();
-  void storiesStore.load();
-  void postsStore.load();
-  void gamesStore.load();
-  void reelsStore.load();
-  void catalog.load();
+  void loadHomeData();
 });
+
+async function loadHomeData(): Promise<void> {
+  await session.load();
+  await Promise.all([
+    storiesStore.load(),
+    postsStore.load(),
+    gamesStore.load(),
+    clubsStore.load(),
+    reelsStore.load(),
+    catalog.load(),
+  ]);
+}
 </script>
 
 <style scoped>

@@ -46,7 +46,10 @@
       />
     </template>
 
-    <p v-if="post.body" class="post-card__body">{{ post.body }}</p>
+    <p v-if="post.body" class="post-card__body">{{ sharedGameCaption }}</p>
+    <router-link v-if="sharedGameId" :to="`/games/${encodeURIComponent(sharedGameId)}`" class="post-card__game-link">
+      View Game on GORA
+    </router-link>
 
     <router-link
       v-if="post.sharedPost"
@@ -239,6 +242,15 @@ const isEditingTags = ref(false);
 const galleryOpen = ref(false);
 const reportTarget = ref<FeedPost | null>(null);
 const hiddenByPreference = ref(false);
+
+const sharedGameTarget = computed(() => {
+  const lines = props.post.body.split(/\r?\n/);
+  const lastLine = lines.at(-1)?.trim() ?? '';
+  const match = lastLine.match(/(?:https?:\/\/[^/\s]+)?\/games\/([^/?#\s]+)(?:[?#][^\s]*)?$/i);
+  return match ? { id: match[1], caption: lines.slice(0, -1).join('\n').trim() } : null;
+});
+const sharedGameId = computed(() => sharedGameTarget.value?.id ?? null);
+const sharedGameCaption = computed(() => sharedGameTarget.value?.caption || props.post.body);
 
 /** Only the indicator is shown; the list of custom viewers never appears on the card. */
 const privacy = computed(() => getPrivacyOption(props.post.visibility));
@@ -519,6 +531,18 @@ const hiddenMediaCount = computed(() => availableMedia.value.length - visibleMed
   font-size: 0.92rem;
   line-height: 1.45;
   white-space: pre-line;
+}
+
+.post-card__game-link {
+  align-self: flex-start;
+  margin: 8px 14px 0;
+  padding: 7px 12px;
+  border: 1px solid var(--ion-color-primary);
+  border-radius: 999px;
+  color: var(--ion-color-primary);
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-decoration: none;
 }
 
 .post-card__shared {

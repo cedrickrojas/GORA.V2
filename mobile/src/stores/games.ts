@@ -103,12 +103,18 @@ export const useGamesStore = defineStore('games', () => {
   const authorized = createAuthorizedCall(auth);
 
   async function load(): Promise<void> {
-    if (isLoaded.value) {
-      return;
+    if (!isLoaded.value) {
+      games.value = await fetchDemoGames();
+      isLoaded.value = true;
     }
 
-    games.value = await fetchDemoGames();
-    isLoaded.value = true;
+    if (auth.accessToken && (listStatus.value === 'idle' || listStatus.value === 'error')) {
+      await fetchGames({ limit: 50 });
+    }
+  }
+
+  function refreshFeedGames(): Promise<ActionResult> {
+    return fetchGames({ limit: 50 });
   }
 
   /** Demo games only; GORA games use the join requests store. */
@@ -135,6 +141,8 @@ export const useGamesStore = defineStore('games', () => {
     try {
       const game = remember(await authorized((token) => createGameRequest(token, input)));
       hostedIds.value = [game.id, ...hostedIds.value.filter((id) => id !== game.id)];
+      listIds.value = [game.id, ...listIds.value.filter((id) => id !== game.id)];
+      listStatus.value = 'ready';
       return { ok: true, game };
     } catch (caught) {
       if (!isCurrent()) return { ok: false, message: 'The account changed. Try again.' };
@@ -292,6 +300,7 @@ export const useGamesStore = defineStore('games', () => {
     games,
     isLoaded,
     load,
+    refreshFeedGames,
     requestToJoin,
     gamesById,
     detailStatus,

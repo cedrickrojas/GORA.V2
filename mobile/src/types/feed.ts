@@ -1,4 +1,5 @@
-import type { Game } from './game';
+import type { ApiGame, Game } from './game';
+import type { Club } from './club';
 import type { FeedPost } from './post';
 import type { Reel } from './reel';
 import type { UserSummary } from './user';
@@ -25,6 +26,8 @@ export interface FeedActivity {
 export type HomeFeedItem =
   | { type: 'POST'; id: string; at: number; post: FeedPost }
   | { type: 'GAME'; id: string; at: number; game: Game }
+  | { type: 'SERVER_GAME'; id: string; at: number; game: ApiGame }
+  | { type: 'CLUB'; id: string; at: number; club: Club }
   | { type: 'REEL'; id: string; at: number; reel: Reel }
   | { type: 'ACTIVITY'; id: string; at: number; activity: FeedActivity };
 
