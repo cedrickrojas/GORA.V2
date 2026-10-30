@@ -5,8 +5,9 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import type { ParticipantStatus, Prisma } from '../generated/prisma/client';
+import type { GameLeaveStatus, ParticipantStatus, Prisma } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { GoraPointsService } from '../gora-points/gora-points.service';
 import { formatDisplayName } from '../users/display-name';
 import { AUTHOR_SELECT } from '../users/user.types';
 import { ACTIVE_PLAYER_STATUS, summarizeGameCapacity } from './game-capacity';
@@ -16,7 +17,7 @@ import {
   lockGame,
   type GameFacts,
 } from './game-roster';
-import type { GameRosterView, MyParticipationView } from './game-player.types';
+import type { GameLeaveRequestView, GameRosterView, MyParticipationView } from './game-player.types';
 import { visibleGamesWhere } from './game-visibility';
 import { GAME_NOT_FOUND_MESSAGE } from './games.service';
 
@@ -47,6 +48,8 @@ const REMOVE_BLOCKED_MESSAGES: Record<
 
 const PLAYER_SELECT = {
   joinedAt: true,
+  status: true,
+  attendanceStatus: true,
   user: { select: AUTHOR_SELECT },
 } as const satisfies Prisma.GameParticipantSelect;
 
@@ -59,7 +62,7 @@ const PLAYER_SELECT = {
  */
 @Injectable()
 export class GamePlayersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService, private readonly points: GoraPointsService) {}
 
   async roster(viewerId: string, gameId: string): Promise<GameRosterView> {
     await this.findVisibleGame(viewerId, gameId);
@@ -71,9 +74,9 @@ export class GamePlayersService {
     return this.participation(viewerId, gameId);
   }
 
-  /** Only the player's own row; the game does not need to be visible to leave it. */
-  async leave(viewerId: string, gameId: string): Promise<MyParticipationView> {
-    await this.prisma.$transaction(async (tx) => {
+  /** Ask the host to approve leaving; a pending request does not release the seat. */
+  async requestLeave(viewerId: string, gameId: string): Promise<GameLeaveRequestView> {
+    return this.prisma.$transaction(async (tx) => {
       const game = await lockGame(tx, gameId);
       const row = await tx.gameParticipant.findUnique({
         where: { gameId_userId: { gameId, userId: viewerId } },
@@ -84,23 +87,69 @@ export class GamePlayersService {
         throw new NotFoundException(NOT_A_PLAYER_MESSAGE);
       }
 
-      if (row.status !== ACTIVE_PLAYER_STATUS) {
-        throw new ConflictException(LEAVE_BLOCKED_MESSAGES[row.status]);
-      }
+      if (row.status !== ACTIVE_PLAYER_STATUS) throw new ConflictException(LEAVE_BLOCKED_MESSAGES[row.status]);
 
       assertRosterUnlocked(game);
 
-      const { count } = await tx.gameParticipant.updateMany({
-        where: { gameId, userId: viewerId, status: ACTIVE_PLAYER_STATUS },
-        data: { status: 'LEFT' },
+      const existing = await tx.gameLeaveRequest.findUnique({ where: { gameId_userId: { gameId, userId: viewerId } } });
+      if (existing?.status === 'PENDING') return toLeaveRequestView(existing);
+
+      const request = await tx.gameLeaveRequest.upsert({
+        where: { gameId_userId: { gameId, userId: viewerId } },
+        create: { gameId, userId: viewerId },
+        update: { status: 'PENDING', respondedAt: null, createdAt: new Date() },
+        select: { id: true, gameId: true, userId: true, status: true, createdAt: true },
       });
-
-      if (count === 0) {
-        throw new ConflictException(LEAVE_BLOCKED_MESSAGES.LEFT);
-      }
+      await tx.notification.create({
+        data: { userId: game.hostId, actorId: viewerId, type: 'GAME_LEAVE_REQUEST', gameId },
+      });
+      return toLeaveRequestView(request);
     });
+  }
 
-    return this.participation(viewerId, gameId);
+  async cancelLeaveRequest(viewerId: string, gameId: string): Promise<GameLeaveRequestView> {
+    const request = await this.prisma.gameLeaveRequest.findUnique({ where: { gameId_userId: { gameId, userId: viewerId } } });
+    if (!request || request.status !== 'PENDING') throw new ConflictException('There is no pending leave request to cancel.');
+    const updated = await this.prisma.gameLeaveRequest.update({ where: { id: request.id }, data: { status: 'CANCELLED', respondedAt: new Date() } });
+    return toLeaveRequestView(updated);
+  }
+
+  async myLeaveRequest(viewerId: string, gameId: string): Promise<GameLeaveRequestView | null> {
+    const request = await this.prisma.gameLeaveRequest.findUnique({ where: { gameId_userId: { gameId, userId: viewerId } } });
+    return request ? toLeaveRequestView(request) : null;
+  }
+
+  async hostLeaveRequests(hostId: string, gameId: string): Promise<GameLeaveRequestView[]> {
+    const game = await this.findVisibleGame(hostId, gameId);
+    if (game.hostId !== hostId) throw new ForbiddenException(PLAYER_HOST_ONLY_MESSAGE);
+    const requests = await this.prisma.gameLeaveRequest.findMany({
+      where: { gameId }, orderBy: [{ createdAt: 'desc' }],
+      select: { id: true, gameId: true, userId: true, status: true, createdAt: true, user: { select: { ...AUTHOR_SELECT, id: true, username: true, firstName: true, lastName: true, profileImageUrl: true } } },
+    });
+    return requests.map((request) => ({ ...toLeaveRequestView(request), user: {
+      id: request.user.id, username: request.user.username, firstName: request.user.firstName, lastName: request.user.lastName,
+      displayName: formatDisplayName(request.user), profileImageUrl: request.user.profileImageUrl, joinedAt: request.createdAt.toISOString(),
+    } }));
+  }
+
+  async respondLeaveRequest(hostId: string, gameId: string, userId: string, approve: boolean): Promise<GameLeaveRequestView> {
+    const game = await this.findVisibleGame(hostId, gameId);
+    if (game.hostId !== hostId) throw new ForbiddenException(PLAYER_HOST_ONLY_MESSAGE);
+    return this.prisma.$transaction(async (tx) => {
+      const locked = await lockGame(tx, gameId);
+      assertRosterUnlocked(locked);
+      const request = await tx.gameLeaveRequest.findUnique({ where: { gameId_userId: { gameId, userId } } });
+      if (!request || request.status !== 'PENDING') throw new ConflictException('This leave request is no longer pending.');
+      if (approve) {
+        const { count } = await tx.gameParticipant.updateMany({ where: { gameId, userId, status: ACTIVE_PLAYER_STATUS }, data: { status: 'LEFT' } });
+        if (!count) throw new ConflictException('This player is no longer active in the game.');
+        await this.points.awardInTransaction(tx, userId, 'GAME_CANCELLED_PLAYER', request.id, -1);
+      }
+      const status: GameLeaveStatus = approve ? 'APPROVED' : 'REJECTED';
+      const updated = await tx.gameLeaveRequest.update({ where: { id: request.id }, data: { status, respondedAt: new Date() } });
+      await tx.notification.create({ data: { userId, actorId: hostId, type: approve ? 'GAME_LEAVE_APPROVED' : 'GAME_LEAVE_REJECTED', gameId } });
+      return toLeaveRequestView(updated);
+    });
   }
 
   async remove(
@@ -148,6 +197,40 @@ export class GamePlayersService {
     });
   }
 
+  async markAttendance(hostId: string, gameId: string, userId: string, attended: boolean): Promise<GameRosterView> {
+    const game = await this.findVisibleGame(hostId, gameId);
+    if (game.hostId !== hostId) throw new ForbiddenException(PLAYER_HOST_ONLY_MESSAGE);
+    if (game.status !== 'COMPLETED') throw new ConflictException('Attendance can be confirmed after the game is completed.');
+
+    return this.prisma.$transaction(async (tx) => {
+      await lockGame(tx, gameId);
+      const participant = await tx.gameParticipant.findUnique({
+        where: { gameId_userId: { gameId, userId } },
+        select: { id: true, status: true, attendanceStatus: true },
+      });
+      if (!participant || participant.status !== 'COMPLETED') throw new NotFoundException(PLAYER_NOT_FOUND_MESSAGE);
+      if (participant.attendanceStatus) throw new ConflictException('Attendance has already been reviewed.');
+
+      const attendanceStatus = attended ? 'ATTENDED' : 'NO_SHOW';
+      const updated = await tx.gameParticipant.updateMany({
+        where: { id: participant.id, attendanceStatus: null },
+        data: { attendanceStatus },
+      });
+      if (!updated.count) throw new ConflictException('Attendance has already been reviewed.');
+
+      if (attended) {
+        // Existing completion awards make this idempotent for games completed before attendance review existed.
+        await this.points.awardInTransaction(tx, userId, 'GAME_COMPLETED_PLAYER', gameId, 3);
+      } else {
+        await this.points.awardInTransaction(tx, userId, 'GAME_NO_SHOW_PLAYER', participant.id, -2);
+      }
+      await tx.notification.create({
+        data: { userId, actorId: hostId, type: attended ? 'GAME_ATTENDANCE_CONFIRMED' : 'GAME_NO_SHOW_REPORTED', gameId },
+      });
+      return this.loadRoster(tx, gameId);
+    });
+  }
+
   private async participation(
     userId: string,
     gameId: string,
@@ -174,7 +257,7 @@ export class GamePlayersService {
       select: { id: true, requiredPlayers: true, status: true },
     });
     const rows = await client.gameParticipant.findMany({
-      where: { gameId, status: ACTIVE_PLAYER_STATUS },
+      where: { gameId, status: game.status === 'COMPLETED' ? 'COMPLETED' : ACTIVE_PLAYER_STATUS },
       select: PLAYER_SELECT,
       orderBy: [{ joinedAt: 'asc' }, { id: 'asc' }],
     });
@@ -194,6 +277,8 @@ export class GamePlayersService {
         displayName: formatDisplayName(row.user),
         profileImageUrl: row.user.profileImageUrl,
         joinedAt: row.joinedAt.toISOString(),
+        status: row.status,
+        attendanceStatus: row.attendanceStatus,
       })),
     };
   }
@@ -221,4 +306,10 @@ function assertRosterUnlocked(game: GameFacts): void {
   if (message) {
     throw new ConflictException(message);
   }
+}
+
+function toLeaveRequestView(request: {
+  id: string; gameId: string; userId: string; status: GameLeaveStatus; createdAt: Date;
+}): GameLeaveRequestView {
+  return { id: request.id, gameId: request.gameId, userId: request.userId, status: request.status, createdAt: request.createdAt.toISOString() };
 }

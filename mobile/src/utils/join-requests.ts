@@ -22,8 +22,8 @@ const CLOSED_GAME_LABELS: Record<Exclude<GameStatus, 'OPEN'>, string> = {
 
 /**
  * What a viewer can do on a game, from server state only: the host manages players, an
- * ACTIVE player can leave, everyone else goes through join requests. The server re-checks
- * every rule on each call.
+ * ACTIVE player can request to leave, everyone else goes through join requests. The server
+ * re-checks every rule on each call.
  */
 export type JoinRequestAction =
   | { kind: 'host' }

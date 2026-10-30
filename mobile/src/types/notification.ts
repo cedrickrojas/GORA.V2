@@ -2,6 +2,11 @@ import type { UserSummary } from "./user";
 
 export type NotificationType =
   | "GAME_JOIN_REQUEST"
+  | "GAME_LEAVE_REQUEST"
+  | "GAME_LEAVE_APPROVED"
+  | "GAME_LEAVE_REJECTED"
+  | "GAME_ATTENDANCE_CONFIRMED"
+  | "GAME_NO_SHOW_REPORTED"
   | "GAME_JOIN_ACCEPTED"
   | "GAME_JOIN_REJECTED"
   | "GAME_FULL"

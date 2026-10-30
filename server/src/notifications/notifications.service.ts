@@ -37,6 +37,11 @@ const CONTENT = {
   FRIEND_REQUEST: ['Friend request', 'sent you a friend request.'],
   FRIEND_ACCEPTED: ['Friend request accepted', 'accepted your friend request.'],
   GAME_JOIN_REQUEST: ['New join request', 'wants to join'],
+  GAME_LEAVE_REQUEST: ['Request to cancel game participation', 'asked to be removed from'],
+  GAME_LEAVE_APPROVED: ['Leave request approved', 'approved your request to leave'],
+  GAME_LEAVE_REJECTED: ['Leave request declined', 'declined your request to leave'],
+  GAME_ATTENDANCE_CONFIRMED: ['Attendance confirmed', 'confirmed that you attended'],
+  GAME_NO_SHOW_REPORTED: ['Reported as no-show', 'reported that you did not attend'],
   GAME_JOIN_ACCEPTED: ['Request accepted', 'accepted your request to join'],
   GAME_JOIN_REJECTED: ['Request declined', 'declined your request to join'],
   GAME_FULL: ['Game is full', 'Your game has filled all its spots.'],
@@ -70,7 +75,7 @@ export class NotificationsService {
     const enabledTypes: NotificationType[] = ['HELP_REQUEST_RECEIVED', 'HELP_REQUEST_UPDATED'];
     if (!settings || settings.notifyFriends) enabledTypes.push('FRIEND_REQUEST', 'FRIEND_ACCEPTED', 'NEW_FOLLOWER');
     if (!settings || settings.notifyGames) enabledTypes.push(
-      'GAME_JOIN_REQUEST', 'GAME_JOIN_ACCEPTED', 'GAME_JOIN_REJECTED', 'GAME_FULL', 'GAME_CANCELLED', 'GAME_COMPLETED',
+      'GAME_JOIN_REQUEST', 'GAME_JOIN_ACCEPTED', 'GAME_JOIN_REJECTED', 'GAME_LEAVE_REQUEST', 'GAME_LEAVE_APPROVED', 'GAME_LEAVE_REJECTED', 'GAME_ATTENDANCE_CONFIRMED', 'GAME_NO_SHOW_REPORTED', 'GAME_FULL', 'GAME_CANCELLED', 'GAME_COMPLETED',
     );
     if (!settings || settings.notifyMessages) enabledTypes.push('NEW_MESSAGE', 'MESSAGE_REQUEST');
     if (!settings || settings.notifyContent) enabledTypes.push(
@@ -178,7 +183,11 @@ function toView(row: Row) {
         ? `${game} has filled all its spots.`
         : row.type === 'GAME_COMPLETED'
           ? `${game} is complete.`
-          : `${name} ${action} ${game}.`;
+          : row.type === 'GAME_ATTENDANCE_CONFIRMED'
+            ? `${name} ${action} at ${game}. You earned 3 GORA points.`
+            : row.type === 'GAME_NO_SHOW_REPORTED'
+              ? `${name} ${action} at ${game}. 2 GORA points were deducted.`
+              : `${name} ${action} ${game}.`;
     if (row.gameId && row.game) link = `/games/${row.gameId}`;
   } else if (row.type === 'BADGE_UNLOCKED') {
     body = row.badge ? `You earned ${row.badge.name}.` : action;

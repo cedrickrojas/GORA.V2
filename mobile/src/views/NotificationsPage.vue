@@ -42,12 +42,12 @@
         You're all caught up.
       </p>
       <ul v-else class="notifications">
-        <li v-for="item in items" :key="item.id">
+        <li v-for="item in items" :key="item.id" class="notifications__item">
           <button
             type="button"
             class="notification"
             :class="{ 'notification--unread': !item.read }"
-            :disabled="isMarkingAll || !!readingId"
+            :disabled="isMarkingAll"
             @click="openNotification(item)"
           >
             <span
@@ -80,6 +80,41 @@
               aria-label="Unread"
             />
           </button>
+          <div v-if="hasNotificationAction(item)" class="notification__actions">
+            <button
+              v-if="item.type === 'FRIEND_REQUEST'"
+              type="button"
+              class="notification__action notification__action--primary"
+              :disabled="isMarkingAll || !!actionBusyId"
+              @click="acceptFriend(item)"
+            >
+              {{ actionBusyId === item.id ? 'Accepting…' : 'Accept' }}
+            </button>
+            <button
+              v-else-if="item.type === 'GAME_JOIN_REQUEST'"
+              type="button"
+              class="notification__action notification__action--primary"
+              :disabled="isMarkingAll || !!actionBusyId"
+              @click="acceptGameRequest(item)"
+            >
+              {{ actionBusyId === item.id ? 'Accepting…' : 'Accept Join Request' }}
+            </button>
+            <template v-else-if="item.type === 'GAME_LEAVE_REQUEST'">
+              <button type="button" class="notification__action notification__action--primary" :disabled="isMarkingAll || !!actionBusyId" @click="respondToLeave(item, 'approve')">
+                {{ actionBusyId === item.id ? 'Removing…' : 'Approve & Remove Player' }}
+              </button>
+              <button type="button" class="notification__action" :disabled="isMarkingAll || !!actionBusyId" @click="respondToLeave(item, 'reject')">Decline Request</button>
+            </template>
+            <button
+              v-else-if="item.type === 'GAME_JOIN_REJECTED'"
+              type="button"
+              class="notification__action notification__action--primary"
+              :disabled="isMarkingAll || !!actionBusyId"
+              @click="requestToJoinAgain(item)"
+            >
+              {{ actionBusyId === item.id ? 'Sending…' : 'Join Game' }}
+            </button>
+          </div>
         </li>
       </ul>
       <ion-button
@@ -95,7 +130,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted } from "vue";
+import { onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import { storeToRefs } from "pinia";
 import {
@@ -125,11 +160,22 @@ import UserAvatar from "@/components/common/UserAvatar.vue";
 import SubPageHeader from "@/components/layout/SubPageHeader.vue";
 import { useNow } from "@/composables/useNow";
 import { useNotificationsStore } from "@/stores/notifications";
+import { useFriendsStore } from "@/stores/friends";
+import { useGamesStore } from "@/stores/games";
+import { useJoinRequestsStore } from "@/stores/join-requests";
+import { useGamePlayersStore } from "@/stores/game-players";
 import type { AppNotification, NotificationType } from "@/types/notification";
+import { joinRequestAction } from "@/utils/join-requests";
 import { formatTimeAgo } from "@/utils/time";
+import { showNotice } from "@/utils/notice";
 
 const NOTIFICATION_ICONS: Record<NotificationType, string> = {
   GAME_JOIN_REQUEST: flagOutline,
+  GAME_LEAVE_REQUEST: closeCircleOutline,
+  GAME_LEAVE_APPROVED: checkmarkCircleOutline,
+  GAME_LEAVE_REJECTED: closeCircleOutline,
+  GAME_ATTENDANCE_CONFIRMED: checkmarkCircleOutline,
+  GAME_NO_SHOW_REPORTED: closeCircleOutline,
   GAME_JOIN_ACCEPTED: checkmarkCircleOutline,
   GAME_JOIN_REJECTED: closeCircleOutline,
   GAME_FULL: peopleOutline,
@@ -153,6 +199,11 @@ const NOTIFICATION_ICONS: Record<NotificationType, string> = {
 
 const router = useRouter();
 const notificationsStore = useNotificationsStore();
+const friendsStore = useFriendsStore();
+const gamesStore = useGamesStore();
+const joinRequestsStore = useJoinRequestsStore();
+const gamePlayersStore = useGamePlayersStore();
+const actionBusyId = ref<string | null>(null);
 const {
   items,
   unreadCount,
@@ -164,6 +215,140 @@ const {
   isMarkingAll,
 } = storeToRefs(notificationsStore);
 const now = useNow();
+
+function gameIdFor(item: AppNotification): string | null {
+  const match = item.link?.match(/^\/games\/([^/?#]+)/);
+  if (!match) return null;
+  try {
+    return decodeURIComponent(match[1]);
+  } catch {
+    return null;
+  }
+}
+
+function hasNotificationAction(item: AppNotification): boolean {
+  if (item.type === 'FRIEND_REQUEST') return item.actor !== null;
+  if (item.type === 'GAME_JOIN_REQUEST') return item.actor !== null && gameIdFor(item) !== null;
+  if (item.type === 'GAME_LEAVE_REQUEST') return item.actor !== null && gameIdFor(item) !== null;
+  return item.type === 'GAME_JOIN_REJECTED' && gameIdFor(item) !== null;
+}
+
+async function completeNotificationAction(item: AppNotification, message: string): Promise<void> {
+  await notificationsStore.markRead(item.id);
+  void showNotice(message);
+  void notificationsStore.load(true);
+}
+
+async function acceptFriend(item: AppNotification): Promise<void> {
+  const actor = item.actor;
+  if (!actor || actionBusyId.value) return;
+  actionBusyId.value = item.id;
+  try {
+    await friendsStore.refresh();
+    const request = friendsStore.requestWith(actor.id);
+    if (!request || request.direction !== 'RECEIVED') {
+      void showNotice('This friend request is no longer pending.');
+      void notificationsStore.load(true);
+      return;
+    }
+    if (await friendsStore.accept(request.id)) {
+      await completeNotificationAction(item, `You and ${actor.displayName} are now friends.`);
+    } else {
+      void showNotice(friendsStore.error ?? 'Could not accept this friend request.');
+    }
+  } finally {
+    actionBusyId.value = null;
+  }
+}
+
+async function acceptGameRequest(item: AppNotification): Promise<void> {
+  const gameId = gameIdFor(item);
+  const actor = item.actor;
+  if (!gameId || !actor || actionBusyId.value) return;
+  actionBusyId.value = item.id;
+  try {
+    const gameResult = await gamesStore.fetchGame(gameId);
+    if (!gameResult.ok) {
+      void showNotice(gameResult.message);
+      return;
+    }
+    const requestsResult = await joinRequestsStore.fetchGameJoinRequests(gameId);
+    if (!requestsResult.ok) {
+      void showNotice(requestsResult.message);
+      return;
+    }
+    const request = joinRequestsStore.gameJoinRequests(gameId).find(
+      (candidate) => candidate.userId === actor.id && candidate.status === 'PENDING',
+    );
+    if (!request) {
+      void showNotice('This join request is no longer pending.');
+      void notificationsStore.load(true);
+      return;
+    }
+    const result = await joinRequestsStore.acceptJoinRequest(gameId, request.id);
+    if (result.ok) await completeNotificationAction(item, `${actor.displayName} joined the game.`);
+    else void showNotice(result.message);
+  } finally {
+    actionBusyId.value = null;
+  }
+}
+
+async function respondToLeave(item: AppNotification, action: 'approve' | 'reject'): Promise<void> {
+  const gameId = gameIdFor(item);
+  const actor = item.actor;
+  if (!gameId || !actor || actionBusyId.value) return;
+  actionBusyId.value = item.id;
+  try {
+    const result = await gamePlayersStore.respondToLeaveRequest(gameId, actor.id, action);
+    if (result.ok) await completeNotificationAction(item, action === 'approve' ? `${actor.displayName} was removed from the game. 1 GORA point was deducted.` : 'Leave request declined. The player remains in the game.');
+    else void showNotice(result.message);
+  } finally {
+    actionBusyId.value = null;
+  }
+}
+
+async function requestToJoinAgain(item: AppNotification): Promise<void> {
+  const gameId = gameIdFor(item);
+  if (!gameId || actionBusyId.value) return;
+  actionBusyId.value = item.id;
+  try {
+    const gameResult = await gamesStore.fetchGame(gameId);
+    if (!gameResult.ok) {
+      void showNotice(gameResult.message);
+      return;
+    }
+    await Promise.all([
+      joinRequestsStore.fetchMyJoinRequest(gameId),
+      gamePlayersStore.fetchMyParticipation(gameId),
+    ]);
+    const game = gamesStore.gameById(gameId);
+    if (!game) {
+      void showNotice('This game is no longer available.');
+      return;
+    }
+    const action = joinRequestAction(
+      { ...game, isPlayer: game.isPlayer, isHost: game.isHost },
+      joinRequestsStore.myJoinRequest(gameId),
+      gamePlayersStore.participationOf(gameId),
+    );
+    if (action.kind !== 'request') {
+      void showNotice(action.kind === 'closed' ? action.label : 'You cannot join this game right now.');
+      return;
+    }
+    const result = await joinRequestsStore.createJoinRequest(gameId, null);
+    if (!result.ok) {
+      void showNotice(result.message);
+      return;
+    }
+    const request = joinRequestsStore.myJoinRequest(gameId);
+    await completeNotificationAction(
+      item,
+      request?.status === 'ACCEPTED' ? 'You joined the game.' : 'Your join request was sent.',
+    );
+  } finally {
+    actionBusyId.value = null;
+  }
+}
 
 async function openNotification(item: AppNotification): Promise<void> {
   if (!(await notificationsStore.markRead(item.id))) return;
@@ -196,6 +381,8 @@ onMounted(() => {
   list-style: none;
 }
 
+.notifications__item { border-bottom: 1px solid var(--gora-line); }
+
 .notifications__empty,
 .notifications__feedback {
   margin: 48px 16px;
@@ -223,6 +410,33 @@ onMounted(() => {
   font: inherit;
   text-align: left;
 }
+
+.notification__actions {
+  display: flex;
+  gap: 8px;
+  padding: 0 16px 12px 72px;
+}
+
+.notification__action {
+  min-height: 36px;
+  padding: 8px 14px;
+  border: 1px solid var(--gora-line-strong);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ion-text-color);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.notification__action--primary {
+  border-color: var(--ion-color-primary);
+  background: var(--ion-color-primary);
+  color: var(--ion-color-primary-contrast);
+}
+
+.notification__action:disabled { cursor: progress; opacity: 0.6; }
 
 .notification--unread {
   background: rgba(214, 242, 92, 0.06);

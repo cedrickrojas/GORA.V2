@@ -84,7 +84,7 @@
                       :aria-label="`Cancel joining ${game.title}`"
                       @click="confirmCancelJoining(game)"
                     >
-                      {{ actingGameId === game.id ? 'Cancelling...' : 'Cancel Joining' }}
+                      {{ actingGameId === game.id ? 'Sending...' : game.participationStatus === 'ACTIVE' && game.leaveRequestStatus === 'PENDING' ? 'Cancel Leave Request' : game.participationStatus === 'ACTIVE' ? 'Request to Leave' : 'Cancel Join Request' }}
                     </button>
                   </div>
                 </div>
@@ -292,23 +292,32 @@ async function confirmCancelJoining(game: JoinedGame): Promise<void> {
   actionMessage.value = '';
   try {
     const alert = await alertController.create({
-      header: 'Cancel joining?',
-      message: 'Your request or player slot will be cancelled. This game will stay in your history.',
+      header: game.participationStatus === 'ACTIVE' ? (game.leaveRequestStatus === 'PENDING' ? 'Cancel leave request?' : 'Request to leave?') : 'Cancel join request?',
+      message: game.participationStatus === 'ACTIVE'
+        ? game.leaveRequestStatus === 'PENDING'
+          ? 'Your pending request to leave will be withdrawn.'
+          : 'The host must approve before you leave. If approved, 1 GORA point will be deducted.'
+        : 'Your pending request to join will be cancelled.',
       buttons: [
-        { text: 'Keep Joining', role: 'cancel' },
-        { text: 'Cancel Joining', role: 'destructive' },
+        { text: 'Go Back', role: 'cancel' },
+        { text: game.participationStatus === 'ACTIVE' ? (game.leaveRequestStatus === 'PENDING' ? 'Withdraw Request' : 'Request to Leave') : 'Cancel Join Request', role: 'destructive' },
       ],
     });
     await alert.present();
     const { role } = await alert.onDidDismiss();
     if (role !== 'destructive' || !isCurrent()) return;
 
-    const result =
-      game.participationStatus === 'ACTIVE'
-        ? await gamePlayers.leaveGame(game.id)
-        : await joinRequests.cancelJoinRequest(game.id);
+    const result = game.participationStatus === 'ACTIVE'
+      ? game.leaveRequestStatus === 'PENDING'
+        ? await gamePlayers.cancelMyLeaveRequest(game.id)
+        : await gamePlayers.requestLeaveGame(game.id)
+      : await joinRequests.cancelJoinRequest(game.id);
     if (!isCurrent()) return;
-    actionMessage.value = result.ok ? 'Your join was cancelled. The game is saved in your history.' : result.message;
+    actionMessage.value = result.ok
+      ? game.participationStatus === 'ACTIVE'
+        ? game.leaveRequestStatus === 'PENDING' ? 'Your leave request was withdrawn.' : 'Your leave request was sent to the host. 1 GORA point will be deducted if approved.'
+        : 'Your join request was cancelled.'
+      : result.message;
     await gamesStore.fetchJoinedGames();
   } finally {
     actingGameId.value = null;

@@ -2,6 +2,8 @@ import type { JoinedGame } from '@/types/game';
 import { isUpcomingGame } from './game-form';
 
 export function joinedGameLabel(game: JoinedGame): string {
+  if (game.leaveRequestStatus === 'PENDING') return 'Leave request pending';
+  if (game.leaveRequestStatus === 'REJECTED') return 'Leave request declined';
   if (game.participationStatus === 'ACTIVE') return 'Joined';
   if (game.joinRequestStatus === 'PENDING') return 'Pending approval';
   if (game.joinRequestStatus === 'CANCELLED') return 'Join cancelled';

@@ -23,7 +23,6 @@
           badge-text="Selected game"
           :join-action-of="joinActionOf"
           @select="selectedGameId = $event"
-          @view="viewGame"
           @join="openJoin"
         />
 
@@ -44,7 +43,6 @@
             :busy="busyGameId === game.id"
             :highlighted="game.id === selectedGameId"
             :badge="game.id === parsed.selectedGameId ? 'Selected game' : null"
-            @view="viewGame"
             @join="openJoin"
           />
         </section>
@@ -66,7 +64,7 @@
 
 <script setup lang="ts">
 import { onMounted, ref, watch } from 'vue';
-import { useRoute, useRouter } from 'vue-router';
+import { useRoute } from 'vue-router';
 import { IonContent, IonPage, IonSkeletonText } from '@ionic/vue';
 import JoinRequestModal from '@/components/games/JoinRequestModal.vue';
 import SubPageHeader from '@/components/layout/SubPageHeader.vue';
@@ -82,7 +80,6 @@ import { isServerGameId } from '@/utils/game-form';
 import { NEARBY_ACTIVITY_RADIUS_KM, SAME_PLACE_KM, distanceBetweenKm, gamePoint, parseLocationMapRoute } from '@/utils/location-map';
 
 const route = useRoute();
-const router = useRouter();
 const discovery = useDiscoveryStore();
 const gamesStore = useGamesStore();
 
@@ -180,10 +177,6 @@ async function load(): Promise<void> {
   games.value = list;
   status.value = 'ready';
   selectedGameId.value = defaultSelection(list);
-}
-
-function viewGame(gameId: string): void {
-  void router.push(`/games/${gameId}`);
 }
 
 watch(

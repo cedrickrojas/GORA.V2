@@ -44,6 +44,7 @@ model User {
   sentFriendships         Friendship[]              @relation("FriendshipRequester")
   hostedGames             Game[]                    @relation("GameHost")
   gameParticipants        GameParticipant[]
+  gameLeaveRequests      GameLeaveRequest[]
   joinRequests            JoinRequest[]
   hostedLiveStreams       LiveStream[]
   liveViews               LiveViewer[]
@@ -163,6 +164,7 @@ model Game {
   host            User              @relation("GameHost", fields: [hostId], references: [id])
   sport           Sport             @relation(fields: [sportId], references: [id])
   participants    GameParticipant[]
+  leaveRequests   GameLeaveRequest[]
   joinRequests    JoinRequest[]
   liveStreams     LiveStream[]
   notifications   Notification[]
@@ -186,6 +188,7 @@ model GameParticipant {
   status      ParticipantStatus @default(ACTIVE)
   joinedAt    DateTime          @default(now())
   completedAt DateTime?
+  attendanceStatus AttendanceStatus?
   game        Game              @relation(fields: [gameId], references: [id], onDelete: Cascade)
   user        User              @relation(fields: [userId], references: [id])
 
@@ -193,6 +196,22 @@ model GameParticipant {
   @@index([userId])
   @@index([gameId, status])
   @@index([status])
+}
+
+model GameLeaveRequest {
+  id          String             @id @default(uuid()) @db.Uuid
+  gameId      String             @db.Uuid
+  userId      String             @db.Uuid
+  status      GameLeaveStatus    @default(PENDING)
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+  respondedAt DateTime?
+  game        Game               @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  user        User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([gameId, userId])
+  @@index([gameId, status])
+  @@index([userId, status])
 }
 
 model JoinRequest {
@@ -989,6 +1008,8 @@ enum GoraPointReason {
   POST_CREATED
   GAME_COMPLETED_HOST
   GAME_COMPLETED_PLAYER
+  GAME_CANCELLED_PLAYER
+  GAME_NO_SHOW_PLAYER
 }
 
 enum ParticipantStatus {
@@ -1003,6 +1024,18 @@ enum JoinRequestStatus {
   ACCEPTED
   REJECTED
   CANCELLED
+}
+
+enum GameLeaveStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum AttendanceStatus {
+  ATTENDED
+  NO_SHOW
 }
 
 enum FriendshipStatus {
@@ -1040,6 +1073,11 @@ enum NotificationType {
   FRIEND_REQUEST
   FRIEND_ACCEPTED
   GAME_JOIN_REQUEST
+  GAME_LEAVE_REQUEST
+  GAME_LEAVE_APPROVED
+  GAME_LEAVE_REJECTED
+  GAME_ATTENDANCE_CONFIRMED
+  GAME_NO_SHOW_REPORTED
   GAME_JOIN_ACCEPTED
   GAME_JOIN_REJECTED
   GAME_FULL

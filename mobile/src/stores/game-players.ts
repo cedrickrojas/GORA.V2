@@ -3,10 +3,15 @@ import { ref, watch } from 'vue';
 import {
   getGamePlayers,
   getMyParticipation,
-  leaveGame as leaveGameCall,
+  requestLeaveGame as requestLeaveGameCall,
+  getMyLeaveRequest,
+  cancelLeaveRequest as cancelLeaveRequestCall,
+  getGameLeaveRequests,
+  respondLeaveRequest as respondLeaveRequestCall,
   removePlayer as removePlayerCall,
+  markPlayerAttendance,
 } from '@/services/game-players-api.service';
-import type { GameRoster, MyParticipation } from '@/types/game-player';
+import type { GameLeaveRequest, GameRoster, MyParticipation } from '@/types/game-player';
 import { useAuthStore } from './auth';
 import { captureSession, createAuthorizedCall, describeContentError } from './authorized';
 import { useGamesStore } from './games';
@@ -29,8 +34,11 @@ export const useGamePlayersStore = defineStore('game-players', () => {
   const rosterStatus = ref<Record<string, LoadStatus>>({});
   const rosterError = ref<Record<string, string | null>>({});
   const participationByGame = ref<Record<string, MyParticipation>>({});
+  const leaveRequestByGame = ref<Record<string, GameLeaveRequest | null>>({});
+  const hostLeaveRequestsByGame = ref<Record<string, GameLeaveRequest[]>>({});
   const leavingGameId = ref<string | null>(null);
   const removingUserId = ref<string | null>(null);
+  const attendanceUserId = ref<string | null>(null);
 
   watch(
     [() => auth.sessionVersion, () => auth.accessToken, () => auth.currentUser?.id],
@@ -39,8 +47,11 @@ export const useGamePlayersStore = defineStore('game-players', () => {
       rosterStatus.value = {};
       rosterError.value = {};
       participationByGame.value = {};
+      leaveRequestByGame.value = {};
+      hostLeaveRequestsByGame.value = {};
       leavingGameId.value = null;
       removingUserId.value = null;
+      attendanceUserId.value = null;
     },
     { flush: 'sync' },
   );
@@ -93,12 +104,34 @@ export const useGamePlayersStore = defineStore('game-players', () => {
     }
   }
 
+  async function fetchMyLeaveRequest(gameId: string): Promise<ActionResult> {
+    const isCurrent = captureSession(auth);
+    try {
+      leaveRequestByGame.value = { ...leaveRequestByGame.value, [gameId]: await authorized((token) => getMyLeaveRequest(token, gameId)) };
+      return { ok: true };
+    } catch (caught) {
+      if (!isCurrent()) return { ok: false, message: 'The account changed. Try again.' };
+      return { ok: false, message: describePlayerError(caught) };
+    }
+  }
+
+  async function fetchHostLeaveRequests(gameId: string): Promise<ActionResult> {
+    const isCurrent = captureSession(auth);
+    try {
+      hostLeaveRequestsByGame.value = { ...hostLeaveRequestsByGame.value, [gameId]: await authorized((token) => getGameLeaveRequests(token, gameId)) };
+      return { ok: true };
+    } catch (caught) {
+      if (!isCurrent()) return { ok: false, message: 'The account changed. Try again.' };
+      return { ok: false, message: describePlayerError(caught) };
+    }
+  }
+
   /** The game (count, status, isPlayer) and its roster, both from the server. */
   async function refreshGameCount(gameId: string): Promise<void> {
     await Promise.all([gamesStore.fetchGame(gameId), fetchPlayers(gameId)]);
   }
 
-  async function leaveGame(gameId: string): Promise<ActionResult> {
+  async function requestLeaveGame(gameId: string): Promise<ActionResult> {
     const isCurrent = captureSession(auth);
     if (leavingGameId.value !== null) {
       return { ok: false, message: 'Please wait a moment.' };
@@ -107,17 +140,36 @@ export const useGamePlayersStore = defineStore('game-players', () => {
     leavingGameId.value = gameId;
 
     try {
-      rememberParticipation(await authorized((token) => leaveGameCall(token, gameId)));
-      gamesStore.forgetPlaying(gameId);
-      await refreshGameCount(gameId);
+      leaveRequestByGame.value = { ...leaveRequestByGame.value, [gameId]: await authorized((token) => requestLeaveGameCall(token, gameId)) };
       return { ok: true };
     } catch (caught) {
       if (!isCurrent()) return { ok: false, message: 'The account changed. Try again.' };
-      void fetchMyParticipation(gameId);
-      void refreshGameCount(gameId);
       return { ok: false, message: describePlayerError(caught) };
     } finally {
       if (isCurrent()) leavingGameId.value = null;
+    }
+  }
+
+  async function cancelMyLeaveRequest(gameId: string): Promise<ActionResult> {
+    const isCurrent = captureSession(auth);
+    try {
+      leaveRequestByGame.value = { ...leaveRequestByGame.value, [gameId]: await authorized((token) => cancelLeaveRequestCall(token, gameId)) };
+      return { ok: true };
+    } catch (caught) {
+      if (!isCurrent()) return { ok: false, message: 'The account changed. Try again.' };
+      return { ok: false, message: describePlayerError(caught) };
+    }
+  }
+
+  async function respondToLeaveRequest(gameId: string, userId: string, action: 'approve' | 'reject'): Promise<ActionResult> {
+    const isCurrent = captureSession(auth);
+    try {
+      await authorized((token) => respondLeaveRequestCall(token, gameId, userId, action));
+      await Promise.all([fetchHostLeaveRequests(gameId), refreshGameCount(gameId)]);
+      return { ok: true };
+    } catch (caught) {
+      if (!isCurrent()) return { ok: false, message: 'The account changed. Try again.' };
+      return { ok: false, message: describePlayerError(caught) };
     }
   }
 
@@ -142,19 +194,44 @@ export const useGamePlayersStore = defineStore('game-players', () => {
     }
   }
 
+  async function setAttendance(gameId: string, userId: string, action: 'attended' | 'no_show'): Promise<ActionResult> {
+    const isCurrent = captureSession(auth);
+    if (attendanceUserId.value !== null) return { ok: false, message: 'Please wait a moment.' };
+    attendanceUserId.value = userId;
+    try {
+      rememberRoster(await authorized((token) => markPlayerAttendance(token, gameId, userId, action)));
+      await gamesStore.fetchGame(gameId);
+      return { ok: true };
+    } catch (caught) {
+      if (!isCurrent()) return { ok: false, message: 'The account changed. Try again.' };
+      void refreshGameCount(gameId);
+      return { ok: false, message: describePlayerError(caught) };
+    } finally {
+      if (isCurrent()) attendanceUserId.value = null;
+    }
+  }
+
   return {
     rosterByGame,
     rosterStatus,
     rosterError,
     participationByGame,
+    leaveRequestByGame,
+    hostLeaveRequestsByGame,
     leavingGameId,
     removingUserId,
+    attendanceUserId,
     rosterOf,
     participationOf,
     fetchPlayers,
     fetchMyParticipation,
+    fetchMyLeaveRequest,
+    fetchHostLeaveRequests,
     refreshGameCount,
-    leaveGame,
+    requestLeaveGame,
+    cancelMyLeaveRequest,
+    respondToLeaveRequest,
     removePlayer,
+    setAttendance,
   };
 });

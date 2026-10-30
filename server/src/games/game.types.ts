@@ -1,4 +1,5 @@
 import type {
+  GameLeaveStatus,
   GameStatus,
   JoinRequestStatus,
   ParticipantStatus,
@@ -14,6 +15,7 @@ export interface GameSportView {
 export interface JoinedGameView extends GameView {
   participationStatus: ParticipantStatus | null;
   joinRequestStatus: JoinRequestStatus | null;
+  leaveRequestStatus: GameLeaveStatus | null;
   joinedAt: string | null;
   requestedAt: string | null;
 }

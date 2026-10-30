@@ -194,12 +194,13 @@ async function refreshServerGame(): Promise<void> {
   const roster = gamePlayersStore.fetchPlayers(gameId);
 
   if (gamesStore.gameById(gameId)?.isHost) {
-    await Promise.all([roster, joinRequestsStore.fetchGameJoinRequests(gameId)]);
+    await Promise.all([roster, joinRequestsStore.fetchGameJoinRequests(gameId), gamePlayersStore.fetchHostLeaveRequests(gameId)]);
   } else {
     await Promise.all([
       roster,
       joinRequestsStore.fetchMyJoinRequest(gameId),
       gamePlayersStore.fetchMyParticipation(gameId),
+      gamePlayersStore.fetchMyLeaveRequest(gameId),
     ]);
   }
 }

@@ -1,4 +1,4 @@
-import type { GameStatus, ParticipantStatus } from '../generated/prisma/client';
+import type { AttendanceStatus, GameLeaveStatus, GameStatus, ParticipantStatus } from '../generated/prisma/client';
 
 /** Public profile fields only: never email, date of birth, or credentials. */
 export interface GamePlayerView {
@@ -9,6 +9,8 @@ export interface GamePlayerView {
   displayName: string;
   profileImageUrl: string | null;
   joinedAt: string;
+  status: ParticipantStatus;
+  attendanceStatus: AttendanceStatus | null;
 }
 
 /** ACTIVE players, oldest seat first. Open slots are requiredPlayers - currentPlayers. */
@@ -28,4 +30,13 @@ export interface MyParticipationView {
   status: MyParticipationStatus;
   joinedAt: string | null;
   completedAt: string | null;
+}
+
+export interface GameLeaveRequestView {
+  id: string;
+  gameId: string;
+  userId: string;
+  status: GameLeaveStatus;
+  createdAt: string;
+  user?: Omit<GamePlayerView, 'status' | 'attendanceStatus'>;
 }

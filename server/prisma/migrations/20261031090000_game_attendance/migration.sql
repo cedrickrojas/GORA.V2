@@ -1,0 +1,6 @@
+ALTER TYPE "GoraPointReason" ADD VALUE 'GAME_NO_SHOW_PLAYER';
+ALTER TYPE "NotificationType" ADD VALUE 'GAME_ATTENDANCE_CONFIRMED';
+ALTER TYPE "NotificationType" ADD VALUE 'GAME_NO_SHOW_REPORTED';
+
+CREATE TYPE "AttendanceStatus" AS ENUM ('ATTENDED', 'NO_SHOW');
+ALTER TABLE "GameParticipant" ADD COLUMN "attendanceStatus" "AttendanceStatus";

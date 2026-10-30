@@ -250,6 +250,10 @@ export class GamesService {
           where: { userId: viewerId },
           select: { status: true, createdAt: true },
         },
+        leaveRequests: {
+          where: { userId: viewerId },
+          select: { status: true },
+        },
       },
       orderBy: GAME_ORDER,
     });
@@ -258,6 +262,7 @@ export class GamesService {
       ...toGameView(game, viewerId),
       participationStatus: game.participants[0]?.status ?? null,
       joinRequestStatus: game.joinRequests[0]?.status ?? null,
+      leaveRequestStatus: game.leaveRequests[0]?.status ?? null,
       joinedAt: game.participants[0]?.joinedAt.toISOString() ?? null,
       requestedAt: game.joinRequests[0]?.createdAt.toISOString() ?? null,
     }));
@@ -434,13 +439,10 @@ export class GamesService {
         });
         if (!result.count) return null;
         await tx.gameParticipant.updateMany({ where: { gameId, status: 'ACTIVE' }, data: { status: 'COMPLETED', completedAt: new Date() } });
-        const completedGame = await tx.game.findUnique({ where: { id: gameId }, select: { hostId: true, participants: { where: { status: 'COMPLETED' }, select: { userId: true } } } });
+        const completedGame = await tx.game.findUnique({ where: { id: gameId }, select: { hostId: true } });
         if (!completedGame) return null;
         if (!this.points) return completedGame;
         await this.points.awardInTransaction(tx, completedGame.hostId, 'GAME_COMPLETED_HOST', gameId, 3);
-        for (const player of completedGame.participants) {
-          await this.points.awardInTransaction(tx, player.userId, 'GAME_COMPLETED_PLAYER', gameId, 3);
-        }
         return completedGame;
       });
     }

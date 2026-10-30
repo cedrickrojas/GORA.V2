@@ -60,7 +60,6 @@
             :busy-game-id="busyGameId"
             :join-action-of="joinActionOf"
             @select="selectedMapGameId = $event"
-            @view="viewGame"
             @join="openJoin"
           />
 
@@ -304,10 +303,6 @@ async function refreshSportMap(): Promise<void> {
   } finally {
     if (request === mapRequest) mapLoading.value = false;
   }
-}
-
-function viewGame(gameId: string): void {
-  void router.push(`/games/${gameId}`);
 }
 
 watch([date, () => filters.maxDistanceKm, () => discovery.userLocation], () => {

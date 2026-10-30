@@ -13,6 +13,31 @@
         :user-location="userLocation"
         @select="selectPlace"
       />
+      <div v-if="selectedGame && !loading" class="discovery-map__map-preview" aria-live="polite">
+        <div class="discovery-map__map-preview-copy">
+          <strong>{{ selectedGame.title }}</strong>
+          <span>{{ selectedGame.sport.name }} · {{ formatClockTime(selectedGame.startTime) }}</span>
+        </div>
+        <div v-if="selectedPlace && selectedPlace.games.length > 1" class="discovery-map__map-preview-games">
+          <button
+            v-for="game in selectedPlace.games"
+            :key="game.id"
+            type="button"
+            :class="{ 'discovery-map__map-preview-game--active': game.id === selectedGame.id }"
+            :aria-label="`Show ${game.title}`"
+            :aria-pressed="game.id === selectedGame.id"
+            @click="emit('select', game.id)"
+          >
+            {{ getSportMarker(game.sport.name) }} {{ formatClockTime(game.startTime) }}
+          </button>
+        </div>
+        <RouterLink
+          :to="{ name: 'game-details', params: { gameId: selectedGame.id } }"
+          class="discovery-map__map-preview-action"
+        >
+          View this game
+        </RouterLink>
+      </div>
       <div v-else-if="loading" class="discovery-map__loading" aria-busy="true" aria-label="Loading games">
         <ion-skeleton-text :animated="true" class="discovery-map__skeleton" />
       </div>
@@ -54,7 +79,6 @@
         :busy="busyGameId === selectedGame.id"
         :badge="selectedBadge"
         highlighted
-        @view="emit('view', $event)"
         @join="emit('join', $event)"
       />
     </div>
@@ -63,6 +87,7 @@
 
 <script setup lang="ts">
 import { type Component, computed } from 'vue';
+import { RouterLink } from 'vue-router';
 import { IonSkeletonText } from '@ionic/vue';
 import { type MapMarker, type MapProviderId, resolveMapProvider } from '@/services/map-provider';
 import type { DiscoveredGame } from '@/types/discovery';
@@ -114,7 +139,7 @@ const props = withDefaults(
   },
 );
 
-const emit = defineEmits<{ select: [gameId: string | null]; view: [gameId: string]; join: [gameId: string] }>();
+const emit = defineEmits<{ select: [gameId: string | null]; join: [gameId: string] }>();
 
 const provider = resolveMapProvider();
 const canvas = CANVASES[provider.id] ?? PlaceholderMapCanvas;
@@ -181,6 +206,83 @@ function selectPlace(key: string): void {
 
 @media (min-width: 900px) {
   .discovery-map__frame--country { aspect-ratio: 4 / 3; }
+}
+
+.discovery-map__map-preview {
+  position: absolute;
+  z-index: 900;
+  right: 12px;
+  bottom: 12px;
+  left: 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: 560px;
+  margin-inline: auto;
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 14px;
+  background: rgba(20, 22, 25, 0.96);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.38);
+  color: #fff;
+}
+
+.discovery-map__map-preview-copy {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.discovery-map__map-preview-copy strong,
+.discovery-map__map-preview-copy span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.discovery-map__map-preview-copy strong { font-size: 0.83rem; }
+.discovery-map__map-preview-copy span { color: rgba(255, 255, 255, 0.72); font-size: 0.72rem; }
+
+.discovery-map__map-preview-action {
+  flex: none;
+  padding: 9px 12px;
+  border-radius: 999px;
+  background: var(--ion-color-primary);
+  color: var(--ion-color-primary-contrast);
+  font-size: 0.76rem;
+  font-weight: 800;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.discovery-map__map-preview-games {
+  display: flex;
+  max-width: 38%;
+  gap: 4px;
+  overflow-x: auto;
+}
+
+.discovery-map__map-preview-games button {
+  flex: none;
+  padding: 5px 7px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 999px;
+  background: transparent;
+  color: #fff;
+  font-size: 0.67rem;
+}
+
+.discovery-map__map-preview-games button.discovery-map__map-preview-game--active {
+  border-color: var(--ion-color-primary);
+  color: var(--ion-color-primary);
+}
+
+@media (max-width: 480px) {
+  .discovery-map__map-preview { gap: 7px; padding: 9px; }
+  .discovery-map__map-preview-games { max-width: 28%; }
+  .discovery-map__map-preview-action { padding: 8px 9px; font-size: 0.7rem; }
 }
 
 .discovery-map__legend {

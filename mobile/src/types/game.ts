@@ -7,6 +7,7 @@ import type { JoinRequestStatus } from './join-request';
 export interface JoinedGame extends ApiGame {
   participationStatus: ParticipantStatus | null;
   joinRequestStatus: JoinRequestStatus | null;
+  leaveRequestStatus: import('./game-player').GameLeaveStatus | null;
   joinedAt: string | null;
   requestedAt: string | null;
 }

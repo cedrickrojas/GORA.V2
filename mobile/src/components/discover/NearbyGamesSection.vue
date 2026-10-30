@@ -95,7 +95,6 @@
       :busy-game-id="busyGameId"
       :join-action-of="joinActionOf"
       @select="discovery.selectGame"
-      @view="viewGame"
       @join="openJoin"
     />
 
@@ -112,7 +111,6 @@
         :game="game"
         :join-action="joinActionOf(game)"
         :busy="busyGameId === game.id"
-        @view="viewGame"
         @join="openJoin"
       />
     </div>
@@ -210,10 +208,6 @@ function chooseCustomDate(event: Event): void {
 async function useMyLocation(): Promise<void> {
   await discovery.locate();
   refresh();
-}
-
-function viewGame(gameId: string): void {
-  void router.push(`/games/${gameId}`);
 }
 
 watch(() => [filters.sport, filters.maxDistanceKm], refresh);

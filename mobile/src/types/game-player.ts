@@ -11,6 +11,8 @@ export interface RosterPlayer {
   displayName: string;
   profileImageUrl: string | null;
   joinedAt: string;
+  status: ParticipantStatus;
+  attendanceStatus: 'ATTENDED' | 'NO_SHOW' | null;
 }
 
 /** GET /games/:gameId/players. Counts come from the server's ACTIVE participant rows. */
@@ -30,4 +32,14 @@ export interface MyParticipation {
   status: MyParticipationStatus;
   joinedAt: string | null;
   completedAt: string | null;
+}
+
+export type GameLeaveStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
+export interface GameLeaveRequest {
+  id: string;
+  gameId: string;
+  userId: string;
+  status: GameLeaveStatus;
+  createdAt: string;
+  user?: Omit<RosterPlayer, 'status' | 'attendanceStatus'>;
 }

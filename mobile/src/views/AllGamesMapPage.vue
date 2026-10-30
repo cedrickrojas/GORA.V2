@@ -29,7 +29,6 @@
           :busy-game-id="busyGameId"
           :join-action-of="joinActionOf"
           @select="selectedGameId = $event"
-          @view="viewGame"
           @join="openJoin"
         />
 
@@ -42,7 +41,6 @@
             :join-action="joinActionOf(game)"
             :highlighted="game.id === selectedGameId"
             :busy="busyGameId === game.id"
-            @view="viewGame"
             @join="openJoin"
           />
         </section>
@@ -63,7 +61,6 @@
 
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
-import { useRouter } from 'vue-router';
 import { IonContent, IonPage } from '@ionic/vue';
 import JoinRequestModal from '@/components/games/JoinRequestModal.vue';
 import DiscoveredGameCard from '@/components/map/DiscoveredGameCard.vue';
@@ -73,7 +70,6 @@ import { useDiscoveryJoin } from '@/composables/useDiscoveryJoin';
 import { useDiscoveryStore } from '@/stores/discovery';
 import type { DiscoveredGame } from '@/types/discovery';
 
-const router = useRouter();
 const discovery = useDiscoveryStore();
 const games = ref<DiscoveredGame[]>([]);
 const loading = ref(true);
@@ -102,10 +98,6 @@ async function load(): Promise<void> {
   if (result.ok) games.value = result.games;
   else error.value = result.message;
   loading.value = false;
-}
-
-function viewGame(gameId: string): void {
-  void router.push(`/games/${gameId}`);
 }
 
 onMounted(() => void load());

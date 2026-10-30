@@ -18,7 +18,9 @@
     </p>
 
     <div class="found-game__actions">
-      <button type="button" class="found-game__button" @click="emit('view', game.id)">View Game</button>
+      <RouterLink :to="{ name: 'game-details', params: { gameId: game.id } }" class="found-game__button">
+        View Game
+      </RouterLink>
       <button
         type="button"
         class="found-game__button found-game__button--primary"
@@ -51,7 +53,7 @@ const props = withDefaults(
   }>(),
   { busy: false, highlighted: false, badge: null },
 );
-const emit = defineEmits<{ view: [gameId: string]; join: [gameId: string] }>();
+const emit = defineEmits<{ join: [gameId: string] }>();
 
 const distanceText = computed(() => formatDistanceAway(props.game.distanceKm));
 
@@ -142,6 +144,9 @@ const joinLabel = computed(() => {
 }
 
 .found-game__button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   padding: 9px 12px;
   border: 1px solid var(--gora-line);
   border-radius: 999px;
@@ -151,6 +156,7 @@ const joinLabel = computed(() => {
   font: inherit;
   font-size: 0.84rem;
   font-weight: 700;
+  text-decoration: none;
 }
 
 .found-game__button--primary {
