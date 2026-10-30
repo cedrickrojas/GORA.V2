@@ -9,7 +9,7 @@
         <DesktopContacts />
       </template>
       <ion-tab-bar v-if="!isMessageThread" slot="bottom" class="gora-tab-bar">
-        <ion-tab-button tab="home" href="/home">
+        <ion-tab-button tab="home" href="/home" @click="refreshIfSelected('/home', 'home')">
           <ion-icon :icon="homeOutline" aria-hidden="true" />
           <ion-label>Home</ion-label>
         </ion-tab-button>
@@ -17,7 +17,7 @@
           <ion-icon :icon="searchOutline" aria-hidden="true" />
           <ion-label>Search</ion-label>
         </ion-tab-button>
-        <ion-tab-button tab="discover" href="/discover">
+        <ion-tab-button tab="discover" href="/discover" @click="refreshIfSelected('/discover', 'discover')">
           <ion-icon :icon="compassOutline" aria-hidden="true" />
           <ion-label>Discover</ion-label>
         </ion-tab-button>
@@ -69,6 +69,7 @@ import { useNotificationPolling } from '@/composables/useNotificationPolling';
 import { useAuthStore } from '@/stores/auth';
 import { useChatStore } from '@/stores/chat';
 import { useClubChatStore } from '@/stores/club-chat';
+import { requestTabRefresh, type RefreshableMainTab } from '@/utils/tab-refresh';
 
 /** Feed pages get Facebook-style sidebars on wide screens (CSS decides the width). */
 const SIDEBAR_PATHS = ['/home', '/discover', '/create/game'];
@@ -86,6 +87,10 @@ const showSidebars = computed(() => SIDEBAR_PATHS.includes(route.path) || route.
 const isMessageThread = computed(() =>
   ['chat-thread', 'chat-request', 'club-chat', 'post-details'].includes(String(route.name)),
 );
+
+function refreshIfSelected(path: string, tab: RefreshableMainTab): void {
+  if (route.path === path) requestTabRefresh(tab);
+}
 
 // An API call that got 401 (expired or revoked token) ends the session; return to Log In
 // and come back to this page afterwards.

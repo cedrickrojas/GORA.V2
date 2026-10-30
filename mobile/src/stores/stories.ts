@@ -6,18 +6,21 @@ import {
   deleteStory as deleteStoryRequest,
   listActiveStories,
   listMyStories,
+  listStoryViewers,
+  markStoryViewed as markStoryViewedRequest,
   updateStory as updateStoryRequest,
   updateStoryVisibility as updateStoryVisibilityRequest,
   uploadStory as uploadStoryRequest,
 } from '@/services/stories-api.service';
 import type { MediaUploadOptions } from '@/services/media-upload.service';
 import type { PostVisibility } from '@/types/post';
-import type { ApiStory, Story, StoryDraft, StoryGroup, StoryUploadDraft } from '@/types/story';
+import type { ApiStory, Story, StoryDraft, StoryGroup, StoryUploadDraft, StoryViewer } from '@/types/story';
 import { storyFileType, validateStoryFile } from '@/utils/story-upload';
 import { STORY_CAPTION_MAX_LENGTH, toStory, validateCaption, validateStoryDraft } from '@/utils/media-api';
 import { isServerId } from '@/utils/post-api';
 import { validatePostAudience } from '@/utils/post-privacy';
 import { groupStoriesByUser, partitionStories } from '@/utils/stories';
+import { toUserSummary } from '@/utils/display-name';
 import { useAuthStore } from './auth';
 import { captureSession, createAuthorizedCall, describeContentError } from './authorized';
 import { DEMO_PEOPLE_MESSAGE } from './posts';
@@ -48,6 +51,8 @@ export const useStoriesStore = defineStore('stories', () => {
   const serverError = ref<string | null>(null);
   const loadedForUserId = ref<string | null>(null);
   const busyStoryId = ref<string | null>(null);
+  const viewersByStoryId = ref<Record<string, StoryViewer[]>>({});
+  const loadingViewersStoryId = ref<string | null>(null);
 
   /** The signed-in account (the demo user only when nobody is signed in). */
   const viewer = computed(() => session.me);
@@ -70,6 +75,8 @@ export const useStoriesStore = defineStore('stories', () => {
       loadedForUserId.value = null;
       serverError.value = null;
       busyStoryId.value = null;
+      viewersByStoryId.value = {};
+      loadingViewersStoryId.value = null;
     },
     { flush: 'sync' },
   );
@@ -151,6 +158,47 @@ export const useStoriesStore = defineStore('stories', () => {
       if (existing) {
         Object.assign(existing, toStory(updated));
       }
+    }
+  }
+
+  /** Marks a story immediately in the rail and persists the seen state for signed-in viewers. */
+  async function markViewed(storyId: string): Promise<void> {
+    const story = allStories.value.find((candidate) => candidate.id === storyId);
+    if (!story || story.viewedByViewer) return;
+
+    if (!story.fromServer) {
+      story.viewedByViewer = true;
+      return;
+    }
+
+    story.viewedByViewer = true;
+    try {
+      replaceStory(await authorized((token) => markStoryViewedRequest(token, storyId)));
+    } catch {
+      // Keep the immediate gray ring; the next story refresh can retry if the request failed.
+    }
+  }
+
+  async function loadViewers(storyId: string, force = false): Promise<string | null> {
+    if (!savesToServer.value || !findOwnStory(storyId)) return 'Only you can see viewers of your story.';
+    if (!force && viewersByStoryId.value[storyId]) return null;
+    const isCurrent = captureSession(auth);
+    loadingViewersStoryId.value = storyId;
+    try {
+      const result = await authorized((token) => listStoryViewers(token, storyId));
+      if (!isCurrent()) return 'The account changed. Try again.';
+      viewersByStoryId.value = {
+        ...viewersByStoryId.value,
+        [storyId]: result.map((entry) => ({
+          user: toUserSummary(entry.user),
+          viewedAt: entry.viewedAt,
+        })),
+      };
+      return null;
+    } catch (caught) {
+      return describeContentError(caught, STORY_UNAVAILABLE_MESSAGE);
+    } finally {
+      if (isCurrent()) loadingViewersStoryId.value = null;
     }
   }
 
@@ -324,9 +372,13 @@ export const useStoriesStore = defineStore('stories', () => {
     serverStatus,
     serverError,
     busyStoryId,
+    viewersByStoryId,
+    loadingViewersStoryId,
     load,
     refresh,
     getFeedAt,
+    markViewed,
+    loadViewers,
     createStory,
     uploadStory,
     editStory,

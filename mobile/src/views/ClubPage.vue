@@ -77,6 +77,10 @@
               <ion-icon :icon="chatbubblesOutline" aria-hidden="true" />
               Chat
             </button>
+            <button type="button" class="club__secondary club__chat" @click="shareClub">
+              <ion-icon :icon="shareSocialOutline" aria-hidden="true" />
+              Share
+            </button>
           </div>
           <p v-if="joinState === 'REQUESTED'" class="club__note">An admin will review your request. Tap again to cancel it.</p>
           <p v-else-if="joinState === 'FULL'" class="club__note">This club has reached its member limit.</p>
@@ -178,8 +182,8 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { IonContent, IonIcon, IonPage, onIonViewWillEnter } from '@ionic/vue';
-import { chatbubblesOutline, earthOutline, locationOutline, lockClosedOutline, peopleOutline } from 'ionicons/icons';
+import { IonContent, IonIcon, IonPage, alertController, onIonViewWillEnter } from '@ionic/vue';
+import { chatbubblesOutline, earthOutline, locationOutline, lockClosedOutline, peopleOutline, shareSocialOutline } from 'ionicons/icons';
 import ClubAvatar from '@/components/clubs/ClubAvatar.vue';
 import SegmentTabs from '@/components/common/SegmentTabs.vue';
 import UserAvatar from '@/components/common/UserAvatar.vue';
@@ -191,6 +195,7 @@ import { useJoinGame } from '@/composables/useJoinGame';
 import { useNow } from '@/composables/useNow';
 import { usePostActions } from '@/composables/usePostActions';
 import { useClubsStore } from '@/stores/clubs';
+import { useChatStore } from '@/stores/chat';
 import { useGamesStore } from '@/stores/games';
 import { usePostsStore } from '@/stores/posts';
 import { useReelsStore } from '@/stores/reels';
@@ -225,6 +230,7 @@ const router = useRouter();
 const clubId = String(route.params.clubId ?? '');
 const session = useSessionStore();
 const clubsStore = useClubsStore();
+const chatStore = useChatStore();
 const postsStore = usePostsStore();
 const gamesStore = useGamesStore();
 const reelsStore = useReelsStore();
@@ -395,6 +401,48 @@ function openChat(): void {
   if (canOpenChat.value) {
     void router.push(`/chat/clubs/${clubId}`);
   }
+}
+
+async function shareClub(): Promise<void> {
+  const currentClub = club.value;
+  if (!currentClub) return;
+  await chatStore.load();
+  const conversations = chatStore.sortedConversations;
+  if (conversations.length === 0) {
+    void showNotice('Start a message conversation before sharing a club.');
+    return;
+  }
+  const clubUrl = new URL(`/clubs/${encodeURIComponent(currentClub.id)}`, window.location.origin).href;
+  const alert = await alertController.create({
+    header: 'Share club to messages',
+    subHeader: 'Choose a conversation',
+    inputs: conversations.slice(0, 20).map((conversation, index) => ({
+      type: 'radio' as const,
+      label: conversation.partner.displayName,
+      value: conversation.id,
+      checked: index === 0,
+    })),
+    buttons: [
+      { text: 'Cancel', role: 'cancel' },
+      {
+        text: 'Send',
+        handler: async (conversationId: unknown) => {
+          if (typeof conversationId !== 'string') return false;
+          const error = await chatStore.sendMessage(
+            conversationId,
+            `Check out ${currentClub.name} on GORA:\n${clubUrl}`,
+          );
+          if (error) {
+            void showNotice(error);
+            return false;
+          }
+          void showNotice(`Club sent to ${chatStore.getConversation(conversationId)?.partner.displayName ?? 'messages'}.`);
+          return true;
+        },
+      },
+    ],
+  });
+  await alert.present();
 }
 
 onIonViewWillEnter(() => {

@@ -28,17 +28,8 @@
         <span>posted a game · {{ formatTimeAgo(item.at, nowMs) }}</span>
       </span>
     </header>
-    <div class="feed-entry__server-game">
-      <span>{{ item.game.sport.name }}</span>
-      <h3>{{ item.game.title }}</h3>
-      <p v-if="item.game.description">{{ item.game.description }}</p>
-      <div class="feed-entry__server-game-facts">
-        <span>{{ item.game.gameDate }} · {{ item.game.startTime }}</span>
-        <span>{{ item.game.locationName }}</span>
-        <span>Players {{ item.game.currentPlayers }}/{{ item.game.requiredPlayers }}</span>
-      </div>
-      <router-link :to="`/games/${item.game.id}`">View Game</router-link>
-    </div>
+    <p v-if="item.game.description" class="feed-entry__text">{{ item.game.description }}</p>
+    <ServerGameFeedCard :game="item.game" />
   </article>
 
   <article v-else-if="item.type === 'REEL'" class="feed-entry">
@@ -93,6 +84,7 @@ import { IonIcon } from '@ionic/vue';
 import { enterOutline, eyeOutline, playCircle, ribbonOutline, trophyOutline } from 'ionicons/icons';
 import UserAvatar from '@/components/common/UserAvatar.vue';
 import GameCard from '@/components/games/GameCard.vue';
+import ServerGameFeedCard from './ServerGameFeedCard.vue';
 import ClubRow from '@/components/clubs/ClubRow.vue';
 import PostCard from './PostCard.vue';
 import type { FeedActivityKind, HomeFeedItem } from '@/types/feed';
@@ -145,47 +137,6 @@ const emit = defineEmits<{
   margin: 0;
   font-size: 0.92rem;
   line-height: 1.45;
-}
-
-.feed-entry__server-game {
-  display: flex;
-  flex-direction: column;
-  gap: 7px;
-  padding: 14px;
-  border: 1px solid var(--gora-line);
-  border-radius: 16px;
-  background: var(--gora-surface);
-}
-
-.feed-entry__server-game > span {
-  color: var(--ion-color-primary);
-  font-size: 0.72rem;
-  font-weight: 800;
-  text-transform: uppercase;
-}
-
-.feed-entry__server-game h3,
-.feed-entry__server-game p { margin: 0; }
-.feed-entry__server-game h3 { font-size: 1.02rem; }
-.feed-entry__server-game p { color: var(--gora-muted); font-size: 0.84rem; }
-
-.feed-entry__server-game-facts {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 5px 12px;
-  color: var(--gora-muted);
-  font-size: 0.76rem;
-}
-
-.feed-entry__server-game a {
-  align-self: flex-start;
-  padding: 8px 14px;
-  border-radius: 999px;
-  background: var(--ion-color-primary);
-  color: var(--ion-color-primary-contrast);
-  font-size: 0.8rem;
-  font-weight: 800;
-  text-decoration: none;
 }
 
 .feed-entry__club-list {

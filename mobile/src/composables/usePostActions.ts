@@ -99,6 +99,7 @@ export function usePostActions() {
     const sheet = await actionSheetController.create({
       header: 'Share post',
       subHeader: 'Only people in this post’s audience can open the link.',
+      cssClass: 'gora-sheet',
       buttons: [
         {
           text: 'Share to messages',

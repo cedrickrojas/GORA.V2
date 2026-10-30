@@ -1,4 +1,5 @@
 <template>
+  <div>
   <ion-modal :is-open="isOpen" class="story-viewer-modal" @did-dismiss="emit('close')">
     <div v-if="currentGroup && currentStory" class="story-viewer">
       <div class="story-viewer__media" :style="{ background: visual.gradient }">
@@ -47,6 +48,10 @@
             @busy="$event ? pause() : resume()"
             @deleted="emit('close')"
           />
+          <button v-if="isOwnStory" type="button" class="story-viewer__viewers" @click="openViewers">
+            <ion-icon :icon="eyeOutline" aria-hidden="true" />
+            Viewers
+          </button>
           <button type="button" class="story-viewer__close" aria-label="Close story" @click="emit('close')">
             <ion-icon :icon="closeOutline" />
           </button>
@@ -78,13 +83,16 @@
       </div>
     </div>
   </ion-modal>
+  <StoryViewersModal :is-open="viewersOpen" :story-id="currentStory?.id ?? null" @close="viewersOpen = false" />
+  </div>
 </template>
 
 <script setup lang="ts">
-import { computed, toRef, watch } from 'vue';
+import { computed, ref, toRef, watch } from 'vue';
 import { IonIcon, IonModal } from '@ionic/vue';
-import { closeOutline, hourglassOutline, musicalNotes, play } from 'ionicons/icons';
+import { closeOutline, eyeOutline, hourglassOutline, musicalNotes, play } from 'ionicons/icons';
 import UserAvatar from '@/components/common/UserAvatar.vue';
+import StoryViewersModal from '@/components/stories/StoryViewersModal.vue';
 import StoryOptionsButton from '@/components/media/StoryOptionsButton.vue';
 import { useStoryPlayback } from '@/composables/useStoryPlayback';
 import { useStoriesStore } from '@/stores/stories';
@@ -104,6 +112,7 @@ const props = defineProps<{
 const emit = defineEmits<{ close: [] }>();
 
 const storiesStore = useStoriesStore();
+const viewersOpen = ref(false);
 const { currentGroup, currentStory, start, stop, pause, resume, next, previous, getSegmentFill } = useStoryPlayback(
   toRef(props, 'groups'),
   () => emit('close'),
@@ -120,6 +129,10 @@ const privacyLabel = computed(() => {
 
 const visual = computed(() => getSportVisual(currentStory.value?.media.sport ?? ''));
 
+async function openViewers(): Promise<void> {
+  viewersOpen.value = true;
+}
+
 const postedLabel = computed(() =>
   currentStory.value ? formatTimeAgo(Date.parse(currentStory.value.createdAt), props.nowMs) : '',
 );
@@ -131,6 +144,14 @@ const timeLeftLabel = computed(() =>
 watch(
   () => props.isOpen,
   (isOpen) => (isOpen ? start(props.startIndex) : stop()),
+  { immediate: true },
+);
+
+watch(
+  () => currentStory.value?.id,
+  (storyId) => {
+    if (storyId) void storiesStore.markViewed(storyId);
+  },
   { immediate: true },
 );
 </script>
@@ -266,6 +287,21 @@ watch(
   color: #fff;
   font-size: 26px;
   cursor: pointer;
+}
+
+.story-viewer__viewers {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 9px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.35);
+  color: #fff;
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 700;
+  white-space: nowrap;
 }
 
 .story-viewer__expiry {

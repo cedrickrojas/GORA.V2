@@ -35,7 +35,7 @@
   --gora-muted: #aab3bf;
   --gora-line: rgba(245, 246, 248, 0.12);
   --gora-line-strong: rgba(245, 246, 248, 0.26);
-  --gora-ring-spent: rgba(245, 246, 248, 0.12);
+  --gora-ring-spent: rgba(170, 179, 191, 0.52);
   --gora-accent-soft: rgba(255, 96, 40, 0.1);
   --gora-accent-line: rgba(255, 96, 40, 0.35);
   --gora-radius-card: 10px;
@@ -88,7 +88,7 @@ ion-action-sheet.gora-sheet {
   --background: var(--gora-surface);
   --button-background-hover: var(--gora-accent-soft);
   --button-background-selected: var(--gora-accent-soft);
-  --button-color: var(--ion-text-color);
+  --button-color: #f5f6f8;
   --color: var(--gora-muted);
 }
 

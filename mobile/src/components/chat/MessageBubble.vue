@@ -39,7 +39,7 @@
       />
       <p v-else :class="{ 'message-bubble__unsent': unsent }">
         <template v-for="(part, index) in bodyParts" :key="index">
-          <a v-if="part.url" :href="part.url" target="_blank" rel="noopener noreferrer">{{ part.text }}</a>
+          <a v-if="part.url" :href="part.url" :target="isInternalLink(part.url) ? undefined : '_blank'" rel="noopener noreferrer" @click="openMessageLink($event, part.url)">{{ part.text }}</a>
           <template v-else>{{ part.text }}</template>
         </template>
       </p>
@@ -123,6 +123,7 @@
 
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue';
+import { useRouter } from 'vue-router';
 import {
   IonIcon,
   IonModal,
@@ -161,6 +162,7 @@ const emit = defineEmits<{
   action: [action: 'unsend' | 'forward' | 'pin' | 'report'];
 }>();
 const photoOpen = ref(false);
+const router = useRouter();
 const bubble = ref<HTMLElement | null>(null);
 const picker = ref<HTMLElement | null>(null);
 const pickerOpen = ref(false);
@@ -172,6 +174,21 @@ const bodyParts = computed(() =>
     url: /^https?:\/\//i.test(text) ? text : null,
   })),
 );
+
+function isInternalLink(value: string): boolean {
+  try {
+    return new URL(value, window.location.origin).origin === window.location.origin;
+  } catch {
+    return false;
+  }
+}
+
+function openMessageLink(event: MouseEvent, value: string): void {
+  if (!isInternalLink(value) || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+  event.preventDefault();
+  const url = new URL(value, window.location.origin);
+  void router.push(`${url.pathname}${url.search}${url.hash}`);
+}
 let hold: ReturnType<typeof setTimeout> | undefined;
 let startX = 0;
 let startY = 0;
@@ -185,7 +202,7 @@ function cancelHold(): void {
 }
 function startHold(event: PointerEvent): void {
   cancelHold();
-  if ((event.target as HTMLElement).closest?.('audio, button, input')) return;
+  if ((event.target as HTMLElement).closest?.('audio, button, input, a')) return;
   if (!props.canReact || props.busy || event.button !== 0 || event.isPrimary === false) return;
   startX = event.clientX;
   startY = event.clientY;

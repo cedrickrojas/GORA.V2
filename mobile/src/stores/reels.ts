@@ -6,6 +6,7 @@ import {
   deleteReel as deleteReelRequest,
   listReelFeed,
   listUserReels,
+  recordReelShare,
   setReelLike,
   updateReel as updateReelRequest,
   updateReelVisibility as updateReelVisibilityRequest,
@@ -142,6 +143,19 @@ export const useReelsStore = defineStore('reels', () => {
   function replaceReel(updated: ApiReel): void {
     const reel = toReel(updated);
     serverReels.value = serverReels.value.map((candidate) => (candidate.id === reel.id ? reel : candidate));
+  }
+
+  function syncReel(updated: ApiReel): void {
+    replaceReel(updated);
+  }
+
+  async function shareReel(reelId: string): Promise<string | null> {
+    try {
+      replaceReel(await authorized((token) => recordReelShare(token, reelId)));
+      return null;
+    } catch (caught) {
+      return describeContentError(caught, REEL_UNAVAILABLE_MESSAGE);
+    }
   }
 
   async function sportIdFor(name: string): Promise<string | null> {
@@ -381,5 +395,7 @@ export const useReelsStore = defineStore('reels', () => {
     updateReelVisibility,
     deleteReel,
     toggleLike,
+    syncReel,
+    shareReel,
   };
 });

@@ -147,6 +147,7 @@ import { useStoriesStore } from '@/stores/stories';
 import type { StoryGroup } from '@/types/story';
 import { getNearbyRadiusKm } from '@/utils/discover';
 import { buildFriendsFeed, buildHomeFeed, type HomeFeedSources } from '@/utils/feed';
+import { tabRefreshEvent } from '@/utils/tab-refresh';
 
 const router = useRouter();
 const liveVisible = ref(true);
@@ -205,6 +206,9 @@ const viewerGroups = ref<StoryGroup[]>([]);
 const viewerStartIndex = ref(0);
 
 function openStories(group: StoryGroup): void {
+  const firstStory = group.stories[0];
+  if (firstStory) void storiesStore.markViewed(firstStory.id);
+
   const groups = storyFeed.value.own ? [storyFeed.value.own, ...storyFeed.value.others] : [...storyFeed.value.others];
 
   viewerStartIndex.value = Math.max(
@@ -230,6 +234,11 @@ async function refreshFeed(): Promise<void> {
 }
 
 let refreshTimer: ReturnType<typeof setInterval> | undefined;
+const refreshHomeEvent = tabRefreshEvent('home');
+function handleHomeTabRefresh(): void {
+  void refreshFeed();
+}
+
 function stopRefreshing(): void {
   clearInterval(refreshTimer);
   refreshTimer = undefined;
@@ -243,9 +252,13 @@ onIonViewWillEnter(() => {
   }, 30_000);
 });
 onIonViewDidLeave(() => { liveVisible.value = false; stopRefreshing(); });
-onUnmounted(stopRefreshing);
+onUnmounted(() => {
+  stopRefreshing();
+  window.removeEventListener(refreshHomeEvent, handleHomeTabRefresh);
+});
 
 onMounted(() => {
+  window.addEventListener(refreshHomeEvent, handleHomeTabRefresh);
   void loadHomeData();
 });
 

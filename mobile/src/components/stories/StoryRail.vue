@@ -13,6 +13,7 @@
         :user="viewer"
         label="Your Story"
         :lifetime-left="own ? getGroupLifetimeLeft(own, nowMs) : null"
+        :viewed="own ? isStoryGroupViewed(own) : false"
         show-add
         @select="own ? emit('open', own) : emit('add')"
         @add="emit('add')"
@@ -24,6 +25,7 @@
         :user="group.user"
         :label="group.user.username"
         :lifetime-left="getGroupLifetimeLeft(group, nowMs)"
+        :viewed="isStoryGroupViewed(group)"
         @select="emit('open', group)"
       />
     </div>
@@ -36,7 +38,7 @@ import { hourglassOutline } from 'ionicons/icons';
 import SectionHeader from '@/components/common/SectionHeader.vue';
 import type { StoryGroup } from '@/types/story';
 import type { UserSummary } from '@/types/user';
-import { getGroupLifetimeLeft } from '@/utils/stories';
+import { getGroupLifetimeLeft, isStoryGroupViewed } from '@/utils/stories';
 import StoryAvatarButton from './StoryAvatarButton.vue';
 
 defineProps<{

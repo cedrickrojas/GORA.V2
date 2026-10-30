@@ -170,9 +170,9 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { RouterLink, useRoute, useRouter } from 'vue-router';
-import { IonContent, IonIcon, IonPage } from '@ionic/vue';
+import { IonContent, IonIcon, IonPage, onIonViewWillEnter } from '@ionic/vue';
 import { star } from 'ionicons/icons';
 import ClubAvatar from '@/components/clubs/ClubAvatar.vue';
 import ClubRow from '@/components/clubs/ClubRow.vue';
@@ -205,6 +205,7 @@ import { DISCOVER_TABS, type DiscoverTab, buildDiscoverFeed } from '@/utils/disc
 import { buildClubsFeed, buildFriendsFeed, type HomeFeedSources } from '@/utils/feed';
 import { formatDistanceFilter } from '@/utils/search';
 import { getSportVisual, toSportSlug } from '@/utils/sports';
+import { tabRefreshEvent } from '@/utils/tab-refresh';
 import { formatCompactNumber } from '@/utils/time';
 
 const router = useRouter();
@@ -224,6 +225,8 @@ const { likePost, commentOnPost, sharePost } = usePostActions();
 const now = useNow();
 
 const tab = ref<DiscoverTab>('ALL');
+const refreshDiscoverEvent = tabRefreshEvent('discover');
+let discoverDataLoaded = false;
 
 const activeFilters = computed(() => ({ maxDistanceKm: filters.maxDistanceKm, sport: filters.sport }));
 
@@ -301,7 +304,16 @@ function openSportSearch(sport: SportCategory): void {
 }
 
 onMounted(() => {
-  void loadDiscoverData();
+  window.addEventListener(refreshDiscoverEvent, refreshDiscoverData);
+  void loadDiscoverData().finally(() => {
+    discoverDataLoaded = true;
+  });
+});
+
+onUnmounted(() => window.removeEventListener(refreshDiscoverEvent, refreshDiscoverData));
+
+onIonViewWillEnter(() => {
+  if (discoverDataLoaded) void refreshDiscoverData();
 });
 
 async function loadDiscoverData(): Promise<void> {
@@ -314,6 +326,21 @@ async function loadDiscoverData(): Promise<void> {
     clubsStore.load(),
     friendsStore.load(),
     followsStore.load(),
+  ]);
+}
+
+async function refreshDiscoverData(): Promise<void> {
+  if (!discoverDataLoaded) return;
+  await session.load();
+  await Promise.all([
+    catalog.load(),
+    gamesStore.refreshFeedGames(),
+    reelsStore.refresh(),
+    postsStore.refresh(),
+    clubsStore.load(),
+    friendsStore.refresh(),
+    followsStore.load(),
+    discovery.fetchNearbyGames(),
   ]);
 }
 </script>

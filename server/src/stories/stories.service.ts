@@ -20,7 +20,7 @@ import type {
   MediaUploadFile,
   PrivateMediaFile,
 } from '../common/media/private-media.storage';
-import type { DeletedStoryView, StoryView } from './story.types';
+import type { DeletedStoryView, StoryView, StoryViewerView } from './story.types';
 import { visibleStoriesWhere } from './story-visibility';
 
 export const STORY_NOT_FOUND_MESSAGE = 'Story not found.';
@@ -42,6 +42,7 @@ function storySelect(viewerId: string) {
     musicDuration: true,
     createdAt: true,
     expiresAt: true,
+    views: { where: { userId: viewerId }, select: { id: true } },
     user: { select: AUTHOR_SELECT },
     // Loaded only when the viewer posted the story; for everyone else this is always empty.
     customViewers: {
@@ -177,6 +178,33 @@ export class StoriesService {
     }
 
     return this.toView(story, viewerId);
+  }
+
+  /** Records that the viewer opened a visible story; repeated views remain one record. */
+  async markViewed(viewerId: string, storyId: string): Promise<StoryView> {
+    const story = await this.findVisible(viewerId, storyId);
+    await this.prisma.storyView.upsert({
+      where: { storyId_userId: { storyId, userId: viewerId } },
+      create: { storyId, userId: viewerId },
+      update: {},
+    });
+    return { ...story, viewedByViewer: true };
+  }
+
+  /** Only the story owner can see the audience who opened their story. */
+  async listViewers(viewerId: string, storyId: string): Promise<StoryViewerView[]> {
+    const story = await this.prisma.story.findFirst({
+      where: { id: storyId, userId: viewerId, deletedAt: null },
+      select: {
+        views: {
+          where: { userId: { not: viewerId } },
+          orderBy: { viewedAt: 'desc' },
+          select: { viewedAt: true, user: { select: AUTHOR_SELECT } },
+        },
+      },
+    });
+    if (!story) throw new NotFoundException(STORY_NOT_FOUND_MESSAGE);
+    return story.views.map(({ user, viewedAt }) => ({ user, viewedAt }));
   }
 
   /** Edit story (author only): the caption; null or blank removes it. */
@@ -320,6 +348,7 @@ export class StoriesService {
         : null,
       createdAt: story.createdAt,
       expiresAt: story.expiresAt,
+      viewedByViewer: story.views.length > 0,
     };
 
     if (story.userId === viewerId) {

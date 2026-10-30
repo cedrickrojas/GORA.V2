@@ -32,6 +32,7 @@ export function toStory(story: ApiStory): Story {
       : null,
     createdAt: story.createdAt,
     expiresAt: story.expiresAt,
+    viewedByViewer: story.viewedByViewer,
     visibility: story.visibility,
     customViewerIds: story.customViewers?.map((viewer) => viewer.id),
     fromServer: true,

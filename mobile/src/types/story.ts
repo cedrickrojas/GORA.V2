@@ -31,6 +31,8 @@ export interface Story {
   createdAt: string;
   /** ISO 8601 timestamp. Always createdAt + 24 hours. */
   expiresAt: string;
+  /** Whether the active viewer has already opened this story. */
+  viewedByViewer?: boolean;
   /** Same four options as posts. Demo stories are treated as PUBLIC. */
   visibility?: PostVisibility;
   /** Only known for your own stories (the server sends the list to the author only). */
@@ -56,8 +58,19 @@ export interface ApiStory {
   } | null;
   createdAt: string;
   expiresAt: string;
+  viewedByViewer: boolean;
   /** Only sent to the author. */
   customViewers?: ApiPostPerson[];
+}
+
+export interface ApiStoryViewer {
+  user: ApiPostPerson;
+  viewedAt: string;
+}
+
+export interface StoryViewer {
+  user: UserSummary;
+  viewedAt: string;
 }
 
 export interface CreateStoryInput {

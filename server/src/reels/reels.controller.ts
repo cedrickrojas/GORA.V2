@@ -18,7 +18,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { REEL_VIDEO_MAX_BYTES, type ReelVideoFile } from './reel-video.storage';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { ListPostsQueryDto } from '../posts/dto/post.dto';
+import { CreatePostCommentDto, ListPostsQueryDto } from '../posts/dto/post.dto';
 import type { CurrentUser as CurrentUserContext } from '../users/user.types';
 import {
   CreateReelDto,
@@ -88,6 +88,29 @@ export class ReelsController {
     @Param('reelId', reelIdPipe) reelId: string,
   ): Promise<ReelView> {
     return this.reelsService.findVisible(viewer.id, reelId);
+  }
+
+  @Get('reels/:reelId/comments')
+  listComments(
+    @CurrentUser() viewer: CurrentUserContext,
+    @Param('reelId', reelIdPipe) reelId: string,
+    @Query() query: ListPostsQueryDto,
+  ) {
+    return this.reelsService.listComments(viewer.id, reelId, query);
+  }
+
+  @Post('reels/:reelId/comments')
+  addComment(
+    @CurrentUser() viewer: CurrentUserContext,
+    @Param('reelId', reelIdPipe) reelId: string,
+    @Body() dto: CreatePostCommentDto,
+  ) {
+    return this.reelsService.addComment(viewer.id, reelId, dto.content);
+  }
+
+  @Post('reels/:reelId/shares')
+  share(@CurrentUser() viewer: CurrentUserContext, @Param('reelId', reelIdPipe) reelId: string) {
+    return this.reelsService.share(viewer.id, reelId);
   }
 
   @Patch('reels/:reelId')

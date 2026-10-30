@@ -3,7 +3,7 @@
     <button
       type="button"
       class="story-avatar__ring"
-      :class="{ 'story-avatar__ring--empty': lifetimeLeft === null }"
+      :class="{ 'story-avatar__ring--empty': lifetimeLeft === null, 'story-avatar__ring--viewed': viewed }"
       :style="ringStyle"
       :aria-label="ariaLabel"
       @click="emit('select')"
@@ -41,15 +41,18 @@ const props = withDefaults(
     label: string;
     /** Share of the 24-hour lifetime remaining, from 0 to 1. Null when there is no story. */
     lifetimeLeft: number | null;
+    viewed?: boolean;
     showAdd?: boolean;
   }>(),
-  { showAdd: false },
+  { viewed: false, showAdd: false },
 );
 
 const emit = defineEmits<{ select: []; add: [] }>();
 
 const ringStyle = computed(() =>
-  props.lifetimeLeft === null ? {} : { background: getStoryRingBackground(props.lifetimeLeft) },
+  props.lifetimeLeft === null || props.viewed
+    ? {}
+    : { background: getStoryRingBackground(props.lifetimeLeft) },
 );
 
 const ariaLabel = computed(() =>
@@ -84,6 +87,10 @@ const ariaLabel = computed(() =>
   background: transparent;
   outline: 1.5px dashed var(--gora-line-strong);
   outline-offset: -2px;
+}
+
+.story-avatar__ring--viewed {
+  background: var(--gora-ring-spent);
 }
 
 .story-avatar__inner {

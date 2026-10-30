@@ -20,8 +20,15 @@ export interface StoryView {
   } | null;
   createdAt: Date;
   expiresAt: Date;
+  /** Whether this viewer has opened the story. */
+  viewedByViewer: boolean;
   /** Only present for the author. Nobody else ever receives the viewer list. */
   customViewers?: PostAuthor[];
+}
+
+export interface StoryViewerView {
+  user: PostAuthor;
+  viewedAt: Date;
 }
 
 export interface DeletedStoryView {

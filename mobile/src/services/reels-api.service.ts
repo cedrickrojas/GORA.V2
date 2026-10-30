@@ -1,5 +1,6 @@
 import type { PostVisibility } from '@/types/post';
 import type { ApiReel, ApiReelPage, CreateReelInput, UpdateReelInput } from '@/types/reel';
+import type { ApiPostCommentPage, ApiPostComment } from '@/types/post';
 import { apiRequest } from './api-client';
 import { uploadMedia, type MediaUploadOptions } from './media-upload.service';
 
@@ -76,4 +77,16 @@ export function setReelLike(token: string, reelId: string, liked: boolean): Prom
     method: liked ? 'PUT' : 'DELETE',
     token,
   });
+}
+
+export function listReelComments(token: string, reelId: string): Promise<ApiPostCommentPage> {
+  return apiRequest<ApiPostCommentPage>(`${reel(reelId)}/comments?limit=50`, { token });
+}
+
+export function addReelComment(token: string, reelId: string, content: string): Promise<{ comment: ApiPostComment; reel: ApiReel }> {
+  return apiRequest(`${reel(reelId)}/comments`, { method: 'POST', body: { content }, token });
+}
+
+export function recordReelShare(token: string, reelId: string): Promise<ApiReel> {
+  return apiRequest<ApiReel>(`${reel(reelId)}/shares`, { method: 'POST', token });
 }

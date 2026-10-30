@@ -47,7 +47,8 @@
     </template>
 
     <p v-if="post.body" class="post-card__body">{{ sharedGameCaption }}</p>
-    <router-link v-if="sharedGameId" :to="`/games/${encodeURIComponent(sharedGameId)}`" class="post-card__game-link">
+    <ServerGameFeedCard v-if="sharedApiGame" class="post-card__shared-game" :game="sharedApiGame" />
+    <router-link v-else-if="sharedGameId" :to="`/games/${encodeURIComponent(sharedGameId)}`" class="post-card__game-link">
       View Game on GORA
     </router-link>
 
@@ -209,8 +210,11 @@ import {
 import { RouterLink } from 'vue-router';
 import UserAvatar from '@/components/common/UserAvatar.vue';
 import { useFriendsStore } from '@/stores/friends';
+import { useGamesStore } from '@/stores/games';
 import { usePostsStore } from '@/stores/posts';
+import ServerGameFeedCard from '@/components/feed/ServerGameFeedCard.vue';
 import type { FeedPost, PostVisibility } from '@/types/post';
+import { isServerGameId } from '@/utils/game-form';
 import { locationMapPath } from '@/utils/location-map';
 import { showNotice } from '@/utils/notice';
 import { summarizeTags, visibleTags } from '@/utils/post-details';
@@ -235,6 +239,7 @@ const props = defineProps<{ post: FeedPost; nowMs: number }>();
 const emit = defineEmits<{ like: [post: FeedPost]; comment: [post: FeedPost]; share: [post: FeedPost] }>();
 
 const friendsStore = useFriendsStore();
+const gamesStore = useGamesStore();
 const postsStore = usePostsStore();
 const isEditingPost = ref(false);
 const isEditingPrivacy = ref(false);
@@ -250,7 +255,22 @@ const sharedGameTarget = computed(() => {
   return match ? { id: match[1], caption: lines.slice(0, -1).join('\n').trim() } : null;
 });
 const sharedGameId = computed(() => sharedGameTarget.value?.id ?? null);
-const sharedGameCaption = computed(() => sharedGameTarget.value?.caption || props.post.body);
+const sharedApiGame = computed(() => (sharedGameId.value ? gamesStore.gameById(sharedGameId.value) : null));
+const sharedGameCaption = computed(() => {
+  const caption = sharedGameTarget.value?.caption;
+  if (!caption) return props.post.body;
+  const generatedShare = caption.match(/^Check out this (.+?) game:[^\r\n]*(?:\r?\n[^\r\n]*)?$/i);
+  return generatedShare ? `Check out this ${generatedShare[1]} game!` : caption;
+});
+
+watch(
+  sharedGameId,
+  (gameId) => {
+    if (!gameId || !isServerGameId(gameId) || gamesStore.gameById(gameId) || gamesStore.detailStatus[gameId] === 'loading') return;
+    void gamesStore.fetchGame(gameId);
+  },
+  { immediate: true },
+);
 
 /** Only the indicator is shown; the list of custom viewers never appears on the card. */
 const privacy = computed(() => getPrivacyOption(props.post.visibility));
@@ -543,6 +563,10 @@ const hiddenMediaCount = computed(() => availableMedia.value.length - visibleMed
   font-size: 0.78rem;
   font-weight: 700;
   text-decoration: none;
+}
+
+.post-card__shared-game {
+  margin: 12px 14px 0;
 }
 
 .post-card__shared {

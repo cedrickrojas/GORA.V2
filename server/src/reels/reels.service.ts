@@ -189,6 +189,37 @@ export class ReelsService {
     return this.findVisible(viewerId, reelId);
   }
 
+  async listComments(viewerId: string, reelId: string, query: ListPostsQueryDto) {
+    await this.findVisible(viewerId, reelId);
+    const limit = query.limit ?? 30;
+    const comments = await this.prisma.reelComment.findMany({
+      where: { reelId },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      take: limit + 1,
+      ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
+      select: { id: true, content: true, createdAt: true, user: { select: AUTHOR_SELECT } },
+    });
+    return {
+      comments: comments.slice(0, limit).map(({ user, ...comment }) => ({ ...comment, author: user })),
+      nextCursor: comments.length > limit ? comments[limit - 1].id : null,
+    };
+  }
+
+  async addComment(viewerId: string, reelId: string, content: string) {
+    await this.findVisible(viewerId, reelId);
+    const { user, ...comment } = await this.prisma.reelComment.create({
+      data: { reelId, userId: viewerId, content },
+      select: { id: true, content: true, createdAt: true, user: { select: AUTHOR_SELECT } },
+    });
+    return { comment: { ...comment, author: user }, reel: await this.findVisible(viewerId, reelId) };
+  }
+
+  async share(viewerId: string, reelId: string): Promise<ReelView> {
+    await this.findVisible(viewerId, reelId);
+    await this.prisma.reelShare.create({ data: { reelId, userId: viewerId } });
+    return this.findVisible(viewerId, reelId);
+  }
+
   async findVisible(viewerId: string, reelId: string): Promise<ReelView> {
     const reel = await this.prisma.reel.findFirst({
       where: { AND: [{ id: reelId }, visibleReelsWhere(viewerId)] },

@@ -28,7 +28,7 @@ import {
   CompleteStoryUploadDto,
 } from './dto/story.dto';
 import { STORY_NOT_FOUND_MESSAGE, StoriesService } from './stories.service';
-import type { DeletedStoryView, StoryView } from './story.types';
+import type { DeletedStoryView, StoryView, StoryViewerView } from './story.types';
 
 const storyIdPipe = new ParseUUIDPipe({
   exceptionFactory: () => new NotFoundException(STORY_NOT_FOUND_MESSAGE),
@@ -90,6 +90,22 @@ export class StoriesController {
     @Param('storyId', storyIdPipe) storyId: string,
   ): Promise<StoryView> {
     return this.storiesService.findVisible(viewer.id, storyId);
+  }
+
+  @Post(':storyId/view')
+  markViewed(
+    @CurrentUser() viewer: CurrentUserContext,
+    @Param('storyId', storyIdPipe) storyId: string,
+  ): Promise<StoryView> {
+    return this.storiesService.markViewed(viewer.id, storyId);
+  }
+
+  @Get(':storyId/viewers')
+  viewers(
+    @CurrentUser() viewer: CurrentUserContext,
+    @Param('storyId', storyIdPipe) storyId: string,
+  ): Promise<StoryViewerView[]> {
+    return this.storiesService.listViewers(viewer.id, storyId);
   }
 
   @Patch(':storyId')

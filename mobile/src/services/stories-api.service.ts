@@ -1,5 +1,5 @@
 import type { PostVisibility } from '@/types/post';
-import type { ApiStory, CreateStoryInput } from '@/types/story';
+import type { ApiStory, ApiStoryViewer, CreateStoryInput } from '@/types/story';
 import { apiRequest } from './api-client';
 import { uploadMedia, type MediaUploadOptions } from './media-upload.service';
 
@@ -33,6 +33,14 @@ export function listActiveStories(token: string): Promise<ApiStory[]> {
 
 export function listMyStories(token: string): Promise<ApiStory[]> {
   return apiRequest<ApiStory[]>('/stories/mine', { token });
+}
+
+export function markStoryViewed(token: string, storyId: string): Promise<ApiStory> {
+  return apiRequest<ApiStory>(`${story(storyId)}/view`, { method: 'POST', token });
+}
+
+export function listStoryViewers(token: string, storyId: string): Promise<ApiStoryViewer[]> {
+  return apiRequest<ApiStoryViewer[]>(`${story(storyId)}/viewers`, { token });
 }
 
 export function createStory(token: string, input: CreateStoryInput): Promise<ApiStory> {

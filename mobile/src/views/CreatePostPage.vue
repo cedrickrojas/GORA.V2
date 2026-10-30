@@ -282,7 +282,7 @@ async function loadSharedGame(id: string): Promise<void> {
   if (sportOptions.value.includes(sharedGame.value.sport)) sport.value = sharedGame.value.sport;
   if (!caption.value.trim()) {
     const url = new URL(`/games/${encodeURIComponent(id)}`, window.location.origin).href;
-    caption.value = `Check out this ${sharedGame.value.sport} game: ${sharedGame.value.title}\n${sharedGame.value.locationName} · ${sharedGame.value.when}\n${url}`;
+    caption.value = `Check out this ${sharedGame.value.sport} game!\n${url}`;
   }
 }
 

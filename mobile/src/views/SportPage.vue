@@ -174,6 +174,7 @@ import { useFiltersStore } from '@/stores/filters';
 import { useGamesStore } from '@/stores/games';
 import { usePostsStore } from '@/stores/posts';
 import { useReelsStore } from '@/stores/reels';
+import { useSportsStore } from '@/stores/sports';
 import { discoverGames } from '@/services/games-api.service';
 import { createAuthorizedCall } from '@/stores/authorized';
 import type { DiscoveredGame } from '@/types/discovery';
@@ -202,6 +203,7 @@ const gamesStore = useGamesStore();
 const postsStore = usePostsStore();
 const reelsStore = useReelsStore();
 const filters = useFiltersStore();
+const sportsStore = useSportsStore();
 const auth = useAuthStore();
 const discovery = useDiscoveryStore();
 const authorized = createAuthorizedCall(auth);
@@ -267,8 +269,27 @@ async function refreshSportMap(): Promise<void> {
   mapLoading.value = true;
   mapError.value = null;
   try {
+    const result = await sportsStore.fetchSports();
+    if (request !== mapRequest) return;
+    if (!result.ok) {
+      mapGames.value = [];
+      mapError.value = result.message;
+      return;
+    }
+
+    // The search catalog uses demo ids such as "sport-badminton". The games API
+    // requires the UUID from GET /sports, so resolve the selected name first.
+    const apiSport = sportsStore.activeSports.find(
+      (candidate) => candidate.name.trim().toLowerCase() === selected.name.trim().toLowerCase(),
+    );
+    if (!apiSport) {
+      mapGames.value = [];
+      mapError.value = `GORA games for ${selected.name} are not available yet.`;
+      return;
+    }
+
     const query = buildDiscoveryQuery({
-      sportId: selected.id,
+      sportId: apiSport.id,
       dateFilter: date.value,
       customDate: null,
       distanceKm: filters.maxDistanceKm,

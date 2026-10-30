@@ -67,6 +67,11 @@ export function getGroupLifetimeLeft(group: StoryGroup, nowMs: number): number {
   return newest ? getStoryLifetimeLeft(newest, nowMs) : 0;
 }
 
+/** A user's story ring stays orange until every active story in that group is viewed. */
+export function isStoryGroupViewed(group: StoryGroup): boolean {
+  return group.stories.length > 0 && group.stories.every((story) => story.viewedByViewer === true);
+}
+
 /** The lit arc shrinks as the story ages, so the ring doubles as a countdown. */
 export function getStoryRingBackground(lifetimeLeft: number): string {
   const degrees = Math.round(Math.min(1, Math.max(0, lifetimeLeft)) * 360);

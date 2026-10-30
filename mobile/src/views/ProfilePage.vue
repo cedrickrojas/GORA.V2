@@ -141,7 +141,8 @@
 
         <section class="profile-section profile-section--last">
           <SectionHeader title="My Feed">
-            <span class="profile-section__meta">{{ myFeed.length }} {{ myFeed.length === 1 ? 'post' : 'posts' }}</span>
+            <span class="profile-section__meta">{{ myFeed.length }} {{ myFeed.length === 1 ? 'update' : 'updates' }}</span>
+            <router-link to="/profile/games" class="profile-section__meta">Manage games</router-link>
           </SectionHeader>
           <router-link to="/create/post" class="profile-composer">
             <UserAvatar v-if="profileStore.account" :user="profileStore.account" :size="38" />
@@ -149,13 +150,13 @@
             <ion-icon :icon="imageOutline" class="profile-composer__icon" aria-label="Add photos" />
           </router-link>
           <p v-if="myFeed.length === 0" class="profile-section__empty">
-            No posts yet. <router-link to="/create/post">Create your first post</router-link>
+            No posts or games yet. <router-link to="/create/post">Create your first post</router-link>
           </p>
           <div class="profile-feed">
-            <PostCard
-              v-for="post in myFeed"
-              :key="post.id"
-              :post="post"
+            <FeedEntry
+              v-for="item in myFeed"
+              :key="item.id"
+              :item="item"
               :now-ms="now"
               @like="likePost"
               @comment="commentOnPost"
@@ -196,7 +197,7 @@ import { chevronDown, createOutline, ellipsisHorizontal, imageOutline } from 'io
 import ClubAvatar from '@/components/clubs/ClubAvatar.vue';
 import SectionHeader from '@/components/common/SectionHeader.vue';
 import UserAvatar from '@/components/common/UserAvatar.vue';
-import PostCard from '@/components/feed/PostCard.vue';
+import FeedEntry from '@/components/feed/FeedEntry.vue';
 import AppHeader from '@/components/layout/AppHeader.vue';
 import HighlightGrid from '@/components/profile/HighlightGrid.vue';
 import MySportsSection from '@/components/profile/MySportsSection.vue';
@@ -205,12 +206,14 @@ import SportEditorModal from '@/components/profile/SportEditorModal.vue';
 import { useNow } from '@/composables/useNow';
 import { usePostActions } from '@/composables/usePostActions';
 import { useClubsStore } from '@/stores/clubs';
+import { useGamesStore } from '@/stores/games';
 import { usePostsStore } from '@/stores/posts';
 import { type ActionResult, useProfileStore } from '@/stores/profile';
 import { useReelsStore } from '@/stores/reels';
 import { useSessionStore } from '@/stores/session';
 import { useSportsStore } from '@/stores/sports';
 import type { AddSportInput, UserSportEntry } from '@/types/profile';
+import type { HomeFeedItem } from '@/types/feed';
 import { CLUB_ROLE_LABELS, groupMyClubs } from '@/utils/clubs';
 import { toHighlight } from '@/utils/media-api';
 import { showNotice } from '@/utils/notice';
@@ -222,6 +225,7 @@ const profileStore = useProfileStore();
 const sportsStore = useSportsStore();
 const postsStore = usePostsStore();
 const clubsStore = useClubsStore();
+const gamesStore = useGamesStore();
 const reelsStore = useReelsStore();
 const session = useSessionStore();
 const { likePost, commentOnPost, sharePost } = usePostActions();
@@ -266,8 +270,21 @@ const highlights = computed(() =>
     ? reelsStore.myReels.slice(0, 3).map(toHighlight)
     : (profileStore.profile?.highlights.slice(0, 3) ?? []),
 );
-/** Only posts you wrote; other people's posts never show on your profile. */
-const myFeed = computed(() => postsStore.myPosts);
+/** Own posts and every game you hosted, shown together in newest-first order. */
+const myFeed = computed<HomeFeedItem[]>(() => [
+  ...postsStore.myPosts.map((post) => ({
+    type: 'POST' as const,
+    id: `post:${post.id}`,
+    at: Date.parse(post.createdAt),
+    post,
+  })),
+  ...gamesStore.hostedGames.map((game) => ({
+    type: 'SERVER_GAME' as const,
+    id: `game:${game.id}`,
+    at: Date.parse(game.createdAt),
+    game,
+  })),
+].sort((a, b) => b.at - a.at));
 
 async function loadProfile(): Promise<void> {
   await profileStore.fetchMyProfile();
@@ -321,6 +338,7 @@ async function confirmRemoveSport(sport: UserSportEntry): Promise<void> {
 
 onIonViewWillEnter(() => {
   void clubsStore.load();
+  void gamesStore.fetchMyGames();
 
   if (reelsStore.isLoaded) {
     void reelsStore.refresh();

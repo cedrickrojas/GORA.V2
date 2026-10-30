@@ -42,15 +42,17 @@
         </div>
 
         <div v-else :key="activeTab" class="reels" :aria-label="`${activeTabLabel} reels`">
+          <ReelCommentsModal :is-open="commentsOpen" :reel-id="commentReelId" @close="commentsOpen = false" />
           <ReelSlide
             v-for="reel in visibleReels"
             :key="reel.id"
             :reel="reel"
+            :data-reel-id="reel.id"
             :is-following="followsStore.isFollowing(reel.author.id)"
             :can-follow="canFollow(session.me?.id ?? null, reel.author.id)"
             @like="likeReel($event.id)"
-            @comment="showLaterPhaseNotice('Comments')"
-            @share="showLaterPhaseNotice('Sharing')"
+            @comment="openComments($event.id)"
+            @share="shareReel($event)"
             @follow="followsStore.toggleFollow($event.author.id)"
           />
         </div>
@@ -60,16 +62,18 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue';
-import { useRouter } from 'vue-router';
+import { computed, nextTick, onMounted, ref, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import { IonContent, IonIcon, IonPage, onIonViewWillEnter } from '@ionic/vue';
 import { peopleOutline, radioOutline } from 'ionicons/icons';
 import ReelSlide from '@/components/reels/ReelSlide.vue';
+import ReelCommentsModal from '@/components/reels/ReelCommentsModal.vue';
 import { useFollowsStore } from '@/stores/follows';
 import { useReelsStore } from '@/stores/reels';
 import { useSessionStore } from '@/stores/session';
 import { canFollow } from '@/utils/follows';
-import { showLaterPhaseNotice, showNotice } from '@/utils/notice';
+import { showNotice } from '@/utils/notice';
+import type { Reel } from '@/types/reel';
 import {
   DEFAULT_REELS_TAB,
   REELS_TABS,
@@ -80,10 +84,13 @@ import {
 
 const reelsStore = useReelsStore();
 const router = useRouter();
+const route = useRoute();
 const followsStore = useFollowsStore();
 const session = useSessionStore();
 
 const activeTab = ref<ReelsTab>(DEFAULT_REELS_TAB);
+const commentsOpen = ref(false);
+const commentReelId = ref<string | null>(null);
 const activeTabLabel = computed(() => REELS_TABS.find((tab) => tab.id === activeTab.value)?.label ?? '');
 
 /**
@@ -108,6 +115,17 @@ watch(activeTab, (tab) => {
   }
 });
 
+watch(
+  () => [route.query.reel, visibleReels.value] as const,
+  async ([reelId]) => {
+    if (typeof reelId !== 'string') return;
+    if (activeTab.value !== 'FOR_YOU') activeTab.value = 'FOR_YOU';
+    await nextTick();
+    document.querySelector<HTMLElement>(`[data-reel-id="${CSS.escape(reelId)}"]`)?.scrollIntoView({ behavior: 'smooth' });
+  },
+  { flush: 'post' },
+);
+
 onMounted(async () => {
   void reelsStore.load();
   await followsStore.load();
@@ -119,6 +137,37 @@ onIonViewWillEnter(() => {
 async function likeReel(id: string): Promise<void> {
   const error = await reelsStore.toggleLike(id);
   if (error) void showNotice(error);
+}
+
+function openComments(reelId: string): void {
+  commentReelId.value = reelId;
+  commentsOpen.value = true;
+}
+
+async function shareReel(reel: Reel): Promise<void> {
+  const url = new URL('/reels', window.location.origin);
+  url.searchParams.set('reel', reel.id);
+  const title = `${reel.author.displayName}'s GORA reel`;
+  const text = reel.caption || `Watch ${reel.author.displayName}'s ${reel.sport} reel on GORA.`;
+  try {
+    if (navigator.share) {
+      await navigator.share({ title, text, url: url.toString() });
+    } else if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(url.toString());
+      await showNotice('Reel link copied.');
+    } else {
+      throw new Error('Sharing is not available on this device.');
+    }
+    if (reel.fromServer) {
+      const error = await reelsStore.shareReel(reel.id);
+      if (error) void showNotice(error);
+    } else {
+      reel.shares += 1;
+    }
+  } catch (caught) {
+    if (caught instanceof DOMException && caught.name === 'AbortError') return;
+    void showNotice(caught instanceof Error ? caught.message : 'Could not share this reel.');
+  }
 }
 </script>
 

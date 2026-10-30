@@ -11,7 +11,7 @@
       >
         <UserAvatar v-if="currentUser" :user="currentUser" :size="34" />
       </button>
-      <router-link to="/home" class="desktop-nav__wordmark" :title="GORA_TAGLINE">{{ GORA_NAME }}</router-link>
+      <router-link to="/home" class="desktop-nav__wordmark" :title="GORA_TAGLINE" @click="refreshIfSelected('/home')">{{ GORA_NAME }}</router-link>
       <router-link to="/search" class="desktop-nav__search">
         <ion-icon :icon="searchOutline" aria-hidden="true" />
         <span>Search GORA</span>
@@ -38,6 +38,7 @@
           :aria-label="tab.label"
           :aria-current="isTabActive(tab, route.path) ? 'page' : undefined"
           :title="tab.label"
+          @click="refreshIfSelected(tab.to)"
         >
           <ion-icon :icon="tab.icon" aria-hidden="true" />
           <span v-if="tab.to === '/chat' && chatStore.badgeCount > 0" class="desktop-nav__badge" aria-hidden="true">
@@ -112,6 +113,7 @@ import { useNotificationsStore } from '@/stores/notifications';
 import { useProfileStore } from '@/stores/profile';
 import { useSessionStore } from '@/stores/session';
 import { MAIN_TAB_LINKS, isTabActive } from '@/utils/navigation';
+import { requestTabRefresh } from '@/utils/tab-refresh';
 
 const route = useRoute();
 const sessionStore = useSessionStore();
@@ -126,6 +128,12 @@ const { unreadCount } = storeToRefs(notificationsStore);
 
 const profileMenuEvent = ref<Event | null>(null);
 const filterEvent = ref<Event | null>(null);
+
+function refreshIfSelected(path: string): void {
+  if (route.path === path && (path === '/home' || path === '/discover')) {
+    requestTabRefresh(path === '/home' ? 'home' : 'discover');
+  }
+}
 
 onMounted(() => {
   void sessionStore.load();
