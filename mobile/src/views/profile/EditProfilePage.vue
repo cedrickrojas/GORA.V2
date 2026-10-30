@@ -17,37 +17,13 @@
           <div class="edit-profile__photo-body">
             <h2 id="edit-photo-title">Profile photo</h2>
             <div class="edit-profile__photo-actions">
-              <ion-button size="small" fill="outline" :disabled="profileStore.saving" @click="pickPhoto">
+              <ion-button size="small" fill="outline" :disabled="profileStore.saving" @click="photoOpen = true">
                 <ion-icon slot="start" :icon="cameraOutline" aria-hidden="true" />
-                Upload photo
-              </ion-button>
-              <ion-button
-                v-if="form.profileImageUrl"
-                size="small"
-                fill="clear"
-                color="medium"
-                :disabled="profileStore.saving"
-                @click="form.profileImageUrl = ''"
-              >
-                Remove
+                {{ form.profileImageUrl ? 'Edit photo' : 'Upload photo' }}
               </ion-button>
             </div>
-            <input ref="fileInput" type="file" accept="image/*" class="edit-profile__file" @change="onFilePicked" />
           </div>
         </section>
-
-        <ion-input
-          v-model="form.profileImageUrl"
-          label="Photo link"
-          label-placement="stacked"
-          fill="outline"
-          type="url"
-          inputmode="url"
-          placeholder="https://..."
-          helper-text="Paste a link to an image. Uploading from your device is coming soon."
-          :error-text="visibleErrors.profileImageUrl"
-          :class="fieldClass('profileImageUrl')"
-        />
 
         <div class="edit-profile__row">
           <ion-input
@@ -131,6 +107,12 @@
           </ion-button>
         </div>
       </form>
+      <ProfilePhotoModal
+        :is-open="photoOpen"
+        :current-url="original?.profileImageUrl ?? null"
+        @close="photoOpen = false"
+        @saved="photoSaved"
+      />
     </ion-content>
   </ion-page>
 </template>
@@ -151,8 +133,8 @@ import {
 import { cameraOutline } from 'ionicons/icons';
 import UserAvatar from '@/components/common/UserAvatar.vue';
 import SubPageHeader from '@/components/layout/SubPageHeader.vue';
-import { uploadImage } from '@/services/upload.service';
 import { useProfileStore } from '@/stores/profile';
+import ProfilePhotoModal from '@/components/profile/ProfilePhotoModal.vue';
 import type { OwnProfile } from '@/types/profile';
 import { toUserSummary } from '@/utils/display-name';
 import { showNotice } from '@/utils/notice';
@@ -162,7 +144,6 @@ import {
   PROFILE_NAME_MAX_LENGTH,
   type ProfileForm,
   type ProfileFormErrors,
-  isImageUrl,
   profileFormFrom,
   profileUpdateFrom,
   validateProfileForm,
@@ -183,7 +164,7 @@ const form = reactive<ProfileForm>({
 });
 const submitted = ref(false);
 const saveError = ref<string | null>(null);
-const fileInput = ref<HTMLInputElement | null>(null);
+const photoOpen = ref(false);
 const today = new Date().toISOString().slice(0, 10);
 
 const errors = computed<ProfileFormErrors>(() => validateProfileForm(form));
@@ -197,7 +178,7 @@ const preview = computed(() =>
     username: original.value?.username ?? '',
     firstName: form.firstName,
     lastName: form.lastName,
-    profileImageUrl: isImageUrl(form.profileImageUrl) ? form.profileImageUrl.trim() : null,
+    profileImageUrl: form.profileImageUrl.trim() || null,
   }),
 );
 
@@ -218,24 +199,9 @@ async function load(): Promise<void> {
   }
 }
 
-function pickPhoto(): void {
-  fileInput.value?.click();
-}
-
-async function onFilePicked(event: Event): Promise<void> {
-  const input = event.target as HTMLInputElement;
-  const file = input.files?.[0];
-  input.value = '';
-
-  if (!file) {
-    return;
-  }
-
-  try {
-    form.profileImageUrl = await uploadImage(file);
-  } catch (caught) {
-    void showNotice(caught instanceof Error ? caught.message : 'That photo could not be uploaded.');
-  }
+function photoSaved(url: string | null): void {
+  form.profileImageUrl = url ?? '';
+  if (original.value) original.value = { ...original.value, profileImageUrl: url };
 }
 
 async function save(): Promise<void> {

@@ -1,6 +1,12 @@
 <template>
   <article class="server-game-card" :class="{ 'server-game-card--successful': game.status === 'COMPLETED', 'server-game-card--cancelled': game.status === 'CANCELLED' }">
-    <div class="server-game-card__banner" :style="{ background: visual.gradient }">
+    <div
+      class="server-game-card__banner"
+      :style="{
+        backgroundColor: visual.gradient,
+        backgroundImage: `linear-gradient(0deg, rgba(0,0,0,.72), rgba(0,0,0,.08)), url('${getSportImage(game.sport.name)}')`,
+      }"
+    >
       <span class="server-game-card__sport"><ion-icon :icon="visual.icon" aria-hidden="true" />{{ game.sport.name }}</span>
       <GameStatusBadge v-if="game.status !== 'OPEN'" :status="game.status" />
     </div>
@@ -54,7 +60,7 @@ import { useJoinRequestsStore } from '@/stores/join-requests';
 import { formatGameDay, formatGameTimeRange } from '@/utils/game-form';
 import { joinRequestAction } from '@/utils/join-requests';
 import { locationMapPath } from '@/utils/location-map';
-import { getSportVisual } from '@/utils/sports';
+import { getSportImage, getSportVisual } from '@/utils/sports';
 import { showNotice } from '@/utils/notice';
 
 const props = defineProps<{ game: ApiGame }>();
@@ -95,7 +101,7 @@ async function sendRequest(message: string | null): Promise<void> {
 .server-game-card{overflow:hidden;border:1px solid var(--gora-line);border-radius:var(--gora-radius-card);background:var(--gora-surface);box-shadow:var(--gora-shadow)}
 .server-game-card--successful{border:2px solid #d8ad43;box-shadow:0 0 0 2px rgb(216 173 67 / 16%),0 8px 24px rgb(216 173 67 / 16%)}
 .server-game-card--cancelled{filter:grayscale(.75);opacity:.72}
-.server-game-card__banner{display:flex;min-height:120px;align-items:flex-end;justify-content:space-between;gap:8px;padding:10px 12px;background-image:linear-gradient(0deg,rgba(0,0,0,.68),rgba(0,0,0,.12))}
+.server-game-card__banner{display:flex;min-height:136px;align-items:flex-end;justify-content:space-between;gap:8px;padding:10px 12px;background-position:center;background-size:cover}
 .server-game-card__sport{display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:var(--gora-radius-control);background:rgba(0,0,0,.55);font-size:.72rem;font-weight:700;text-transform:capitalize}
 .server-game-card__sport ion-icon{font-size:16px}
 .server-game-card__body{padding:16px}

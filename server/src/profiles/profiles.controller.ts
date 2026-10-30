@@ -26,6 +26,8 @@ import { UploadCoverDto } from './dto/upload-cover.dto';
 import { ReportProfileDto } from './dto/report-profile.dto';
 import { HelpRequestDto } from './dto/help-request.dto';
 import { UpdateUserSettingsDto } from './dto/update-user-settings.dto';
+import { UploadProfilePhotoDto } from './dto/upload-profile-photo.dto';
+import { ProfilePhotoService } from './profile-photo.service';
 
 /**
  * Every write targets the signed-in user ("me"), so nobody can edit another profile:
@@ -39,6 +41,7 @@ export class ProfilesController {
     private readonly profiles: ProfilesService,
     private readonly userSports: UserSportsService,
     private readonly covers: ProfileCoverService,
+    private readonly photos: ProfilePhotoService,
   ) {}
 
   @Post('help')
@@ -70,6 +73,18 @@ export class ProfilesController {
   @Delete('me/cover')
   async removeCover(@CurrentUser() viewer: CurrentUserContext): Promise<OwnProfileView> {
     await this.covers.remove(viewer.id);
+    return this.profiles.getOwn(viewer.id);
+  }
+
+  @Put('me/photo')
+  async uploadProfilePhoto(@CurrentUser() viewer: CurrentUserContext, @Body() dto: UploadProfilePhotoDto): Promise<OwnProfileView> {
+    await this.photos.save(viewer.id, dto.photo);
+    return this.profiles.getOwn(viewer.id);
+  }
+
+  @Delete('me/photo')
+  async removeProfilePhoto(@CurrentUser() viewer: CurrentUserContext): Promise<OwnProfileView> {
+    await this.photos.remove(viewer.id);
     return this.profiles.getOwn(viewer.id);
   }
 

@@ -4,9 +4,22 @@ import { apiRequest } from './api-client';
 import { getApiBaseUrl } from './api-config';
 
 function withCoverUrl<T extends OwnProfile | OtherProfile>(profile: T): T {
-  return profile.coverImageUrl?.startsWith('/')
-    ? { ...profile, coverImageUrl: new URL(profile.coverImageUrl, getApiBaseUrl() || window.location.origin).href }
-    : profile;
+  const base = getApiBaseUrl();
+  const absolute = (url: string | null): string | null =>
+    url?.startsWith('/') ? new URL(url, base || window.location.origin).href : url;
+  return {
+    ...profile,
+    profileImageUrl: absolute(profile.profileImageUrl),
+    coverImageUrl: absolute(profile.coverImageUrl),
+  };
+}
+
+export async function uploadMyProfilePhoto(token: string, photo: string): Promise<OwnProfile> {
+  return withCoverUrl(await apiRequest<OwnProfile>('/profiles/me/photo', { method: 'PUT', body: { photo }, token }));
+}
+
+export async function removeMyProfilePhoto(token: string): Promise<OwnProfile> {
+  return withCoverUrl(await apiRequest<OwnProfile>('/profiles/me/photo', { method: 'DELETE', token }));
 }
 
 export async function uploadMyCover(token: string, photo: string): Promise<OwnProfile> {

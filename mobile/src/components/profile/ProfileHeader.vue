@@ -19,6 +19,9 @@
         <span class="profile-header__inner">
           <UserAvatar :user="summary" :size="112" />
         </span>
+        <button v-if="editable" type="button" class="profile-header__photo-edit" aria-label="Update profile photo" @click="photoOpen = true">
+          <ion-icon :icon="cameraOutline" aria-hidden="true" />
+        </button>
       </div>
       <div class="profile-header__name-row">
         <h1 class="profile-header__name">{{ profile.displayName }}</h1>
@@ -45,6 +48,7 @@
       :current-url="profile.coverImageUrl"
       @close="coverOpen = false"
     />
+    <ProfilePhotoModal :is-open="photoOpen" :current-url="profile.profileImageUrl" @close="photoOpen = false" />
   </section>
 </template>
 
@@ -57,6 +61,7 @@ import GoraPointsBadge from '@/components/common/GoraPointsBadge.vue';
 import type { ProfileIdentity } from '@/types/profile';
 import { toUserSummary } from '@/utils/display-name';
 import CoverPhotoModal from './CoverPhotoModal.vue';
+import ProfilePhotoModal from './ProfilePhotoModal.vue';
 
 const props = withDefaults(
   defineProps<{
@@ -70,6 +75,7 @@ const props = withDefaults(
 
 const summary = computed(() => toUserSummary(props.profile));
 const coverOpen = ref(false);
+const photoOpen = ref(false);
 </script>
 
 <style scoped>
@@ -135,6 +141,7 @@ const coverOpen = ref(false);
 }
 
 .profile-header__ring {
+  position: relative;
   display: flex;
   padding: 3px;
   border-radius: 50%;
@@ -151,6 +158,24 @@ const coverOpen = ref(false);
   border-radius: 50%;
   background: var(--ion-background-color);
 }
+
+.profile-header__photo-edit {
+  position: absolute;
+  right: 5px;
+  bottom: 5px;
+  z-index: 2;
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border: 2px solid var(--ion-background-color);
+  border-radius: 50%;
+  background: var(--gora-surface-raised);
+  color: var(--ion-text-color);
+  cursor: pointer;
+}
+
+.profile-header__photo-edit ion-icon { font-size: 18px; }
 
 .profile-header__name-row {
   display: flex;

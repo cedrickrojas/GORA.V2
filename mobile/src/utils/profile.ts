@@ -103,7 +103,7 @@ export function validateProfileForm(form: ProfileForm, now = new Date()): Profil
     errors.dateOfBirth = 'Enter a real date in the past.';
   }
 
-  if (form.profileImageUrl.trim() && !isImageUrl(form.profileImageUrl)) {
+  if (form.profileImageUrl.trim() && !isImageUrl(form.profileImageUrl) && !/^(?:https?:\/\/[^/]+)?\/api\/v1\/profiles\/[a-f0-9-]{36}\/photo\/[a-f0-9-]{36}$/i.test(form.profileImageUrl)) {
     errors.profileImageUrl = 'Use a link that starts with https:// (or http://).';
   }
 

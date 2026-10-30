@@ -244,6 +244,9 @@ export class ProfilesService {
     if (dto.city !== undefined) data.city = dto.city;
     if (dto.profileImageUrl !== undefined) {
       data.profileImageUrl = dto.profileImageUrl;
+      data.profilePhotoRevision = null;
+      data.profilePhotoData = null;
+      data.profilePhotoType = null;
     }
     if (dto.coverImageUrl !== undefined) {
       data.coverImageUrl = dto.coverImageUrl;

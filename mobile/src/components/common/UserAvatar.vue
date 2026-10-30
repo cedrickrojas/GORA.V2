@@ -1,11 +1,11 @@
 <template>
   <span class="avatar" :style="avatarStyle">
     <img
-      v-if="user.avatarUrl && failedUrl !== user.avatarUrl"
-      :src="user.avatarUrl"
+      v-if="imageUrl && failedUrl !== imageUrl"
+      :src="imageUrl"
       :alt="user.displayName"
       class="avatar__image"
-      @error="failedUrl = user.avatarUrl"
+      @error="failedUrl = imageUrl"
     />
     <span v-else class="avatar__initials" aria-hidden="true">{{
       initials
@@ -17,6 +17,7 @@
 import { computed, ref } from 'vue';
 import type { UserSummary } from '@/types/user';
 import { getAvatarTint, getInitials } from '@/utils/avatar';
+import { getApiBaseUrl } from '@/services/api-config';
 
 const props = withDefaults(
   defineProps<{ user: UserSummary; size?: number }>(),
@@ -27,6 +28,9 @@ const props = withDefaults(
 
 /** A photo link that failed to load falls back to initials instead of a broken image. */
 const failedUrl = ref<string | null>(null);
+const imageUrl = computed(() => props.user.avatarUrl?.startsWith('/')
+  ? new URL(props.user.avatarUrl, getApiBaseUrl() || window.location.origin).href
+  : props.user.avatarUrl);
 const initials = computed(() => getInitials(props.user.displayName));
 
 const avatarStyle = computed(() => ({

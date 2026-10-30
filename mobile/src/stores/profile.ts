@@ -7,6 +7,8 @@ import {
   updateMyProfile,
   uploadMyCover,
   removeMyCover,
+  uploadMyProfilePhoto,
+  removeMyProfilePhoto,
 } from '@/services/profile-api.service';
 import { preparePostPhoto } from '@/utils/post-photos';
 import { ApiError } from '@/services/api-client';
@@ -145,6 +147,23 @@ export const useProfileStore = defineStore('profile', () => {
     }
   }
 
+  async function updateProfilePhoto(photo: string | null): Promise<ActionResult> {
+    if (saving.value) return { ok: false, message: 'Please wait for the current change to finish.' };
+    const isCurrent = captureSession(auth);
+    saving.value = true;
+    try {
+      const saved = await authorized((token) => photo ? uploadMyProfilePhoto(token, photo) : removeMyProfilePhoto(token));
+      if (!isCurrent()) return { ok: false, message: 'The account changed. Try again.' };
+      currentProfile.value = saved;
+      if (auth.currentUser?.id === saved.id) auth.currentUser = { ...auth.currentUser, profileImageUrl: saved.profileImageUrl };
+      return { ok: true };
+    } catch (caught) {
+      return { ok: false, message: caught instanceof Error && !(caught instanceof ApiError) ? caught.message : describeApiError(caught) };
+    } finally {
+      if (isCurrent()) saving.value = false;
+    }
+  }
+
   function setOwnSports(sports: UserSportEntry[]): void {
     if (currentProfile.value && currentProfile.value.sports !== sports) {
       currentProfile.value = { ...currentProfile.value, sports };
@@ -184,6 +203,7 @@ export const useProfileStore = defineStore('profile', () => {
     fetchProfile,
     updateProfile,
     updateCover,
+    updateProfilePhoto,
     setOwnSports,
     profile,
     activityStats,

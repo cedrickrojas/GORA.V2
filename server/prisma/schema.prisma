@@ -26,6 +26,9 @@ model User {
   dateOfBirth             DateTime?                 @db.Date
   isActive                Boolean                   @default(true)
   profileImageUrl         String?
+  profilePhotoData        Bytes?
+  profilePhotoType        String?
+  profilePhotoRevision    String?                   @db.Uuid
   role                    UserRole                  @default(USER)
   coverImageUrl           String?
   coverPhotoData          Bytes?
