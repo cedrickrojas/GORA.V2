@@ -483,6 +483,15 @@ ion-header.game-details-header ion-toolbar {
     --padding-end: max(24px, calc((100% - var(--gora-column, 680px)) / 2));
   }
 
+  .game__cta {
+    box-sizing: border-box;
+    width: 100%;
+    max-width: var(--gora-column, 680px);
+    margin-inline: auto;
+    padding: 8px 16px 12px;
+    background: transparent;
+  }
+
   .game {
     display: grid;
     max-width: var(--gora-column, 680px);
