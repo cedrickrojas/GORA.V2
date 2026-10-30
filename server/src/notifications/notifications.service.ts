@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '../generated/prisma/client';
+import type { NotificationType } from '../generated/prisma/enums';
 import { friendshipWithViewer } from '../posts/post-visibility';
 import { PrismaService } from '../prisma/prisma.service';
 import { formatDisplayName } from '../users/display-name';
@@ -56,9 +57,23 @@ const CONTENT = {
 export class NotificationsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  private visibleTo(userId: string): Prisma.NotificationWhereInput {
+  private async visibleTo(userId: string): Promise<Prisma.NotificationWhereInput> {
+    const settings = await this.prisma.userSettings.findUnique({
+      where: { userId },
+      select: { notifyFriends: true, notifyGames: true, notifyMessages: true, notifyContent: true },
+    });
+    const enabledTypes: NotificationType[] = [];
+    if (!settings || settings.notifyFriends) enabledTypes.push('FRIEND_REQUEST', 'FRIEND_ACCEPTED', 'NEW_FOLLOWER');
+    if (!settings || settings.notifyGames) enabledTypes.push(
+      'GAME_JOIN_REQUEST', 'GAME_JOIN_ACCEPTED', 'GAME_JOIN_REJECTED', 'GAME_FULL', 'GAME_CANCELLED', 'GAME_COMPLETED',
+    );
+    if (!settings || settings.notifyMessages) enabledTypes.push('NEW_MESSAGE', 'MESSAGE_REQUEST');
+    if (!settings || settings.notifyContent) enabledTypes.push(
+      'POST_LIKE', 'POST_COMMENT', 'REEL_LIKE', 'REEL_COMMENT', 'STORY_REPLY', 'BADGE_UNLOCKED', 'LIVE_STARTED',
+    );
     return {
       userId,
+      type: { in: enabledTypes },
       OR: [
         { actorId: null },
         {
@@ -74,7 +89,7 @@ export class NotificationsService {
   }
 
   async list(userId: string, { limit, offset }: ListNotificationsDto) {
-    const where = this.visibleTo(userId);
+    const where = await this.visibleTo(userId);
     const [rows, unreadCount, total] = await this.prisma.$transaction([
       this.prisma.notification.findMany({
         where,
@@ -98,14 +113,15 @@ export class NotificationsService {
 
   async markRead(userId: string, id: string) {
     return this.prisma.$transaction(async (tx) => {
+      const visibleTo = await this.visibleTo(userId);
       const updated = await tx.notification.updateMany({
-        where: { id, AND: [this.visibleTo(userId)] },
+        where: { id, AND: [visibleTo] },
         data: { isRead: true },
       });
       if (!updated.count)
         throw new NotFoundException('Notification not found.');
       const unreadCount = await tx.notification.count({
-        where: { AND: [this.visibleTo(userId), { isRead: false }] },
+        where: { AND: [visibleTo, { isRead: false }] },
       });
       return { id, read: true, unreadCount };
     });
@@ -113,12 +129,13 @@ export class NotificationsService {
 
   async markAllRead(userId: string) {
     return this.prisma.$transaction(async (tx) => {
+      const visibleTo = await this.visibleTo(userId);
       const updated = await tx.notification.updateMany({
-        where: { AND: [this.visibleTo(userId), { isRead: false }] },
+        where: { AND: [visibleTo, { isRead: false }] },
         data: { isRead: true },
       });
       const unreadCount = await tx.notification.count({
-        where: { AND: [this.visibleTo(userId), { isRead: false }] },
+        where: { AND: [visibleTo, { isRead: false }] },
       });
       return { updated: updated.count, unreadCount };
     });

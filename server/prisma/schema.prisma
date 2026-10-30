@@ -58,6 +58,7 @@ model User {
   postLikes               PostLike[]
   postShares              PostShare[]
   postTags                PostTag[]
+  postPreferences          PostPreference[]
   reels                   Reel[]
   reelComments            ReelComment[]
   customViewerReels       ReelCustomViewer[]
@@ -75,6 +76,7 @@ model User {
   following               UserFollow[]              @relation("UserFollowFollower")
   followers               UserFollow[]              @relation("UserFollowFollowing")
   sports                  UserSport[]
+  settings                UserSettings?
 
   @@index([isActive])
 }
@@ -108,6 +110,19 @@ model UserSport {
 
   @@unique([userId, sportId])
   @@index([sportId])
+}
+
+model UserSettings {
+  userId               String           @id @db.Uuid
+  notifyFriends        Boolean           @default(true)
+  notifyGames          Boolean           @default(true)
+  notifyMessages       Boolean           @default(true)
+  notifyContent        Boolean           @default(true)
+  profileVisibility    ProfileVisibility @default(PUBLIC)
+  defaultDistanceKm    Int?
+  useDeviceLocation    Boolean           @default(true)
+  updatedAt            DateTime          @updatedAt
+  user                 User              @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Game {
@@ -367,6 +382,7 @@ model Post {
   longitude      Float?
   editedAt       DateTime?
   deletedAt      DateTime?
+  archivedAt     DateTime?
   notifications  Notification[]
   club           Club?              @relation(fields: [clubId], references: [id])
   sport          Sport?             @relation(fields: [sportId], references: [id])
@@ -378,13 +394,31 @@ model Post {
   shares         PostShare[]
   tags           PostTag[]
   reports        Report[]
+  preferences     PostPreference[]
 
   @@index([userId, createdAt])
+  @@index([userId, archivedAt])
   @@index([createdAt])
   @@index([clubId, createdAt])
   @@index([sportId, createdAt])
   @@index([visibility])
   @@index([latitude, longitude])
+}
+
+model PostPreference {
+  id         String       @id @default(uuid()) @db.Uuid
+  userId     String       @db.Uuid
+  postId     String       @db.Uuid
+  feedback   PostFeedback?
+  savedAt    DateTime?
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+  user       User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post       Post         @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, postId])
+  @@index([userId, savedAt])
+  @@index([postId, feedback])
 }
 
 model PostTag {
@@ -989,6 +1023,11 @@ enum NotificationType {
   NEW_FOLLOWER
 }
 
+enum ProfileVisibility {
+  PUBLIC
+  FRIENDS
+}
+
 enum BadgeCategory {
   GAMES
   COMPLETION
@@ -1082,6 +1121,12 @@ enum ReportReason {
   SCAM
   IMPERSONATION
   OTHER
+  HELP_REQUEST
+}
+
+enum PostFeedback {
+  INTERESTED
+  NOT_INTERESTED
 }
 
 enum ReportStatus {

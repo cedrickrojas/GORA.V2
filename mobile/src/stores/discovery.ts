@@ -18,6 +18,7 @@ import { createAuthorizedCall } from './authorized';
 import { useFiltersStore } from './filters';
 import type { LoadStatus } from './sports';
 import { useSportsStore } from './sports';
+import { useSettingsStore } from './settings';
 
 export type LocationStatus = 'idle' | 'locating' | 'granted' | 'denied' | 'unavailable' | 'timeout' | 'unsupported';
 
@@ -43,6 +44,7 @@ export const useDiscoveryStore = defineStore('discovery', () => {
   const auth = useAuthStore();
   const filters = useFiltersStore();
   const sportsStore = useSportsStore();
+  const settings = useSettingsStore();
   const authorized = createAuthorizedCall(auth);
 
   const games = ref<DiscoveredGame[]>([]);
@@ -187,8 +189,16 @@ export const useDiscoveryStore = defineStore('discovery', () => {
     viewMode.value = mode;
   }
 
+  function clearLocation(): void {
+    userLocation.value = null;
+    locationStatus.value = 'idle';
+    permissionChecked = true;
+  }
+
   /** Asks for the location (from a tap). A denial is remembered; the app never asks again on its own. */
   async function locate(): Promise<void> {
+    await settings.load();
+    if (!settings.values.useDeviceLocation) return;
     if (locationStatus.value === 'locating') {
       return;
     }
@@ -215,6 +225,9 @@ export const useDiscoveryStore = defineStore('discovery', () => {
     }
 
     permissionChecked = true;
+    await settings.load();
+    filters.maxDistanceKm = settings.values.defaultDistanceKm;
+    if (!settings.values.useDeviceLocation) return;
     const permission = await checkPermission();
 
     if (permission === 'granted') {
@@ -286,6 +299,7 @@ export const useDiscoveryStore = defineStore('discovery', () => {
     clearFilters,
     selectGame,
     setViewMode,
+    clearLocation,
     locate,
     initLocation,
     discoverAround,

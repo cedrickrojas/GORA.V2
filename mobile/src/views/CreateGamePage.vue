@@ -2,11 +2,15 @@
   <ion-page>
     <SubPageHeader :title="pageTitle" :back-href="editId ? `/games/${editId}` : '/create'" />
 
-    <ion-content>
+    <ion-content ref="contentRef">
       <section v-if="created" class="game-created" aria-live="polite">
         <p class="game-created__badge">GAME CREATED!</p>
         <p class="game-created__note">
-          {{ created.autoAccept ? 'Players can join automatically while slots are available.' : 'Players can request to join. You decide who to accept.' }}
+          {{
+            created.autoAccept
+              ? 'Players can join automatically while slots are available.'
+              : 'Players can request to join. You decide who to accept.'
+          }}
         </p>
         <GamePreviewCard :game="created" />
         <button type="button" class="game-created__again" @click="startOver">Create another game</button>
@@ -14,164 +18,259 @@
 
       <p v-else-if="editId && editBlocker" class="create-game__blocked" role="alert">{{ editBlocker }}</p>
 
-      <form v-else class="create-game" novalidate @submit.prevent="submit">
+      <form id="create-game-form" ref="formRef" v-else class="create-game" novalidate @submit.prevent="advance">
+        <header class="create-game__step-header">
+          <p class="create-game__step-count">Step {{ activeStep + 1 }} of {{ GAME_STEPS.length }}</p>
+          <div
+            class="create-game__progress"
+            role="progressbar"
+            aria-label="Game setup progress"
+            aria-valuemin="1"
+            :aria-valuemax="GAME_STEPS.length"
+            :aria-valuenow="activeStep + 1"
+          >
+            <span :style="{ width: `${((activeStep + 1) / GAME_STEPS.length) * 100}%` }" />
+          </div>
+          <h2 ref="stepHeading" class="create-game__step-title" tabindex="-1">{{ currentStep.title }}</h2>
+          <p class="create-game__step-hint">{{ currentStep.hint }}</p>
+        </header>
         <p v-if="sportsError" class="create-game__alert" role="alert">{{ sportsError }}</p>
-
-        <div class="create-game__field" @focusout="touch('sportId')">
-          <label class="create-game__label" for="game-sport">Sport *</label>
-          <select id="game-sport" v-model="form.sportId" class="create-game__input">
-            <option value="" disabled>{{ sportOptions.length ? 'Choose a sport' : 'Loading sports…' }}</option>
-            <option v-for="option in sportOptions" :key="option.id" :value="option.id">{{ option.name }}</option>
-          </select>
-          <p v-if="shown('sportId')" class="create-game__error">{{ errors.sportId }}</p>
-        </div>
-
-        <div class="create-game__field" @focusout="touch('title')">
-          <label class="create-game__label" for="game-title">
-            Title *
-            <span class="create-game__counter">{{ form.title.trim().length }} / {{ GAME_TITLE_MAX }}</span>
-          </label>
-          <input
-            id="game-title"
-            v-model="form.title"
-            class="create-game__input"
-            :maxlength="GAME_TITLE_MAX"
-            placeholder="Sunday Pickup Basketball"
-            autocomplete="off"
-          />
-          <p v-if="shown('title')" class="create-game__error">{{ errors.title }}</p>
-        </div>
-
-        <div class="create-game__field" @focusout="touch('description')">
-          <label class="create-game__label" for="game-description">
-            Description
-            <span class="create-game__counter">{{ form.description.trim().length }} / {{ GAME_DESCRIPTION_MAX }}</span>
-          </label>
-          <textarea
-            id="game-description"
-            v-model="form.description"
-            class="create-game__input"
-            rows="3"
-            :maxlength="GAME_DESCRIPTION_MAX"
-            placeholder="Friendly 5v5, all levels. Bring a white and a dark shirt."
-          />
-          <p v-if="shown('description')" class="create-game__error">{{ errors.description }}</p>
-        </div>
-
-        <div class="create-game__field" @focusout="touch('requiredPlayers')">
-          <label class="create-game__label" for="game-players">Required players *</label>
-          <input
-            id="game-players"
-            v-model="form.requiredPlayers"
-            type="number"
-            inputmode="numeric"
-            min="1"
-            :max="GAME_PLAYERS_MAX"
-            step="1"
-            class="create-game__input create-game__input--narrow"
-            placeholder="12"
-          />
-          <p v-if="shown('requiredPlayers')" class="create-game__error">{{ errors.requiredPlayers }}</p>
-          <p v-else class="create-game__hint">Everyone who plays, including you if you play. You are not added automatically.</p>
-        </div>
-
-        <div class="create-game__field">
-          <label class="create-game__label" for="game-acceptance">Player approval</label>
-          <select id="game-acceptance" v-model="form.autoAccept" class="create-game__input">
-            <option :value="false">Manual Accept</option>
-            <option :value="true">Auto Accept</option>
-          </select>
-          <p class="create-game__hint">
-            {{ form.autoAccept ? 'New requests are accepted automatically while slots are available.' : 'Review each join request and accept or decline it yourself.' }}
-            Existing pending requests still need your review.
-          </p>
-        </div>
-
-        <div class="create-game__field" @focusout="touch('gameDate')">
-          <label class="create-game__label" for="game-date">Date *</label>
-          <input id="game-date" v-model="form.gameDate" type="date" class="create-game__input" :min="today" />
-          <p v-if="shown('gameDate')" class="create-game__error">{{ errors.gameDate }}</p>
-        </div>
-
-        <div class="create-game__grid">
-          <div class="create-game__field" @focusout="touch('startTime')">
-            <label class="create-game__label" for="game-start">Start *</label>
-            <input id="game-start" v-model="form.startTime" type="time" class="create-game__input" />
-            <p v-if="shown('startTime')" class="create-game__error">{{ errors.startTime }}</p>
+        <section v-if="activeStep === 0" class="create-game__step" :aria-label="currentStep.title">
+          <div class="create-game__field" @focusout="touch('sportId')">
+            <label class="create-game__label" for="game-sport">Sport *</label>
+            <select id="game-sport" v-model="form.sportId" class="create-game__input">
+              <option value="" disabled>{{ sportOptions.length ? 'Choose a sport' : 'Loading sports…' }}</option>
+              <option v-for="option in sportOptions" :key="option.id" :value="option.id">{{ option.name }}</option>
+            </select>
+            <p v-if="shown('sportId')" class="create-game__error">{{ errors.sportId }}</p>
           </div>
-          <div class="create-game__field" @focusout="touch('endTime')">
-            <label class="create-game__label" for="game-end">End *</label>
-            <input id="game-end" v-model="form.endTime" type="time" class="create-game__input" />
-            <p v-if="shown('endTime')" class="create-game__error">{{ errors.endTime }}</p>
-          </div>
-        </div>
-        <p class="create-game__hint">Local time at the venue.</p>
 
-        <div class="create-game__field" @focusout="touch('locationName')">
-          <label class="create-game__label" for="game-location">Location *</label>
-          <input
-            id="game-location"
-            v-model="form.locationName"
-            class="create-game__input"
-            :maxlength="GAME_LOCATION_MAX"
-            placeholder="BGC Court, Taguig"
-            autocomplete="off"
-          />
-          <p v-if="shown('locationName')" class="create-game__error">{{ errors.locationName }}</p>
-        </div>
-
-        <div class="create-game__grid">
-          <div class="create-game__field" @focusout="touch('latitude')">
-            <label class="create-game__label" for="game-lat">Latitude</label>
+          <div class="create-game__field" @focusout="touch('title')">
+            <label class="create-game__label" for="game-title">
+              Title *
+              <span class="create-game__counter">{{ form.title.trim().length }} / {{ GAME_TITLE_MAX }}</span>
+            </label>
             <input
-              id="game-lat"
-              v-model="form.latitude"
+              id="game-title"
+              v-model="form.title"
               class="create-game__input"
-              inputmode="decimal"
-              placeholder="14.5509"
+              :maxlength="GAME_TITLE_MAX"
+              placeholder="Sunday Pickup Basketball"
+              autocomplete="off"
             />
-            <p v-if="shown('latitude')" class="create-game__error">{{ errors.latitude }}</p>
+            <p v-if="shown('title')" class="create-game__error">{{ errors.title }}</p>
           </div>
-          <div class="create-game__field" @focusout="touch('longitude')">
-            <label class="create-game__label" for="game-lng">Longitude</label>
+
+          <div class="create-game__field" @focusout="touch('description')">
+            <label class="create-game__label" for="game-description">
+              Caption
+              <span class="create-game__counter"
+                >{{ form.description.trim().length }} / {{ GAME_DESCRIPTION_MAX }}</span
+              >
+            </label>
+            <textarea
+              id="game-description"
+              v-model="form.description"
+              class="create-game__input"
+              rows="3"
+              :maxlength="GAME_DESCRIPTION_MAX"
+              placeholder="Friendly 5v5, all levels. Bring a white and a dark shirt."
+            />
+            <p v-if="shown('description')" class="create-game__error">{{ errors.description }}</p>
+          </div>
+        </section>
+
+        <section v-if="activeStep === 1" class="create-game__step" :aria-label="currentStep.title">
+          <div class="create-game__field" @focusout="touch('requiredPlayers')">
+            <label class="create-game__label" for="game-players">Required players *</label>
             <input
-              id="game-lng"
-              v-model="form.longitude"
-              class="create-game__input"
-              inputmode="decimal"
-              placeholder="121.0503"
+              id="game-players"
+              v-model="form.requiredPlayers"
+              type="number"
+              inputmode="numeric"
+              min="1"
+              :max="GAME_PLAYERS_MAX"
+              step="1"
+              class="create-game__input create-game__input--narrow"
+              placeholder="12"
             />
-            <p v-if="shown('longitude')" class="create-game__error">{{ errors.longitude }}</p>
+            <p v-if="shown('requiredPlayers')" class="create-game__error">{{ errors.requiredPlayers }}</p>
+            <p v-else class="create-game__hint">
+              Everyone who plays, including you if you play. You are not added automatically.
+            </p>
           </div>
-        </div>
-        <p class="create-game__hint">Optional coordinates for the map, which arrives in a later phase.</p>
 
-        <div class="create-game__field">
-          <label class="create-game__label" for="game-club">Club</label>
-          <select id="game-club" v-model="form.clubId" class="create-game__input">
-            <option value="">No club</option>
-            <option v-for="club in clubOptions" :key="club.id" :value="club.id">{{ club.name }}</option>
-          </select>
-          <p class="create-game__hint">Clubs you are an active member of. You stay the host.</p>
-        </div>
+          <div class="create-game__field">
+            <label class="create-game__label" for="game-acceptance">Player approval</label>
+            <select id="game-acceptance" v-model="form.autoAccept" class="create-game__input">
+              <option :value="false">Manual Accept</option>
+              <option :value="true">Auto Accept</option>
+            </select>
+            <p class="create-game__hint">
+              {{
+                form.autoAccept
+                  ? 'New requests are accepted automatically while slots are available.'
+                  : 'Review each join request and accept or decline it yourself.'
+              }}
+              <span v-if="editId">Existing pending requests still need your review.</span>
+            </p>
+          </div>
 
+          <div class="create-game__field">
+            <label class="create-game__label" for="game-club">Club</label>
+            <select id="game-club" v-model="form.clubId" class="create-game__input">
+              <option value="">No club</option>
+              <option v-for="club in clubOptions" :key="club.id" :value="club.id">{{ club.name }}</option>
+            </select>
+            <p class="create-game__hint">Clubs you are an active member of. You stay the host.</p>
+          </div>
+        </section>
+
+        <section v-if="activeStep === 2" class="create-game__step" :aria-label="currentStep.title">
+          <div class="create-game__field" @focusout="touch('gameDate')">
+            <label class="create-game__label" for="game-date">Date *</label>
+            <input id="game-date" v-model="form.gameDate" type="date" class="create-game__input" :min="today" />
+            <p v-if="shown('gameDate')" class="create-game__error">{{ errors.gameDate }}</p>
+          </div>
+
+          <div class="create-game__grid">
+            <div class="create-game__field" @focusout="touch('startTime')">
+              <label class="create-game__label" for="game-start">Start *</label>
+              <input id="game-start" v-model="form.startTime" type="time" class="create-game__input" />
+              <p v-if="shown('startTime')" class="create-game__error">{{ errors.startTime }}</p>
+            </div>
+            <div class="create-game__field" @focusout="touch('endTime')">
+              <label class="create-game__label" for="game-end">End *</label>
+              <input id="game-end" v-model="form.endTime" type="time" class="create-game__input" />
+              <p v-if="shown('endTime')" class="create-game__error">{{ errors.endTime }}</p>
+            </div>
+          </div>
+          <p class="create-game__hint">Local time at the venue.</p>
+        </section>
+
+        <section v-if="activeStep === 3" class="create-game__step" :aria-label="currentStep.title">
+          <div class="create-game__field" @focusout="touch('locationName')">
+            <label class="create-game__label" for="game-location">Location *</label>
+            <input
+              id="game-location"
+              v-model="form.locationName"
+              class="create-game__input"
+              :maxlength="GAME_LOCATION_MAX"
+              placeholder="BGC Court, Taguig"
+              autocomplete="off"
+            />
+            <p v-if="shown('locationName')" class="create-game__error">{{ errors.locationName }}</p>
+          </div>
+
+          <div class="create-game__grid">
+            <div class="create-game__field" @focusout="touch('latitude')">
+              <label class="create-game__label" for="game-lat">Latitude</label>
+              <input
+                id="game-lat"
+                v-model="form.latitude"
+                class="create-game__input"
+                inputmode="decimal"
+                placeholder="14.5509"
+              />
+              <p v-if="shown('latitude')" class="create-game__error">{{ errors.latitude }}</p>
+            </div>
+            <div class="create-game__field" @focusout="touch('longitude')">
+              <label class="create-game__label" for="game-lng">Longitude</label>
+              <input
+                id="game-lng"
+                v-model="form.longitude"
+                class="create-game__input"
+                inputmode="decimal"
+                placeholder="121.0503"
+              />
+              <p v-if="shown('longitude')" class="create-game__error">{{ errors.longitude }}</p>
+            </div>
+          </div>
+          <p class="create-game__hint">Optional. Add both coordinates to show the game on the map.</p>
+        </section>
+
+        <section v-if="isReview" class="create-game__step create-game__review" aria-label="Game review">
+          <article class="create-game__review-card">
+            <div class="create-game__review-heading">
+              <h3>Game details</h3>
+              <button type="button" aria-label="Edit game details" @click="goToStep(0)">Edit</button>
+            </div>
+            <strong>{{ form.title.trim() }}</strong>
+            <p>{{ selectedSportName }}</p>
+            <p v-if="form.description.trim()" class="create-game__review-description">
+              <strong>Caption:</strong> {{ form.description.trim() }}
+            </p>
+          </article>
+          <article class="create-game__review-card">
+            <div class="create-game__review-heading">
+              <h3>Players &amp; approval</h3>
+              <button type="button" aria-label="Edit players and approval" @click="goToStep(1)">Edit</button>
+            </div>
+            <p>{{ form.requiredPlayers }} players</p>
+            <p>{{ form.autoAccept ? 'Auto Accept' : 'Manual Accept' }}</p>
+            <p v-if="form.clubId">{{ selectedClubName }}</p>
+          </article>
+          <article class="create-game__review-card">
+            <div class="create-game__review-heading">
+              <h3>Schedule</h3>
+              <button type="button" aria-label="Edit schedule" @click="goToStep(2)">Edit</button>
+            </div>
+            <p>{{ formatGameDay(form.gameDate) }}</p>
+            <p>{{ formatGameTimeRange(form.startTime, form.endTime) }} &middot; Local time at the venue</p>
+          </article>
+          <article class="create-game__review-card">
+            <div class="create-game__review-heading">
+              <h3>Location</h3>
+              <button type="button" aria-label="Edit location" @click="goToStep(3)">Edit</button>
+            </div>
+            <p>{{ form.locationName.trim() }}</p>
+            <p v-if="String(form.latitude).trim() && String(form.longitude).trim()">
+              {{ form.latitude }}, {{ form.longitude }}
+            </p>
+          </article>
+        </section>
+        <p v-if="stepMessage" class="create-game__alert" role="alert">{{ stepMessage }}</p>
         <p v-if="serverError" class="create-game__alert" role="alert">{{ serverError }}</p>
-        <p v-else-if="submitted && hasErrors" class="create-game__alert" role="alert">
-          Fix the highlighted fields to {{ editId ? 'save your changes' : 'create your game' }}.
-        </p>
-
-        <button type="submit" class="create-game__submit" :disabled="gamesStore.isSaving">
-          {{ submitLabel }}
-        </button>
       </form>
     </ion-content>
+    <ion-footer v-if="!created && !(editId && editBlocker)" class="ion-no-border">
+      <div class="create-game__actions">
+        <button
+          v-if="activeStep > 0"
+          type="button"
+          class="create-game__back"
+          :disabled="gamesStore.isSaving"
+          @click="goToStep(activeStep - 1)"
+        >
+          Back
+        </button>
+        <button
+          v-if="!isReview"
+          type="submit"
+          form="create-game-form"
+          class="create-game__submit"
+          :disabled="gamesStore.isSaving"
+        >
+          Next
+        </button>
+        <button
+          v-else
+          type="submit"
+          form="create-game-form"
+          class="create-game__submit"
+          :disabled="gamesStore.isSaving"
+        >
+          {{ submitLabel }}
+        </button>
+      </div>
+    </ion-footer>
   </ion-page>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { computed, nextTick, onMounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { IonContent, IonPage, onIonViewDidLeave, onIonViewWillEnter } from '@ionic/vue';
+import { IonContent, IonFooter, IonPage, onIonViewDidLeave, onIonViewWillEnter } from '@ionic/vue';
 import GamePreviewCard from '@/components/games/GamePreviewCard.vue';
 import SubPageHeader from '@/components/layout/SubPageHeader.vue';
 import { useClubsStore } from '@/stores/clubs';
@@ -189,6 +288,8 @@ import {
   deviceMoment,
   diffGameInput,
   emptyGameForm,
+  formatGameDay,
+  formatGameTimeRange,
   gameToForm,
   toCreateGameInput,
   validateGameForm,
@@ -208,10 +309,42 @@ const submitted = ref(false);
 const serverError = ref<string | null>(null);
 const sportsError = ref<string | null>(null);
 const created = ref<ApiGame | null>(null);
-const today = ref(deviceMoment().date);
+const validationMoment = ref(deviceMoment());
+const today = computed(() => validationMoment.value.date);
+const activeStep = ref(0);
+const stepMessage = ref<string | null>(null);
+const formRef = ref<HTMLFormElement | null>(null);
+const stepHeading = ref<HTMLElement | null>(null);
+const contentRef = ref<InstanceType<typeof IonContent> | null>(null);
+
+const GAME_STEPS: readonly { title: string; hint: string; fields: readonly GameFormField[] }[] = [
+  {
+    title: 'Game Details',
+    hint: 'Choose your sport and give your game a name.',
+    fields: ['sportId', 'title', 'description'],
+  },
+  {
+    title: 'Players & Approval',
+    hint: 'Set the player count and choose how players join.',
+    fields: ['requiredPlayers', 'autoAccept', 'clubId'],
+  },
+  {
+    title: 'Schedule',
+    hint: 'Choose the game date and local start and end times.',
+    fields: ['gameDate', 'startTime', 'endTime'],
+  },
+  {
+    title: 'Location',
+    hint: 'Tell players where the game will happen.',
+    fields: ['locationName', 'latitude', 'longitude'],
+  },
+  { title: 'Review', hint: 'Check your game before confirming. You can edit any section.', fields: [] },
+];
+const currentStep = computed(() => GAME_STEPS[activeStep.value]);
+const isReview = computed(() => activeStep.value === GAME_STEPS.length - 1);
 
 const original = computed(() => (editId ? gamesStore.gameById(editId) : null));
-const errors = computed(() => validateGameForm(form.value, deviceMoment(), original.value));
+const errors = computed(() => validateGameForm(form.value, validationMoment.value, original.value));
 const hasErrors = computed(() => Object.keys(errors.value).length > 0);
 const pageTitle = computed(() => {
   if (created.value) return 'Game Created';
@@ -237,6 +370,10 @@ const clubOptions = computed(() => {
   const current = original.value?.club;
   return current && !mine.some((club) => club.id === current.id) ? [...mine, current] : mine;
 });
+const selectedSportName = computed(
+  () => sportOptions.value.find((sport) => sport.id === form.value.sportId)?.name ?? '',
+);
+const selectedClubName = computed(() => clubOptions.value.find((club) => club.id === form.value.clubId)?.name ?? '');
 
 const editBlocker = computed(() => {
   const status = editId ? gamesStore.detailStatus[editId] : undefined;
@@ -261,13 +398,58 @@ function resetForm(next: GameForm): void {
   touched.value = new Set();
   submitted.value = false;
   serverError.value = null;
+  activeStep.value = 0;
+  stepMessage.value = null;
+}
+
+async function goToStep(index: number): Promise<void> {
+  if (gamesStore.isSaving || index < 0 || index >= GAME_STEPS.length) return;
+  activeStep.value = index;
+  stepMessage.value = null;
+  await nextTick();
+  void contentRef.value?.$el.scrollToTop?.(0);
+  stepHeading.value?.focus({ preventScroll: true });
+}
+
+async function focusFirstError(): Promise<void> {
+  await nextTick();
+  formRef.value
+    ?.querySelector('.create-game__error')
+    ?.closest('.create-game__field')
+    ?.querySelector<HTMLElement>('input, select, textarea')
+    ?.focus();
+}
+
+async function advance(): Promise<void> {
+  if (gamesStore.isSaving) return;
+  validationMoment.value = deviceMoment();
+  serverError.value = null;
+  if (isReview.value) {
+    await submit();
+    return;
+  }
+  touched.value = new Set([...touched.value, ...currentStep.value.fields]);
+  if (currentStep.value.fields.some((field) => errors.value[field])) {
+    stepMessage.value = 'Complete the highlighted fields to continue.';
+    await focusFirstError();
+    return;
+  }
+  await goToStep(activeStep.value + 1);
 }
 
 async function submit(): Promise<void> {
+  if (gamesStore.isSaving) return;
+  validationMoment.value = deviceMoment();
   submitted.value = true;
   serverError.value = null;
 
-  if (hasErrors.value || gamesStore.isSaving) {
+  if (hasErrors.value) {
+    const invalidStep = GAME_STEPS.findIndex((step) => step.fields.some((field) => errors.value[field]));
+    if (invalidStep >= 0) {
+      await goToStep(invalidStep);
+      stepMessage.value = 'Check the highlighted fields before confirming your game.';
+      await focusFirstError();
+    }
     return;
   }
 
@@ -305,7 +487,7 @@ async function loadSports(): Promise<void> {
 }
 
 onIonViewWillEnter(async () => {
-  today.value = deviceMoment().date;
+  validationMoment.value = deviceMoment();
 
   if (editId) {
     const result = await gamesStore.fetchGame(editId);
@@ -331,6 +513,110 @@ onMounted(() => {
   flex-direction: column;
   gap: 14px;
   padding: 16px 16px 40px;
+}
+
+.create-game__step-header {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.create-game__step-count {
+  margin: 0;
+  color: var(--ion-color-primary);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+.create-game__progress {
+  height: 4px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--gora-line);
+}
+.create-game__progress span {
+  display: block;
+  height: 100%;
+  background: var(--ion-color-primary);
+}
+.create-game__step-title {
+  margin: 6px 0 0;
+  font-size: 1.3rem;
+  font-weight: 800;
+}
+.create-game__step-title:focus {
+  outline: none;
+}
+.create-game__step-hint {
+  margin: 0;
+  color: var(--gora-muted);
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+.create-game__step {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.create-game__review-card {
+  padding: 16px;
+  border: 1px solid var(--gora-line);
+  border-radius: 12px;
+  background: var(--gora-surface);
+  overflow-wrap: anywhere;
+}
+.create-game__review-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.create-game__review-heading h3 {
+  margin: 0;
+  font-size: 0.85rem;
+}
+.create-game__review-heading button {
+  padding: 6px 10px;
+  border: 0;
+  border-radius: 6px;
+  background: var(--gora-surface-raised);
+  color: var(--ion-color-primary);
+  font: inherit;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+.create-game__review-card p {
+  margin: 6px 0 0;
+  color: var(--gora-muted);
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+.create-game__review-description {
+  white-space: pre-line;
+}
+.create-game__actions {
+  display: flex;
+  max-width: var(--gora-column, 680px);
+  gap: 12px;
+  margin: 0 auto;
+  padding: 12px 16px max(12px, var(--gora-input-safe-bottom, env(safe-area-inset-bottom)));
+  border-top: 1px solid var(--gora-line);
+  background: var(--ion-background-color);
+}
+.create-game__back {
+  flex: 1;
+  min-height: 48px;
+  padding: 12px;
+  border: 1px solid var(--gora-line-strong);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ion-text-color);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 700;
+}
+.create-game__back:disabled {
+  opacity: 0.5;
+  cursor: wait;
 }
 
 .create-game__field {
@@ -415,7 +701,8 @@ textarea.create-game__input {
 }
 
 .create-game__submit {
-  margin-top: 8px;
+  flex: 1;
+  min-height: 48px;
   padding: 14px;
   border: 0;
   border-radius: 999px;

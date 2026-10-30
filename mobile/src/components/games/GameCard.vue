@@ -1,5 +1,5 @@
 <template>
-  <article class="game-card">
+  <article class="game-card" :class="{ 'game-card--successful': game.status === 'COMPLETED' }">
     <div
       class="game-card__banner"
       :class="{
@@ -12,9 +12,10 @@
         <ion-icon :icon="visual.icon" aria-hidden="true" />
         {{ game.sport }}
       </span>
-      <span v-if="game.status !== 'OPEN'" class="game-card__flag">{{
-        GAME_STATUS_FLAGS[game.status]
-      }}</span>
+      <span v-if="game.status !== 'OPEN'" class="game-card__flag" :class="{ 'game-card__flag--successful': game.status === 'COMPLETED' }">
+        <ion-icon v-if="game.status === 'COMPLETED'" :icon="checkmarkCircle" aria-hidden="true" />
+        {{ game.status === 'COMPLETED' ? 'Successful' : GAME_STATUS_FLAGS[game.status] }}
+      </span>
     </div>
 
     <div class="game-card__body">
@@ -80,6 +81,7 @@ import { computed } from 'vue';
 import { RouterLink } from 'vue-router';
 import { IonIcon } from '@ionic/vue';
 import {
+  checkmarkCircle,
   locationOutline,
   peopleCircleOutline,
   timeOutline,
@@ -118,6 +120,11 @@ const visual = computed(() => getSportVisual(props.game.sport));
   box-shadow: var(--gora-shadow);
 }
 
+.game-card--successful {
+  border: 2px solid #d8ad43;
+  box-shadow: 0 0 0 2px rgb(216 173 67 / 16%), 0 8px 24px rgb(216 173 67 / 16%);
+}
+
 .game-card__banner {
   display: flex;
   height: 120px;
@@ -144,6 +151,18 @@ const visual = computed(() => getSportVisual(props.game.sport));
   background: rgba(0, 0, 0, 0.4);
   font-size: 0.72rem;
   font-weight: 700;
+}
+
+.game-card__flag--successful {
+  gap: 5px;
+  border: 1px solid #f4ca62;
+  background: rgb(82 57 10 / 92%);
+  color: #ffda72;
+  box-shadow: 0 0 12px rgb(255 204 72 / 28%);
+}
+
+.game-card__flag--successful ion-icon {
+  font-size: 17px;
 }
 
 .game-card__body {

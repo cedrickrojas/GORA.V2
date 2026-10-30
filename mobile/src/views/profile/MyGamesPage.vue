@@ -1,12 +1,105 @@
 <template>
   <ion-page>
     <SubPageHeader title="My Games" />
-    <ion-content :fullscreen="true">
+    <ion-content ref="contentRef" :fullscreen="true">
       <div class="my-games">
-        <router-link to="/create/game" class="my-games__create">+ Create Game</router-link>
+        <div class="my-games__menu" role="tablist" aria-label="My Games sections">
+          <button
+            v-for="(section, index) in menuSections"
+            :id="`my-games-tab-${section.id}`"
+            :key="section.id"
+            type="button"
+            role="tab"
+            class="my-games__menu-item"
+            :class="{ 'my-games__menu-item--active': activeSection === section.id }"
+            :aria-selected="activeSection === section.id"
+            :aria-controls="`my-games-${section.id}`"
+            :tabindex="activeSection === section.id ? 0 : -1"
+            @click="selectSection(section.id)"
+            @keydown="navigateMenu($event, index)"
+          >
+            <span>{{ section.label }}</span>
+            <span v-if="section.count !== null" class="my-games__menu-count">{{ section.count }}</span>
+          </button>
+        </div>
         <p v-if="actionMessage" class="my-games__notice" role="status">{{ actionMessage }}</p>
 
-        <section class="my-games__section" aria-labelledby="hosted-games-title">
+        <section
+          id="my-games-create"
+          v-show="activeSection === 'create'"
+          class="my-games__section my-games__create-panel"
+          role="tabpanel"
+          aria-labelledby="my-games-tab-create"
+        >
+          <SectionHeader title="Create Games" />
+          <p class="my-games__description">
+            Organize your next game. Choose a sport, set the schedule, and decide how players join.
+          </p>
+          <router-link to="/create/game" class="my-games__create">+ Create Game</router-link>
+        </section>
+
+        <section
+          id="my-games-joined"
+          v-show="activeSection === 'joined'"
+          class="my-games__section"
+          role="tabpanel"
+          aria-labelledby="my-games-tab-joined"
+        >
+          <SectionHeader id="joined-games-title" title="Joined Games">
+            <span class="my-games__count">{{ gamesStore.joinedGames.length }}</span>
+          </SectionHeader>
+          <p class="my-games__description">Your join requests, upcoming games, and game history.</p>
+          <p v-if="gamesStore.joinedError" class="my-games__alert" role="alert">
+            {{ gamesStore.joinedError }}
+            <button type="button" @click="gamesStore.fetchJoinedGames()">Try again</button>
+          </p>
+          <p v-else-if="gamesStore.joinedStatus !== 'ready' && !gamesStore.joinedGames.length" class="my-games__empty">
+            Loading joined games...
+          </p>
+          <p v-else-if="!gamesStore.joinedGames.length" class="my-games__empty">
+            Games you request to join will appear here.
+          </p>
+          <template v-else>
+            <div v-for="group in joinedGroups" :key="group.title" class="my-games__group">
+              <h3>
+                {{ group.title }} <span>{{ group.games.length }}</span>
+              </h3>
+              <p v-if="!group.games.length" class="my-games__empty">{{ group.empty }}</p>
+              <div v-else class="my-games__stack">
+                <div v-for="game in group.games" :key="game.id" class="my-games__joined-card">
+                  <GamePreviewCard :game="game" :show-description="false" />
+                  <div class="my-games__participation">
+                    <div>
+                      <span class="my-games__badge">{{ joinedGameLabel(game) }}</span>
+                      <p v-if="game.joinedAt || game.requestedAt" class="my-games__date">
+                        {{ game.joinedAt ? 'Joined' : 'Requested' }}
+                        {{ historyDate(game.joinedAt ?? game.requestedAt) }}
+                      </p>
+                    </div>
+                    <button
+                      v-if="canCancelJoining(game, today)"
+                      type="button"
+                      class="my-games__cancel"
+                      :disabled="actingGameId !== null"
+                      :aria-label="`Cancel joining ${game.title}`"
+                      @click="confirmCancelJoining(game)"
+                    >
+                      {{ actingGameId === game.id ? 'Cancelling...' : 'Cancel Joining' }}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </template>
+        </section>
+
+        <section
+          id="my-games-hosted"
+          v-show="activeSection === 'hosted'"
+          class="my-games__section"
+          role="tabpanel"
+          aria-labelledby="my-games-tab-hosted"
+        >
           <SectionHeader id="hosted-games-title" title="Hosted Games">
             <span class="my-games__count">{{ gamesStore.hostedGames.length }}</span>
           </SectionHeader>
@@ -66,62 +159,13 @@
             </div>
           </template>
         </section>
-
-        <section class="my-games__section" aria-labelledby="joined-games-title">
-          <SectionHeader id="joined-games-title" title="Joined Games">
-            <span class="my-games__count">{{ gamesStore.joinedGames.length }}</span>
-          </SectionHeader>
-          <p class="my-games__description">Your join requests, upcoming games, and game history.</p>
-          <p v-if="gamesStore.joinedError" class="my-games__alert" role="alert">
-            {{ gamesStore.joinedError }}
-            <button type="button" @click="gamesStore.fetchJoinedGames()">Try again</button>
-          </p>
-          <p v-else-if="gamesStore.joinedStatus !== 'ready' && !gamesStore.joinedGames.length" class="my-games__empty">
-            Loading joined games...
-          </p>
-          <p v-else-if="!gamesStore.joinedGames.length" class="my-games__empty">
-            Games you request to join will appear here.
-          </p>
-          <template v-else>
-            <div v-for="group in joinedGroups" :key="group.title" class="my-games__group">
-              <h3>
-                {{ group.title }} <span>{{ group.games.length }}</span>
-              </h3>
-              <p v-if="!group.games.length" class="my-games__empty">{{ group.empty }}</p>
-              <div v-else class="my-games__stack">
-                <div v-for="game in group.games" :key="game.id" class="my-games__joined-card">
-                  <GamePreviewCard :game="game" :show-description="false" />
-                  <div class="my-games__participation">
-                    <div>
-                      <span class="my-games__badge">{{ joinedGameLabel(game) }}</span>
-                      <p v-if="game.joinedAt || game.requestedAt" class="my-games__date">
-                        {{ game.joinedAt ? 'Joined' : 'Requested' }}
-                        {{ historyDate(game.joinedAt ?? game.requestedAt) }}
-                      </p>
-                    </div>
-                    <button
-                      v-if="canCancelJoining(game, today)"
-                      type="button"
-                      class="my-games__cancel"
-                      :disabled="actingGameId !== null"
-                      :aria-label="`Cancel joining ${game.title}`"
-                      @click="confirmCancelJoining(game)"
-                    >
-                      {{ actingGameId === game.id ? 'Cancelling...' : 'Cancel Joining' }}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </template>
-        </section>
       </div>
     </ion-content>
   </ion-page>
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, nextTick, ref } from 'vue';
 import { RouterLink } from 'vue-router';
 import { alertController, IonContent, IonPage, onIonViewWillEnter } from '@ionic/vue';
 import SectionHeader from '@/components/common/SectionHeader.vue';
@@ -143,6 +187,36 @@ const joinRequests = useJoinRequestsStore();
 const today = ref(deviceMoment().date);
 const actingGameId = ref<string | null>(null);
 const actionMessage = ref('');
+const contentRef = ref<InstanceType<typeof IonContent> | null>(null);
+type GamesSection = 'create' | 'joined' | 'hosted';
+const activeSection = ref<GamesSection>('joined');
+const menuSections = computed(() => [
+  { id: 'create' as const, label: 'Create Games', count: null },
+  { id: 'joined' as const, label: 'Joined Games', count: gamesStore.joinedGames.length },
+  { id: 'hosted' as const, label: 'Hosted Games', count: gamesStore.hostedGames.length },
+]);
+
+function selectSection(section: GamesSection): void {
+  if (activeSection.value === section) return;
+  activeSection.value = section;
+  actionMessage.value = '';
+  void nextTick(() => {
+    void contentRef.value?.$el.scrollToTop?.(0);
+  });
+}
+
+function navigateMenu(event: KeyboardEvent, index: number): void {
+  let next: number;
+  if (event.key === 'ArrowRight') next = (index + 1) % menuSections.value.length;
+  else if (event.key === 'ArrowLeft') next = (index + menuSections.value.length - 1) % menuSections.value.length;
+  else if (event.key === 'Home') next = 0;
+  else if (event.key === 'End') next = menuSections.value.length - 1;
+  else return;
+  event.preventDefault();
+  selectSection(menuSections.value[next].id);
+  const menu = (event.currentTarget as HTMLElement).parentElement;
+  menu?.querySelectorAll<HTMLButtonElement>('[role="tab"]')[next]?.focus();
+}
 
 const hostedGroups = computed(() => {
   const hosted = splitHostedGames(gamesStore.hostedGames, today.value);
@@ -253,6 +327,54 @@ onIonViewWillEnter(() => {
 .my-games {
   padding: 12px 16px 32px;
 }
+.my-games__menu {
+  position: sticky;
+  z-index: 3;
+  top: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--gora-line);
+  border-radius: var(--gora-radius-card);
+  background: var(--ion-background-color);
+}
+.my-games__menu-item {
+  display: flex;
+  min-width: 0;
+  min-height: 48px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 6px;
+  border: 0;
+  border-radius: var(--gora-radius-control);
+  background: transparent;
+  color: var(--gora-muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: clamp(0.72rem, 2.8vw, 0.85rem);
+  font-weight: 700;
+  line-height: 1.3;
+}
+.my-games__menu-item--active {
+  background: var(--ion-color-primary);
+  color: var(--ion-color-primary-contrast);
+}
+.my-games__menu-count {
+  min-width: 20px;
+  padding: 2px 5px;
+  border-radius: 999px;
+  background: var(--gora-surface-raised);
+  color: var(--ion-text-color);
+  font-size: 0.68rem;
+}
+.my-games__create-panel {
+  padding: 20px;
+  border: 1px solid var(--gora-line);
+  border-radius: var(--gora-radius-card);
+  background: var(--gora-surface);
+}
 .my-games__create {
   display: block;
   padding: 11px;
@@ -266,10 +388,6 @@ onIonViewWillEnter(() => {
 }
 .my-games__section {
   margin-top: 24px;
-}
-.my-games__section + .my-games__section {
-  padding-top: 20px;
-  border-top: 1px solid var(--gora-line);
 }
 .my-games__count {
   color: var(--ion-color-primary);

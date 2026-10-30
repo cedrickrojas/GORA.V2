@@ -1,10 +1,5 @@
-import {
-  BadRequestException,
-  ForbiddenException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
-import type { PostVisibility, Prisma } from '../generated/prisma/client';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { PostFeedback, type PostVisibility, type Prisma } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AudienceService } from '../social/audience.service';
 import { RelationshipService } from '../social/relationship.service';
@@ -18,19 +13,13 @@ import type {
   UpdatePostTagsDto,
   UpdatePostVisibilityDto,
 } from './dto/post.dto';
+import type { ReportPostDto } from './dto/post-actions.dto';
 import type { DeletedPostView, PostPage, PostView } from './post.types';
-import {
-  friendshipWithViewer,
-  visiblePostsWhere,
-  visibleTaggedUserWhere,
-} from './post-visibility';
+import { friendshipWithViewer, visiblePostsWhere, visibleTaggedUserWhere } from './post-visibility';
 
 export const POST_NOT_FOUND_MESSAGE = 'Post not found.';
 const DEFAULT_PAGE_SIZE = 20;
-const POST_ORDER = [
-  { createdAt: 'desc' },
-  { id: 'desc' },
-] satisfies Prisma.PostOrderByWithRelationInput[];
+const POST_ORDER = [{ createdAt: 'desc' }, { id: 'desc' }] satisfies Prisma.PostOrderByWithRelationInput[];
 
 function postSelect(viewerId: string) {
   return {
@@ -45,6 +34,7 @@ function postSelect(viewerId: string) {
     latitude: true,
     longitude: true,
     editedAt: true,
+    archivedAt: true,
     createdAt: true,
     updatedAt: true,
     user: { select: AUTHOR_SELECT },
@@ -57,6 +47,7 @@ function postSelect(viewerId: string) {
       },
     },
     likes: { where: { userId: viewerId }, select: { id: true } },
+    preferences: { where: { userId: viewerId }, select: { feedback: true, savedAt: true } },
     media: {
       orderBy: { sortOrder: 'asc' },
       select: {
@@ -100,16 +91,10 @@ export class PostsService {
   ) {}
 
   async create(authorId: string, dto: CreatePostDto): Promise<PostView> {
-    const media = (dto.photos ?? []).map((photo, index) =>
-      this.photos.decode(photo, index),
-    );
+    const media = (dto.photos ?? []).map((photo, index) => this.photos.decode(photo, index));
     if (!dto.caption?.trim() && media.length === 0)
       throw new BadRequestException('Write something or add a photo to post.');
-    const viewerIds = await this.resolveAudience(
-      authorId,
-      dto.visibility,
-      dto.customViewerIds,
-    );
+    const viewerIds = await this.resolveAudience(authorId, dto.visibility, dto.customViewerIds);
     const taggedIds = await this.resolveTags(authorId, dto.taggedUserIds ?? []);
 
     if (dto.sportId) {
@@ -126,13 +111,8 @@ export class PostsService {
         locationName: dto.location?.name,
         latitude: dto.location?.latitude,
         longitude: dto.location?.longitude,
-        customViewers: viewerIds
-          ? { createMany: { data: viewerIds.map((userId) => ({ userId })) } }
-          : undefined,
-        tags:
-          taggedIds.length > 0
-            ? { createMany: { data: taggedIds.map((userId) => ({ userId })) } }
-            : undefined,
+        customViewers: viewerIds ? { createMany: { data: viewerIds.map((userId) => ({ userId })) } } : undefined,
+        tags: taggedIds.length > 0 ? { createMany: { data: taggedIds.map((userId) => ({ userId })) } } : undefined,
       },
       select: postSelect(authorId),
     });
@@ -154,11 +134,7 @@ export class PostsService {
     return this.toView(post, viewerId);
   }
 
-  async listComments(
-    viewerId: string,
-    postId: string,
-    query: ListPostsQueryDto,
-  ) {
+  async listComments(viewerId: string, postId: string, query: ListPostsQueryDto) {
     await this.findVisible(viewerId, postId);
     const limit = query.limit ?? 30;
     const comments = await this.prisma.postComment.findMany({
@@ -174,9 +150,7 @@ export class PostsService {
       },
     });
     return {
-      comments: comments
-        .slice(0, limit)
-        .map(({ user, ...comment }) => ({ ...comment, author: user })),
+      comments: comments.slice(0, limit).map(({ user, ...comment }) => ({ ...comment, author: user })),
       nextCursor: comments.length > limit ? comments[limit - 1].id : null,
     };
   }
@@ -198,11 +172,7 @@ export class PostsService {
     };
   }
 
-  async deleteComment(
-    viewerId: string,
-    postId: string,
-    commentId: string,
-  ): Promise<PostView> {
+  async deleteComment(viewerId: string, postId: string, commentId: string): Promise<PostView> {
     const post = await this.findVisible(viewerId, postId);
     const comment = await this.prisma.postComment.findFirst({
       where: { id: commentId, postId, user: visibleTaggedUserWhere(viewerId) },
@@ -210,9 +180,7 @@ export class PostsService {
     });
     if (!comment) throw new NotFoundException('Comment not found.');
     if (comment.userId !== viewerId && post.author.id !== viewerId)
-      throw new ForbiddenException(
-        'Only the comment or post author can delete this comment.',
-      );
+      throw new ForbiddenException('Only the comment or post author can delete this comment.');
     await this.prisma.postComment.deleteMany({
       where: { id: commentId, postId },
     });
@@ -227,11 +195,7 @@ export class PostsService {
   }
 
   /** Idempotent reactions; hidden and deleted posts use the same 404 as reads. */
-  async setLike(
-    viewerId: string,
-    postId: string,
-    liked: boolean,
-  ): Promise<PostView> {
+  async setLike(viewerId: string, postId: string, liked: boolean): Promise<PostView> {
     await this.findVisible(viewerId, postId);
     if (liked) {
       await this.prisma.postLike.upsert({
@@ -247,16 +211,102 @@ export class PostsService {
     return this.findVisible(viewerId, postId);
   }
 
+  async setFeedback(viewerId: string, postId: string, feedback: PostFeedback | null): Promise<PostView> {
+    await this.findVisible(viewerId, postId);
+    const where = { userId_postId: { userId: viewerId, postId } };
+    if (feedback) {
+      await this.prisma.postPreference.upsert({
+        where,
+        create: { userId: viewerId, postId, feedback },
+        update: { feedback },
+      });
+    } else {
+      await this.prisma.postPreference.updateMany({ where: { userId: viewerId, postId }, data: { feedback: null } });
+      await this.prisma.postPreference.deleteMany({
+        where: { userId: viewerId, postId, feedback: null, savedAt: null },
+      });
+    }
+    return this.findVisible(viewerId, postId);
+  }
+
+  async setSaved(viewerId: string, postId: string, saved: boolean): Promise<PostView> {
+    await this.findVisible(viewerId, postId);
+    const where = { userId_postId: { userId: viewerId, postId } };
+    if (saved) {
+      await this.prisma.postPreference.upsert({
+        where,
+        create: { userId: viewerId, postId, savedAt: new Date() },
+        update: { savedAt: new Date() },
+      });
+    } else {
+      await this.prisma.postPreference.updateMany({ where: { userId: viewerId, postId }, data: { savedAt: null } });
+      await this.prisma.postPreference.deleteMany({
+        where: { userId: viewerId, postId, feedback: null, savedAt: null },
+      });
+    }
+    return this.findVisible(viewerId, postId);
+  }
+
+  async reportPost(viewerId: string, postId: string, dto: ReportPostDto) {
+    const post = await this.findVisible(viewerId, postId);
+    if (post.author.id === viewerId) throw new BadRequestException('You cannot report your own post.');
+    const existing = await this.prisma.report.findFirst({
+      where: { reporterId: viewerId, postId, status: { in: ['PENDING', 'REVIEWING'] } },
+      select: { id: true },
+    });
+    const report =
+      existing ??
+      (await this.prisma.report.create({
+        data: {
+          reporterId: viewerId,
+          reportedUserId: post.author.id,
+          postId,
+          reason: dto.reason,
+          description: dto.description,
+        },
+        select: { id: true },
+      }));
+    return { reported: true, id: report.id };
+  }
+
+  async saved(viewerId: string) {
+    const entries = await this.prisma.postPreference.findMany({
+      where: { userId: viewerId, savedAt: { not: null }, post: visiblePostsWhere(viewerId) },
+      orderBy: [{ savedAt: 'desc' }, { id: 'desc' }],
+      take: 50,
+      select: { post: { select: postSelect(viewerId) } },
+    });
+    return { posts: entries.map(({ post }) => this.toView(post, viewerId)), nextCursor: null };
+  }
+
+  async archived(viewerId: string) {
+    const posts = await this.prisma.post.findMany({
+      where: { userId: viewerId, archivedAt: { not: null }, deletedAt: null },
+      orderBy: [{ archivedAt: 'desc' }, { id: 'desc' }],
+      take: 50,
+      select: postSelect(viewerId),
+    });
+    return { posts: posts.map((post) => this.toView(post, viewerId)), nextCursor: null };
+  }
+
+  async setArchived(viewerId: string, postId: string, archived: boolean): Promise<PostView> {
+    const post = await this.prisma.post.findFirst({
+      where: { id: postId, userId: viewerId, deletedAt: null },
+      select: { id: true },
+    });
+    if (!post) throw new NotFoundException(POST_NOT_FOUND_MESSAGE);
+    const updated = await this.prisma.post.update({
+      where: { id: postId },
+      data: { archivedAt: archived ? new Date() : null },
+      select: postSelect(viewerId),
+    });
+    return this.toView(updated, viewerId);
+  }
+
   /** A profile feed: only the author's posts this viewer is allowed to see, newest first. */
-  async listByAuthor(
-    viewerId: string,
-    username: string,
-    query: ListPostsQueryDto,
-  ): Promise<PostPage> {
+  async listByAuthor(viewerId: string, username: string, query: ListPostsQueryDto): Promise<PostPage> {
     const author = await this.usersService.findActiveByUsername(username);
-    const state = author
-      ? await this.relationships.between(viewerId, author.id)
-      : null;
+    const state = author ? await this.relationships.between(viewerId, author.id) : null;
 
     if (!author || state === 'BLOCKED_BY_THEM') {
       throw new NotFoundException('User not found.');
@@ -270,35 +320,24 @@ export class PostsService {
     const where: Prisma.PostWhereInput =
       query.scope === 'FRIENDS'
         ? {
-            OR: [
-              { userId: viewerId },
-              { user: friendshipWithViewer(viewerId, 'ACCEPTED') },
-            ],
+            OR: [{ userId: viewerId }, { user: friendshipWithViewer(viewerId, 'ACCEPTED') }],
           }
         : {};
-    return this.page(viewerId, where, query);
+    return this.page(
+      viewerId,
+      { AND: [where, { preferences: { none: { userId: viewerId, feedback: 'NOT_INTERESTED' } } }] },
+      query,
+    );
   }
 
   /**
    * Edit Post (author only). Only the fields that are sent change; editedAt is set when
    * something actually changed. Privacy and tags have their own routes.
    */
-  async update(
-    viewerId: string,
-    postId: string,
-    dto: UpdatePostDto,
-  ): Promise<PostView> {
-    const current = await this.findAuthoredPost(
-      viewerId,
-      postId,
-      'Only the author can edit this post.',
-    );
+  async update(viewerId: string, postId: string, dto: UpdatePostDto): Promise<PostView> {
+    const current = await this.findAuthoredPost(viewerId, postId, 'Only the author can edit this post.');
 
-    if (
-      dto.caption !== undefined &&
-      !dto.caption.trim() &&
-      current._count.media === 0
-    ) {
+    if (dto.caption !== undefined && !dto.caption.trim() && current._count.media === 0) {
       throw new BadRequestException('Write something or add a photo to post.');
     }
 
@@ -355,11 +394,7 @@ export class PostsService {
    * while the row, its likes, comments, tags, and media stay in the database.
    */
   async remove(viewerId: string, postId: string): Promise<DeletedPostView> {
-    await this.findAuthoredPost(
-      viewerId,
-      postId,
-      'Only the author can delete this post.',
-    );
+    await this.findAuthoredPost(viewerId, postId, 'Only the author can delete this post.');
 
     const { count } = await this.prisma.post.updateMany({
       where: { id: postId, userId: viewerId, deletedAt: null },
@@ -374,28 +409,14 @@ export class PostsService {
   }
 
   /** The new visibility applies to the very next read, because every read uses visiblePostsWhere. */
-  async updateVisibility(
-    viewerId: string,
-    postId: string,
-    dto: UpdatePostVisibilityDto,
-  ): Promise<PostView> {
-    const post = await this.findAuthoredPost(
-      viewerId,
-      postId,
-      'Only the author can change who can see this post.',
-    );
+  async updateVisibility(viewerId: string, postId: string, dto: UpdatePostVisibilityDto): Promise<PostView> {
+    const post = await this.findAuthoredPost(viewerId, postId, 'Only the author can change who can see this post.');
 
     const keepsSavedAudience =
-      dto.visibility === 'CUSTOM' &&
-      dto.customViewerIds === undefined &&
-      post._count.customViewers > 0;
+      dto.visibility === 'CUSTOM' && dto.customViewerIds === undefined && post._count.customViewers > 0;
     const viewerIds = keepsSavedAudience
       ? null
-      : await this.resolveAudience(
-          viewerId,
-          dto.visibility,
-          dto.customViewerIds,
-        );
+      : await this.resolveAudience(viewerId, dto.visibility, dto.customViewerIds);
 
     const updated = await this.prisma.$transaction(async (tx) => {
       if (viewerIds) {
@@ -416,16 +437,8 @@ export class PostsService {
   }
 
   /** Only the author manages tags. The list replaces the current tags; [] removes them all. */
-  async updateTags(
-    viewerId: string,
-    postId: string,
-    dto: UpdatePostTagsDto,
-  ): Promise<PostView> {
-    await this.findAuthoredPost(
-      viewerId,
-      postId,
-      'Only the author can change who is tagged.',
-    );
+  async updateTags(viewerId: string, postId: string, dto: UpdatePostTagsDto): Promise<PostView> {
+    await this.findAuthoredPost(viewerId, postId, 'Only the author can change who is tagged.');
 
     const taggedIds = await this.resolveTags(viewerId, dto.userIds);
 
@@ -447,11 +460,7 @@ export class PostsService {
     return this.toView(updated, viewerId);
   }
 
-  private async page(
-    viewerId: string,
-    where: Prisma.PostWhereInput,
-    query: ListPostsQueryDto,
-  ): Promise<PostPage> {
+  private async page(viewerId: string, where: Prisma.PostWhereInput, query: ListPostsQueryDto): Promise<PostPage> {
     const take = query.limit ?? DEFAULT_PAGE_SIZE;
     const posts = await this.prisma.post.findMany({
       where: { AND: [where, visiblePostsWhere(viewerId)] },
@@ -470,11 +479,7 @@ export class PostsService {
   }
 
   /** 404 when the viewer cannot see the post (or it is deleted), 403 when they are not its author. */
-  private async findAuthoredPost(
-    viewerId: string,
-    postId: string,
-    forbiddenMessage: string,
-  ) {
+  private async findAuthoredPost(viewerId: string, postId: string, forbiddenMessage: string) {
     const post = await this.prisma.post.findFirst({
       where: { AND: [{ id: postId }, visiblePostsWhere(viewerId)] },
       select: {
@@ -500,10 +505,7 @@ export class PostsService {
   }
 
   /** Tagged people must be active, not the author, and not blocked in either direction. */
-  private async resolveTags(
-    authorId: string,
-    ids: string[],
-  ): Promise<string[]> {
+  private async resolveTags(authorId: string, ids: string[]): Promise<string[]> {
     if (ids.length === 0) {
       return [];
     }
@@ -546,31 +548,21 @@ export class PostsService {
   }
 
   private toView(post: PostRecord, viewerId: string): PostView {
-    const {
-      user,
-      customViewers,
-      userId,
-      tags,
-      locationName,
-      latitude,
-      longitude,
-      _count,
-      likes,
-      ...fields
-    } = post;
+    const { user, customViewers, userId, tags, locationName, latitude, longitude, _count, likes, ...fields } = post;
     const view: PostView = {
       ...fields,
       media: fields.media.map(({ contentType, ...item }) => ({
         ...item,
-        mediaUrl: contentType
-          ? this.photos.url(post.id, item.id, viewerId)
-          : item.mediaUrl,
+        mediaUrl: contentType ? this.photos.url(post.id, item.id, viewerId) : item.mediaUrl,
       })),
       author: user,
       likeCount: _count.likes,
       commentCount: _count.comments,
       shareCount: _count.shares,
       likedByViewer: likes.length > 0,
+      interestedByViewer: post.preferences[0]?.feedback === 'INTERESTED',
+      savedByViewer: Boolean(post.preferences[0]?.savedAt),
+      notInterestedByViewer: post.preferences[0]?.feedback === 'NOT_INTERESTED',
       location:
         locationName !== null && latitude !== null && longitude !== null
           ? { name: locationName, latitude, longitude }

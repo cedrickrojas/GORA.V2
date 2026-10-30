@@ -10,7 +10,7 @@ import {
   Min,
   ValidateIf,
 } from 'class-validator';
-import { ReportStatus, UserRole } from '../generated/prisma/client';
+import { ReportReason, ReportStatus, UserRole } from '../generated/prisma/client';
 
 export class AdminPageQuery {
   @IsOptional()
@@ -40,6 +40,10 @@ export class AdminReportsQuery extends AdminPageQuery {
   @IsOptional()
   @IsEnum(ReportStatus)
   status?: ReportStatus;
+
+  @IsOptional()
+  @IsEnum(ReportReason)
+  reason?: ReportReason;
 }
 
 export class UpdateAdminUserDto {

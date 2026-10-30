@@ -8,8 +8,13 @@ import {
   recordPostShare,
   deletePost as deletePostRequest,
   listFeed,
+  listSavedPosts,
+  listArchivedPosts,
   listUserPosts,
+  setPostFeedback,
   setPostLike,
+  setPostSaved,
+  setPostArchived,
   updatePost as updatePostRequest,
   updatePostTags as updatePostTagsRequest,
   updatePostVisibility as updatePostVisibilityRequest,
@@ -57,6 +62,8 @@ export const usePostsStore = defineStore('posts', () => {
   const posts = ref<FeedPost[]>([]);
   const isLoaded = ref(false);
   const serverPosts = ref<FeedPost[]>([]);
+  const savedPosts = ref<FeedPost[]>([]);
+  const archivedPosts = ref<FeedPost[]>([]);
   const serverStatus = ref<LoadStatus>('idle');
   const serverError = ref<string | null>(null);
   const loadedForUserId = ref<string | null>(null);
@@ -83,6 +90,7 @@ export const usePostsStore = defineStore('posts', () => {
     () => {
       feedGeneration++;
       serverPosts.value = [];
+      savedPosts.value = [];
       serverStatus.value = 'idle';
       serverError.value = null;
       loadedForUserId.value = null;
@@ -518,9 +526,93 @@ export const usePostsStore = defineStore('posts', () => {
     }
   }
 
+  async function setFeedback(postId: string, feedback: 'INTERESTED' | 'NOT_INTERESTED' | null): Promise<string | null> {
+    const post = findPost(postId);
+    if (!post) return 'This post is no longer available.';
+    if (!post.fromServer) return 'Sign in to save your post preferences.';
+    try {
+      const updated = toFeedPost(await authorized((token) => setPostFeedback(token, postId, feedback)));
+      replacePost(updated);
+      savedPosts.value = savedPosts.value.map((item) => (item.id === postId ? updated : item));
+      if (feedback === 'NOT_INTERESTED') {
+        serverPosts.value = serverPosts.value.filter((item) => item.id !== postId);
+        friendPosts.value = friendPosts.value.filter((item) => item.id !== postId);
+      }
+      return null;
+    } catch (caught) {
+      return describePostError(caught);
+    }
+  }
+
+  async function setSaved(postId: string, saved: boolean): Promise<string | null> {
+    const post = findPost(postId);
+    if (!post) return 'This post is no longer available.';
+    if (!post.fromServer) return 'Sign in to save posts to your account.';
+    try {
+      const updated = toFeedPost(await authorized((token) => setPostSaved(token, postId, saved)));
+      replacePost(updated);
+      savedPosts.value = saved
+        ? [updated, ...savedPosts.value.filter((item) => item.id !== postId)]
+        : savedPosts.value.filter((item) => item.id !== postId);
+      return null;
+    } catch (caught) {
+      return describePostError(caught);
+    }
+  }
+
+  async function loadSaved(): Promise<string | null> {
+    if (!auth.accessToken) return 'Sign in to view your saved posts.';
+    try {
+      const page = await authorized((token) => listSavedPosts(token));
+      savedPosts.value = page.posts.map(toFeedPost);
+      rememberProfilePosts(savedPosts.value);
+      return null;
+    } catch (caught) {
+      return describePostError(caught);
+    }
+  }
+
+  async function loadArchived(): Promise<string | null> {
+    if (!auth.accessToken) return 'Sign in to view archived posts.';
+    try {
+      const page = await authorized((token) => listArchivedPosts(token));
+      archivedPosts.value = page.posts.map(toFeedPost);
+      rememberProfilePosts(archivedPosts.value);
+      return null;
+    } catch (caught) {
+      return describePostError(caught);
+    }
+  }
+
+  async function setArchived(postId: string, archived: boolean): Promise<string | null> {
+    const post = findPost(postId);
+    if (!post || post.author.id !== me.value?.id) return 'Only the author can archive this post.';
+    if (!post.fromServer) return 'Sign in to archive posts.';
+    try {
+      const updated = toFeedPost(await authorized((token) => setPostArchived(token, postId, archived)));
+      replacePost(updated);
+      archivedPosts.value = archived
+        ? [updated, ...archivedPosts.value.filter((item) => item.id !== postId)]
+        : archivedPosts.value.filter((item) => item.id !== postId);
+      if (archived) {
+        serverPosts.value = serverPosts.value.filter((item) => item.id !== postId);
+        friendPosts.value = friendPosts.value.filter((item) => item.id !== postId);
+        savedPosts.value = savedPosts.value.filter((item) => item.id !== postId);
+      } else {
+        serverPosts.value = [updated, ...serverPosts.value.filter((item) => item.id !== postId)];
+        if (updated.savedByViewer) savedPosts.value = [updated, ...savedPosts.value.filter((item) => item.id !== postId)];
+      }
+      return null;
+    } catch (caught) {
+      return describePostError(caught);
+    }
+  }
+
   return {
     posts,
     serverPosts,
+    savedPosts,
+    archivedPosts,
     friendPosts,
     nextCursor,
     friendsNextCursor,
@@ -536,6 +628,8 @@ export const usePostsStore = defineStore('posts', () => {
     publishError,
     busyPostId,
     load,
+    loadSaved,
+    loadArchived,
     refresh,
     byAuthor,
     publish,
@@ -544,6 +638,9 @@ export const usePostsStore = defineStore('posts', () => {
     updateVisibility,
     updateTags,
     toggleLike,
+    setFeedback,
+    setSaved,
+    setArchived,
     findPost,
     rememberProfilePosts,
     loadPost,

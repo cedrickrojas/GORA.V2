@@ -113,25 +113,28 @@ beforeEach(() => {
 });
 afterEach(() => {
   wrapper?.unmount();
+  document.body.innerHTML = '';
   vi.unstubAllGlobals();
 });
 
-async function openPage() {
-  wrapper = mount(MyGamesPage, { global: { stubs: { RouterLink: RouterLinkStub } } });
+async function openPage(section: 'create' | 'joined' | 'hosted' = 'joined') {
+  wrapper = mount(MyGamesPage, { attachTo: document.body, global: { stubs: { RouterLink: RouterLinkStub } } });
+  await flushPromises();
+  await wrapper.get(`#my-games-tab-${section}`).trigger('click');
   await flushPromises();
   return wrapper;
 }
 
 describe('My Games', () => {
   test('hosted cards link to editing and request management', async () => {
-    const page = await openPage();
+    const page = await openPage('hosted');
     const links = page.findAllComponents(RouterLinkStub);
     expect(links.some((link) => link.props('to') === '/games/hosted/edit')).toBe(true);
     expect(page.get('.my-games__host-controls').text()).toContain('Manage Requests (2)');
   });
 
   test('host can switch between automatic and manual approval', async () => {
-    const page = await openPage();
+    const page = await openPage('hosted');
     const select = page.get('select');
     await select.setValue('auto');
     await flushPromises();
@@ -149,7 +152,7 @@ describe('My Games', () => {
   });
 
   test('failed mode changes restore the saved option and show the server error', async () => {
-    const page = await openPage();
+    const page = await openPage('hosted');
     const original = fetchMock.getMockImplementation()!;
     fetchMock.mockImplementation((url, init) =>
       init?.method === 'PATCH'
@@ -165,7 +168,7 @@ describe('My Games', () => {
   });
 
   test('cancelling a hosted game keeps it in hosted history and hides editing', async () => {
-    const page = await openPage();
+    const page = await openPage('hosted');
     await page.get('.my-games__host-cancel').trigger('click');
     await flushPromises();
     expect(useGamesStore().hostedGames[0].status).toBe('CANCELLED');
@@ -180,14 +183,32 @@ describe('My Games', () => {
       false,
     );
   });
-  test('keeps hosted and joined games in two separate sections', async () => {
+  test('offers Create, Joined, and Hosted menus and displays only the selected section', async () => {
     const page = await openPage();
-    const sections = page.findAll('section');
-    expect(sections).toHaveLength(2);
-    expect(sections[0].text()).toContain('Hosted Games');
-    expect(sections[0].text()).toContain('Hosted volleyball');
-    expect(sections[1].text()).toContain('Joined Games');
-    expect(sections[1].text()).toContain('Weekend basketball');
+    expect(page.findAll('[role="tab"]').map((tab) => tab.get('span').text())).toEqual([
+      'Create Games',
+      'Joined Games',
+      'Hosted Games',
+    ]);
+    expect(page.findAll('[role="tabpanel"]')).toHaveLength(3);
+    expect(page.get('#my-games-joined').isVisible()).toBe(true);
+    expect(page.get('#my-games-hosted').isVisible()).toBe(false);
+    expect(page.get('#my-games-create').isVisible()).toBe(false);
+    expect(page.get('#my-games-joined').text()).toContain('Weekend basketball');
+
+    await page.get('#my-games-tab-hosted').trigger('click');
+    await flushPromises();
+    expect(page.get('#my-games-hosted').isVisible()).toBe(true);
+    expect(page.get('#my-games-hosted').text()).toContain('Hosted volleyball');
+    expect(page.get('#my-games-joined').isVisible()).toBe(false);
+
+    await page.get('#my-games-tab-hosted').trigger('keydown', { key: 'Home' });
+    await flushPromises();
+    expect(page.get('#my-games-tab-create').attributes('aria-selected')).toBe('true');
+    expect(page.get('#my-games-create').isVisible()).toBe(true);
+    expect(page.get('#my-games-hosted').isVisible()).toBe(false);
+    const createLink = page.findAllComponents(RouterLinkStub).find((link) => link.props('to') === '/create/game');
+    expect(createLink?.isVisible()).toBe(true);
   });
 
   test.each(['accepted', 'pending'])('cancels an %s join and keeps it in history after reloading', async (state) => {

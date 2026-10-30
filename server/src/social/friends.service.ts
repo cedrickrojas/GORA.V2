@@ -1,9 +1,4 @@
-import {
-  BadRequestException,
-  ConflictException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AUTHOR_SELECT } from '../users/user.types';
@@ -77,14 +72,9 @@ export class FriendsService {
         receiver: { select: PERSON_SELECT },
       },
     });
-    const other = (row: (typeof rows)[number]) =>
-      row.requesterId === viewerId ? row.receiver : row.requester;
-    const friendIds = rows
-      .filter((row) => row.status === 'ACCEPTED')
-      .map((row) => other(row).id);
-    const requestIds = rows
-      .filter((row) => row.status === 'PENDING')
-      .map((row) => other(row).id);
+    const other = (row: (typeof rows)[number]) => (row.requesterId === viewerId ? row.receiver : row.requester);
+    const friendIds = rows.filter((row) => row.status === 'ACCEPTED').map((row) => other(row).id);
+    const requestIds = rows.filter((row) => row.status === 'PENDING').map((row) => other(row).id);
     const shared =
       friendIds.length && requestIds.length
         ? await this.prisma.friendship.findMany({
@@ -117,29 +107,20 @@ export class FriendsService {
       featured: false,
     });
     return {
-      friends: rows
-        .filter((row) => row.status === 'ACCEPTED')
-        .map((row) => person(other(row))),
+      friends: rows.filter((row) => row.status === 'ACCEPTED').map((row) => person(other(row))),
       requests: rows
         .filter((row) => row.status === 'PENDING')
         .map((row) => ({
           id: row.id,
-          direction:
-            row.receiverId === viewerId
-              ? ('RECEIVED' as const)
-              : ('SENT' as const),
+          direction: row.receiverId === viewerId ? ('RECEIVED' as const) : ('SENT' as const),
           player: person(other(row)),
           createdAt: row.createdAt.toISOString(),
           mutualFriends: shared.filter(
-            (pair) =>
-              pair.requesterId === other(row).id ||
-              pair.receiverId === other(row).id,
+            (pair) => pair.requesterId === other(row).id || pair.receiverId === other(row).id,
           ).length,
         })),
       blockedIds: rows
-        .filter(
-          (row) => row.status === 'BLOCKED' && row.blockedById === viewerId,
-        )
+        .filter((row) => row.status === 'BLOCKED' && row.blockedById === viewerId)
         .map((row) => other(row).id),
     };
   }
@@ -147,8 +128,7 @@ export class FriendsService {
   async send(viewerId: string, username: string) {
     const target = await this.users.findActiveByUsername(username);
     if (!target) throw new NotFoundException('User not found.');
-    if (target.id === viewerId)
-      throw new BadRequestException('You cannot add yourself.');
+    if (target.id === viewerId) throw new BadRequestException('You cannot add yourself.');
     const pairKey = toPairKey(viewerId, target.id);
     let row = await this.prisma.friendship.findUnique({ where: { pairKey } });
     if (!row) {
@@ -157,23 +137,16 @@ export class FriendsService {
           data: { requesterId: viewerId, receiverId: target.id, pairKey },
         });
       } catch (error) {
-        if (
-          !(error instanceof Prisma.PrismaClientKnownRequestError) ||
-          error.code !== 'P2002'
-        )
-          throw error;
+        if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== 'P2002') throw error;
         row = await this.prisma.friendship.findUniqueOrThrow({
           where: { pairKey },
         });
       }
     }
-    if (row.status === 'BLOCKED')
-      throw new NotFoundException('User not found.');
+    if (row.status === 'BLOCKED') throw new NotFoundException('User not found.');
     if (row.status === 'ACCEPTED') return this.list(viewerId);
     if (row.status === 'PENDING' && row.requesterId !== viewerId) {
-      throw new ConflictException(
-        'This player already sent you a request. Accept it to become friends.',
-      );
+      throw new ConflictException('This player already sent you a request. Accept it to become friends.');
     }
     if (row.status === 'REJECTED') {
       const result = await this.prisma.friendship.updateMany({
@@ -186,11 +159,41 @@ export class FriendsService {
           createdAt: new Date(),
         },
       });
-      if (!result.count)
-        throw new ConflictException(
-          'This relationship changed. Refresh and try again.',
-        );
+      if (!result.count) throw new ConflictException('This relationship changed. Refresh and try again.');
     }
+    return this.list(viewerId);
+  }
+
+  async block(viewerId: string, username: string) {
+    const target = await this.users.findActiveByUsername(username);
+    if (!target || target.id === viewerId) throw new NotFoundException('User not found.');
+    const pairKey = toPairKey(viewerId, target.id);
+    let row = await this.prisma.friendship.findUnique({ where: { pairKey } });
+    if (!row) {
+      try {
+        row = await this.prisma.friendship.create({
+          data: {
+            requesterId: viewerId,
+            receiverId: target.id,
+            pairKey,
+            status: 'BLOCKED',
+            blockedById: viewerId,
+          },
+        });
+      } catch (error) {
+        if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== 'P2002') throw error;
+        row = await this.prisma.friendship.findUniqueOrThrow({ where: { pairKey } });
+      }
+    }
+    if (row.status === 'BLOCKED') {
+      if (row.blockedById !== viewerId) throw new NotFoundException('User not found.');
+      return this.list(viewerId);
+    }
+    const result = await this.prisma.friendship.updateMany({
+      where: { id: row.id, status: row.status },
+      data: { status: 'BLOCKED', blockedById: viewerId },
+    });
+    if (!result.count) throw new ConflictException('This relationship changed. Refresh and try again.');
     return this.list(viewerId);
   }
 
@@ -205,10 +208,7 @@ export class FriendsService {
       },
       data: { status: 'ACCEPTED' },
     });
-    if (!result.count)
-      throw new NotFoundException(
-        'This friend request is no longer available.',
-      );
+    if (!result.count) throw new NotFoundException('This friend request is no longer available.');
     return this.list(viewerId);
   }
 
@@ -221,10 +221,7 @@ export class FriendsService {
       },
       data: { status: 'REJECTED' },
     });
-    if (!result.count)
-      throw new NotFoundException(
-        'This friend request is no longer available.',
-      );
+    if (!result.count) throw new NotFoundException('This friend request is no longer available.');
     return this.list(viewerId);
   }
 
@@ -239,8 +236,7 @@ export class FriendsService {
       },
       data: { status: 'REJECTED', blockedById: null },
     });
-    if (!result.count)
-      throw new NotFoundException('This relationship is no longer available.');
+    if (!result.count) throw new NotFoundException('This relationship is no longer available.');
     return this.list(viewerId);
   }
 }

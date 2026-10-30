@@ -21,6 +21,11 @@
 
       <template v-else>
         <ProfileHeader :profile="profile" editable :has-active-story="profile.sections.stories > 0">
+          <template #cover-actions>
+            <button type="button" class="profile-cover-menu" aria-label="Profile archive and saved posts" @click="coverMenuEvent = $event">
+              <ion-icon :icon="ellipsisHorizontal" aria-hidden="true" />
+            </button>
+          </template>
           <template #actions>
             <router-link to="/profile/edit" class="profile-action profile-action--primary">
               <ion-icon :icon="createOutline" aria-hidden="true" />
@@ -28,6 +33,13 @@
             </router-link>
           </template>
         </ProfileHeader>
+
+        <ion-popover :is-open="coverMenuEvent !== null" :event="coverMenuEvent" side="bottom" alignment="end" @did-dismiss="coverMenuEvent = null">
+          <nav class="profile-cover-menu__links" aria-label="Profile options">
+            <router-link to="/profile/archive" class="profile-cover-menu__link" @click="coverMenuEvent = null">Archive</router-link>
+            <router-link to="/profile/saved" class="profile-cover-menu__link" @click="coverMenuEvent = null">Saved Posts</router-link>
+          </nav>
+        </ion-popover>
 
         <nav class="profile-stats" aria-label="Profile summary">
           <router-link v-for="stat in stats" :key="stat.label" :to="stat.to" class="profile-stats__item">
@@ -179,7 +191,7 @@ import {
   alertController,
   onIonViewWillEnter,
 } from '@ionic/vue';
-import { chevronDown, createOutline, imageOutline } from 'ionicons/icons';
+import { chevronDown, createOutline, ellipsisHorizontal, imageOutline } from 'ionicons/icons';
 import ClubAvatar from '@/components/clubs/ClubAvatar.vue';
 import SectionHeader from '@/components/common/SectionHeader.vue';
 import UserAvatar from '@/components/common/UserAvatar.vue';
@@ -230,6 +242,7 @@ const sections = computed(() =>
 );
 /** The click that opened the More menu, used to anchor it. Null when closed. */
 const moreEvent = ref<Event | null>(null);
+const coverMenuEvent = ref<Event | null>(null);
 /** Every club you are an ACTIVE member of (the same list as My Clubs → Your clubs), owner first. */
 const myClubs = computed(() => groupMyClubs(clubsStore.clubs).joined);
 
@@ -605,5 +618,36 @@ onMounted(() => {
   height: 56px;
   margin: 0;
   border-radius: var(--gora-radius-card);
+}
+
+.profile-cover-menu {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  place-items: center;
+  border: 1px solid rgb(255 255 255 / 35%);
+  border-radius: 50%;
+  background: rgb(8 19 31 / 78%);
+  color: #fff;
+  font-size: 22px;
+  cursor: pointer;
+}
+
+.profile-cover-menu__links {
+  display: grid;
+  min-width: 170px;
+  padding: 6px;
+}
+
+.profile-cover-menu__link {
+  padding: 12px;
+  border-radius: 8px;
+  color: var(--gora-text);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.profile-cover-menu__link:hover {
+  background: var(--gora-surface);
 }
 </style>

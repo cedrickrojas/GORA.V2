@@ -1,0 +1,1 @@
+ALTER TYPE "ReportReason" ADD VALUE 'HELP_REQUEST';

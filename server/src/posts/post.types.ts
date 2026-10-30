@@ -36,8 +36,12 @@ export interface PostView {
   commentCount: number;
   shareCount: number;
   likedByViewer: boolean;
+  interestedByViewer?: boolean;
+  notInterestedByViewer?: boolean;
+  savedByViewer?: boolean;
   /** When the author last changed the caption, sport, or location; null if never. */
   editedAt: Date | null;
+  archivedAt?: Date | null;
   createdAt: Date;
   updatedAt: Date;
   /** Only present for the author. Nobody else ever receives the viewer list. */

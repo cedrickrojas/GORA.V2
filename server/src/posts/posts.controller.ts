@@ -23,6 +23,7 @@ import {
   UpdatePostTagsDto,
   UpdatePostVisibilityDto,
 } from './dto/post.dto';
+import { PostFeedbackDto, ReportPostDto } from './dto/post-actions.dto';
 import type { DeletedPostView, PostPage, PostView } from './post.types';
 import { POST_NOT_FOUND_MESSAGE, PostsService } from './posts.service';
 
@@ -34,6 +35,26 @@ const postIdPipe = new ParseUUIDPipe({
 @UseGuards(JwtAuthGuard)
 export class PostsController {
   constructor(private readonly postsService: PostsService) {}
+
+  @Get('posts/saved')
+  saved(@CurrentUser() viewer: CurrentUserContext) {
+    return this.postsService.saved(viewer.id);
+  }
+
+  @Get('posts/archived')
+  archived(@CurrentUser() viewer: CurrentUserContext) {
+    return this.postsService.archived(viewer.id);
+  }
+
+  @Put('posts/:postId/archive')
+  archive(@CurrentUser() viewer: CurrentUserContext, @Param('postId', postIdPipe) postId: string) {
+    return this.postsService.setArchived(viewer.id, postId, true);
+  }
+
+  @Delete('posts/:postId/archive')
+  restore(@CurrentUser() viewer: CurrentUserContext, @Param('postId', postIdPipe) postId: string) {
+    return this.postsService.setArchived(viewer.id, postId, false);
+  }
 
   @Get('posts/:postId/comments')
   comments(
@@ -63,34 +84,55 @@ export class PostsController {
   }
 
   @Post('posts/:postId/shares')
-  share(
-    @CurrentUser() viewer: CurrentUserContext,
-    @Param('postId', postIdPipe) postId: string,
-  ) {
+  share(@CurrentUser() viewer: CurrentUserContext, @Param('postId', postIdPipe) postId: string) {
     return this.postsService.share(viewer.id, postId);
   }
 
-  @Post('posts')
-  create(
+  @Post('posts/:postId/feedback')
+  feedback(
     @CurrentUser() viewer: CurrentUserContext,
-    @Body() dto: CreatePostDto,
-  ): Promise<PostView> {
+    @Param('postId', postIdPipe) postId: string,
+    @Body() dto: PostFeedbackDto,
+  ) {
+    return this.postsService.setFeedback(viewer.id, postId, dto.feedback);
+  }
+
+  @Delete('posts/:postId/feedback')
+  clearFeedback(@CurrentUser() viewer: CurrentUserContext, @Param('postId', postIdPipe) postId: string) {
+    return this.postsService.setFeedback(viewer.id, postId, null);
+  }
+
+  @Put('posts/:postId/save')
+  save(@CurrentUser() viewer: CurrentUserContext, @Param('postId', postIdPipe) postId: string) {
+    return this.postsService.setSaved(viewer.id, postId, true);
+  }
+
+  @Delete('posts/:postId/save')
+  unsave(@CurrentUser() viewer: CurrentUserContext, @Param('postId', postIdPipe) postId: string) {
+    return this.postsService.setSaved(viewer.id, postId, false);
+  }
+
+  @Post('posts/:postId/report')
+  report(
+    @CurrentUser() viewer: CurrentUserContext,
+    @Param('postId', postIdPipe) postId: string,
+    @Body() dto: ReportPostDto,
+  ) {
+    return this.postsService.reportPost(viewer.id, postId, dto);
+  }
+
+  @Post('posts')
+  create(@CurrentUser() viewer: CurrentUserContext, @Body() dto: CreatePostDto): Promise<PostView> {
     return this.postsService.create(viewer.id, dto);
   }
 
   @Get('posts')
-  listFeed(
-    @CurrentUser() viewer: CurrentUserContext,
-    @Query() query: ListPostsQueryDto,
-  ): Promise<PostPage> {
+  listFeed(@CurrentUser() viewer: CurrentUserContext, @Query() query: ListPostsQueryDto): Promise<PostPage> {
     return this.postsService.listFeed(viewer.id, query);
   }
 
   @Get('posts/:postId')
-  findOne(
-    @CurrentUser() viewer: CurrentUserContext,
-    @Param('postId', postIdPipe) postId: string,
-  ): Promise<PostView> {
+  findOne(@CurrentUser() viewer: CurrentUserContext, @Param('postId', postIdPipe) postId: string): Promise<PostView> {
     return this.postsService.findVisible(viewer.id, postId);
   }
 
@@ -104,18 +146,12 @@ export class PostsController {
   }
 
   @Put('posts/:postId/like')
-  like(
-    @CurrentUser() viewer: CurrentUserContext,
-    @Param('postId', postIdPipe) postId: string,
-  ): Promise<PostView> {
+  like(@CurrentUser() viewer: CurrentUserContext, @Param('postId', postIdPipe) postId: string): Promise<PostView> {
     return this.postsService.setLike(viewer.id, postId, true);
   }
 
   @Delete('posts/:postId/like')
-  unlike(
-    @CurrentUser() viewer: CurrentUserContext,
-    @Param('postId', postIdPipe) postId: string,
-  ): Promise<PostView> {
+  unlike(@CurrentUser() viewer: CurrentUserContext, @Param('postId', postIdPipe) postId: string): Promise<PostView> {
     return this.postsService.setLike(viewer.id, postId, false);
   }
 

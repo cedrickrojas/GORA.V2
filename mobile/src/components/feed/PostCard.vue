@@ -1,5 +1,5 @@
 <template>
-  <article class="post-card">
+  <article v-if="!hiddenByPreference" class="post-card">
     <header class="post-card__header">
       <router-link :to="authorPath" class="post-card__avatar" :aria-label="`${post.author.displayName}'s profile`">
         <UserAvatar :user="post.author" :size="38" />
@@ -26,7 +26,6 @@
         Announcement
       </span>
       <button
-        v-if="isOwnPost"
         type="button"
         class="post-card__menu"
         :class="{ 'post-card__menu--solo': !post.isAnnouncement }"
@@ -145,6 +144,7 @@
         <span class="sr-only">Share</span>
       </button>
     </footer>
+    <ReportPostModal :post="reportTarget" @close="reportTarget = null" />
   </article>
 </template>
 
@@ -164,6 +164,9 @@ import {
 } from '@ionic/vue';
 import {
   arrowRedoOutline,
+  archiveOutline,
+  bookmarkOutline,
+  flagOutline,
   chatbubbleOutline,
   createOutline,
   earthOutline,
@@ -177,6 +180,8 @@ import {
   personAddOutline,
   settingsOutline,
   trashOutline,
+  thumbsDownOutline,
+  thumbsUpOutline,
 } from 'ionicons/icons';
 import { RouterLink } from 'vue-router';
 import UserAvatar from '@/components/common/UserAvatar.vue';
@@ -192,6 +197,7 @@ import { formatCompactNumber, formatTimeAgo } from '@/utils/time';
 import EditPostModal from './EditPostModal.vue';
 import EditPostPrivacyModal from './EditPostPrivacyModal.vue';
 import TagPeopleModal from './TagPeopleModal.vue';
+import ReportPostModal from './ReportPostModal.vue';
 
 const MEDIA_PREVIEW_LIMIT = 4;
 
@@ -211,6 +217,8 @@ const isEditingPost = ref(false);
 const isEditingPrivacy = ref(false);
 const isEditingTags = ref(false);
 const galleryOpen = ref(false);
+const reportTarget = ref<FeedPost | null>(null);
+const hiddenByPreference = ref(false);
 
 /** Only the indicator is shown; the list of custom viewers never appears on the card. */
 const privacy = computed(() => getPrivacyOption(props.post.visibility));
@@ -249,27 +257,84 @@ async function saveTags(ids: string[]): Promise<string | null> {
 }
 
 async function openOptions(): Promise<void> {
+  const preferences = [
+    {
+      text: props.post.interestedByViewer ? 'Remove interested' : 'Interested',
+      icon: thumbsUpOutline,
+      handler: () => void setFeedback(props.post.interestedByViewer ? null : 'INTERESTED'),
+    },
+    {
+      text: props.post.notInterestedByViewer ? 'Undo not interested' : 'Not interested',
+      icon: thumbsDownOutline,
+      handler: () => void setFeedback(props.post.notInterestedByViewer ? null : 'NOT_INTERESTED'),
+    },
+    {
+      text: props.post.savedByViewer ? 'Remove from saved' : 'Save post',
+      icon: bookmarkOutline,
+      handler: () => void savePost(!props.post.savedByViewer),
+    },
+    ...(!isOwnPost.value
+      ? [
+          {
+            text: 'Report post',
+            icon: flagOutline,
+            role: 'destructive' as const,
+            handler: () => {
+              reportTarget.value = props.post;
+            },
+          },
+        ]
+      : []),
+  ];
   const sheet = await actionSheetController.create({
     header: 'Post options',
     cssClass: 'gora-sheet',
-    buttons: [
-      { text: 'Edit post', icon: createOutline, handler: () => void (isEditingPost.value = true) },
-      {
-        text: 'Edit privacy',
-        icon: PRIVACY_ICONS[props.post.visibility],
-        handler: () => void (isEditingPrivacy.value = true),
-      },
-      {
-        text: taggedIds.value.length > 0 ? 'Edit tags' : 'Tag people',
-        icon: personAddOutline,
-        handler: () => void (isEditingTags.value = true),
-      },
-      { text: 'Delete post', icon: trashOutline, role: 'destructive', handler: () => void confirmDelete() },
-      { text: 'Cancel', role: 'cancel' },
-    ],
+    buttons: isOwnPost.value
+      ? [
+          { text: 'Edit post', icon: createOutline, handler: () => void (isEditingPost.value = true) },
+          {
+            text: 'Edit privacy',
+            icon: PRIVACY_ICONS[props.post.visibility],
+            handler: () => void (isEditingPrivacy.value = true),
+          },
+          {
+            text: taggedIds.value.length > 0 ? 'Edit tags' : 'Tag people',
+            icon: personAddOutline,
+            handler: () => void (isEditingTags.value = true),
+          },
+          ...preferences.filter((option) => option.text.includes('Save') || option.text.includes('saved')),
+          {
+            text: props.post.archivedAt ? 'Restore from archive' : 'Archive post',
+            icon: archiveOutline,
+            handler: () => void archivePost(!props.post.archivedAt),
+          },
+          { text: 'Delete post', icon: trashOutline, role: 'destructive', handler: () => void confirmDelete() },
+          { text: 'Cancel', role: 'cancel' },
+        ]
+      : [...preferences, { text: 'Cancel', role: 'cancel' }],
   });
 
   await sheet.present();
+}
+
+async function setFeedback(feedback: 'INTERESTED' | 'NOT_INTERESTED' | null): Promise<void> {
+  const error = await postsStore.setFeedback(props.post.id, feedback);
+  if (error) {
+    void showNotice(error);
+    return;
+  }
+  if (feedback === 'NOT_INTERESTED') hiddenByPreference.value = true;
+  else void showNotice(feedback ? 'We’ll show you more posts like this.' : 'Post preference updated.');
+}
+
+async function savePost(saved: boolean): Promise<void> {
+  const error = await postsStore.setSaved(props.post.id, saved);
+  void showNotice(error ?? (saved ? 'Post saved.' : 'Post removed from saved.'));
+}
+
+async function archivePost(archived: boolean): Promise<void> {
+  const error = await postsStore.setArchived(props.post.id, archived);
+  void showNotice(error ?? (archived ? 'Post archived.' : 'Post restored to your profile.'));
 }
 
 async function confirmDelete(): Promise<void> {
@@ -294,7 +359,12 @@ async function confirmDelete(): Promise<void> {
 }
 
 const failedMedia = ref(new Set<string>());
-watch(() => props.post.media, () => { failedMedia.value = new Set(); });
+watch(
+  () => props.post.media,
+  () => {
+    failedMedia.value = new Set();
+  },
+);
 const availableMedia = computed(() => props.post.media.filter((item) => item.url && !failedMedia.value.has(item.id)));
 const visibleMedia = computed(() => availableMedia.value.slice(0, MEDIA_PREVIEW_LIMIT));
 const hiddenMediaCount = computed(() => availableMedia.value.length - visibleMedia.value.length);

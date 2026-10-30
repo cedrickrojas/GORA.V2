@@ -84,3 +84,35 @@ export function deletePost(token: string, postId: string): Promise<{ id: string;
 export function setPostLike(token: string, postId: string, liked: boolean): Promise<ApiPost> {
   return apiRequest<ApiPost>(`${post(postId)}/like`, { method: liked ? 'PUT' : 'DELETE', token });
 }
+
+export function setPostFeedback(
+  token: string,
+  postId: string,
+  feedback: 'INTERESTED' | 'NOT_INTERESTED' | null,
+): Promise<ApiPost> {
+  return apiRequest<ApiPost>(`${post(postId)}/feedback`, {
+    method: feedback ? 'POST' : 'DELETE',
+    ...(feedback ? { body: { feedback } } : {}),
+    token,
+  });
+}
+
+export function setPostSaved(token: string, postId: string, saved: boolean): Promise<ApiPost> {
+  return apiRequest<ApiPost>(`${post(postId)}/save`, { method: saved ? 'PUT' : 'DELETE', token });
+}
+
+export function listSavedPosts(token: string): Promise<ApiPostPage> {
+  return apiRequest<ApiPostPage>('/posts/saved', { token });
+}
+
+export function listArchivedPosts(token: string): Promise<ApiPostPage> {
+  return apiRequest<ApiPostPage>('/posts/archived', { token });
+}
+
+export function setPostArchived(token: string, postId: string, archived: boolean): Promise<ApiPost> {
+  return apiRequest<ApiPost>(`${post(postId)}/archive`, { method: archived ? 'PUT' : 'DELETE', token });
+}
+
+export function reportPost(token: string, postId: string, reason: string, description: string): Promise<void> {
+  return apiRequest(`${post(postId)}/report`, { method: 'POST', body: { reason, description }, token });
+}

@@ -22,6 +22,11 @@
                 class="nav-count"
                 >{{ number(overview.pendingReports) }}</span
               >
+              <span
+                v-if="item.id === 'inbox' && overview?.pendingHelpMessages"
+                class="nav-count"
+                >{{ number(overview.pendingHelpMessages) }}</span
+              >
             </button>
           </nav>
           <div class="sidebar-footer">
@@ -304,11 +309,11 @@
                 </section>
               </template>
 
-              <template v-if="section === 'reports'">
+              <template v-if="section === 'reports' || section === 'inbox'">
                 <form class="filters" @submit.prevent="applyFilters">
                   <label class="filter-label"
-                    >Report status<select v-model="reportStatus">
-                      <option value="">All reports</option>
+                    >{{ section === 'inbox' ? 'Message status' : 'Report status' }}<select v-model="reportStatus">
+                      <option value="">{{ section === 'inbox' ? 'All messages' : 'All reports' }}</option>
                       <option
                         v-for="status in reportStatuses"
                         :key="status"
@@ -320,8 +325,7 @@
                   ><button class="button secondary" :disabled="loading">
                     Apply</button
                   ><span class="muted filter-note"
-                    >Resolving a report records the review outcome. Account
-                    actions are managed in Users.</span
+                    >{{ section === 'inbox' ? 'Help requests are private to the admin team.' : 'Resolving a report records the review outcome. Account actions are managed in Users.' }}</span
                   >
                 </form>
                 <div class="report-list">
@@ -341,7 +345,7 @@
                     </div>
                     <h2>{{ humanize(report.reason) }}</h2>
                     <p class="report-meta">
-                      Reported by
+                      {{ section === 'inbox' ? 'Sent by' : 'Reported by' }}
                       <strong>@{{ report.reporter.username }}</strong
                       ><template v-if="report.reportedUser">
                         · About
@@ -353,7 +357,7 @@
                     <p v-if="report.description" class="report-description">
                       {{ report.description }}
                     </p>
-                    <div class="report-evidence">
+                    <div v-if="section === 'reports'" class="report-evidence">
                       <span>{{ reportTarget(report).label }}</span
                       ><code>{{ reportTarget(report).id }}</code>
                       <p v-if="reportPreview(report)">
@@ -388,7 +392,7 @@
                 >
                   <ion-icon :icon="checkmarkCircleOutline" aria-hidden="true" />
                   <h2>You're all caught up</h2>
-                  <p>No reports match the selected status.</p>
+                    <p>{{ section === 'inbox' ? 'No help messages match the selected status.' : 'No reports match the selected status.' }}</p>
                 </div>
               </template>
 
@@ -610,6 +614,7 @@ import {
   flagOutline,
   footballOutline,
   informationCircleOutline,
+  mailOutline,
   peopleOutline,
   refreshOutline,
   searchOutline,
@@ -652,6 +657,13 @@ const sections = [
     title: 'Keep the community safe.',
     description: 'Review reported activity and record moderation decisions.',
     icon: flagOutline,
+  },
+  {
+    id: 'inbox',
+    label: 'Inbox',
+    title: 'Messages from athletes.',
+    description: 'Read and resolve help requests sent from Settings.',
+    icon: mailOutline,
   },
   {
     id: 'sports',
@@ -704,7 +716,7 @@ const reportStatuses: ReportStatus[] = [
 const pagination = computed(() =>
   section.value === 'users'
     ? users.value
-    : section.value === 'reports'
+      : section.value === 'reports' || section.value === 'inbox'
       ? reports.value
       : section.value === 'audit'
         ? audit.value
@@ -878,14 +890,15 @@ async function load() {
     if (roleFilter.value) params.set('role', roleFilter.value);
     if (userStatus.value) params.set('status', userStatus.value);
   }
-  if (selected === 'reports' && reportStatus.value)
+  if ((selected === 'reports' || selected === 'inbox') && reportStatus.value)
     params.set('status', reportStatus.value);
+  if (selected === 'inbox') params.set('reason', 'HELP_REQUEST');
   try {
     const [summary, result] = await Promise.all([
       adminApi.overview(token),
       selected === 'users'
         ? adminApi.users(token, params)
-        : selected === 'reports'
+        : selected === 'reports' || selected === 'inbox'
           ? adminApi.reports(token, params)
           : selected === 'sports'
             ? adminApi.sports(token)
@@ -903,7 +916,7 @@ async function load() {
     }
     overview.value = summary;
     if (selected === 'users') users.value = result as AdminPage<AdminUser>;
-    if (selected === 'reports')
+    if (selected === 'reports' || selected === 'inbox')
       reports.value = result as AdminPage<AdminReport>;
     if (selected === 'sports') sports.value = result as AdminSport[];
     if (selected === 'audit') audit.value = result as AdminPage<AdminAudit>;

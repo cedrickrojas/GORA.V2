@@ -21,6 +21,36 @@
 
       <template v-else>
         <ProfileHeader :profile="header">
+          <template #cover-actions>
+            <div v-if="relationship !== 'SELF'" class="user-profile__menu-wrap">
+              <button
+                type="button"
+                class="user-profile__menu-trigger"
+                aria-label="More profile options"
+                aria-haspopup="menu"
+                :aria-expanded="profileMenuOpen"
+                @click="profileMenuOpen = !profileMenuOpen"
+              >
+                <ion-icon :icon="ellipsisHorizontalOutline" aria-hidden="true" />
+              </button>
+              <div v-if="profileMenuOpen" class="user-profile__menu" role="menu" aria-label="Profile options">
+                <button type="button" role="menuitem" @click="openReport">
+                  <ion-icon :icon="flagOutline" aria-hidden="true" />
+                  Report
+                </button>
+                <button
+                  v-if="!isBlocked"
+                  type="button"
+                  class="user-profile__menu-danger"
+                  role="menuitem"
+                  @click="confirmBlock"
+                >
+                  <ion-icon :icon="banOutline" aria-hidden="true" />
+                  Block
+                </button>
+              </div>
+            </div>
+          </template>
           <template #actions>
             <button
               v-for="action in actions"
@@ -138,6 +168,7 @@
         </template>
       </template>
     </ion-content>
+    <ReportUserModal :user="reportTarget" @close="reportTarget = null" />
   </ion-page>
 </template>
 
@@ -149,6 +180,9 @@ import {
   checkmarkOutline,
   chatbubbleEllipsesOutline,
   closeOutline,
+  banOutline,
+  ellipsisHorizontalOutline,
+  flagOutline,
   lockOpenOutline,
   personAddOutline,
   peopleOutline,
@@ -162,6 +196,7 @@ import GameCard from '@/components/games/GameCard.vue';
 import SubPageHeader from '@/components/layout/SubPageHeader.vue';
 import MySportsSection from '@/components/profile/MySportsSection.vue';
 import ProfileHeader from '@/components/profile/ProfileHeader.vue';
+import ReportUserModal from '@/components/profile/ReportUserModal.vue';
 import SportList from '@/components/profile/SportList.vue';
 import ReelThumb from '@/components/reels/ReelThumb.vue';
 import { useNow } from '@/composables/useNow';
@@ -240,6 +275,8 @@ const clubsStore = useClubsStore();
 const catalog = useCatalogStore();
 const { likePost, commentOnPost, sharePost } = usePostActions();
 const now = useNow();
+const reportTarget = ref<ProfileIdentity | null>(null);
+const profileMenuOpen = ref(false);
 
 /** Ionic keeps one cached page per URL, so each instance stays on the user it opened with. */
 const pageUsername = String(route.params.username ?? '')
@@ -436,6 +473,40 @@ async function message(identity: ProfileIdentity): Promise<void> {
   }
 
   await router.push(chatStore.openRequest(partner));
+}
+
+function openReport(): void {
+  if (header.value) reportTarget.value = header.value;
+  profileMenuOpen.value = false;
+}
+
+async function confirmBlock(): Promise<void> {
+  const identity = header.value;
+  if (!identity) return;
+  profileMenuOpen.value = false;
+  const alert = await alertController.create({
+    header: `Block @${identity.username}?`,
+    message:
+      'They will not be able to see your profile or message you. You will no longer see their profile or activity.',
+    buttons: [
+      { text: 'Cancel', role: 'cancel' },
+      { text: 'Block', role: 'destructive', handler: () => void blockProfileUser(identity) },
+    ],
+  });
+  await alert.present();
+}
+
+async function blockProfileUser(identity: ProfileIdentity): Promise<void> {
+  const ok = await friendsStore.block(identity.id, identity.username);
+  if (!ok) {
+    if (friendsStore.error) void showNotice(friendsStore.error);
+    return;
+  }
+  void showNotice(`@${identity.username} has been blocked.`);
+  if (apiProfile.value) {
+    const result = await profileStore.fetchProfile(pageUsername);
+    if (result.status === 'found' && !result.profile.isOwnProfile) apiProfile.value = result.profile;
+  }
 }
 
 async function runAction(action: ProfileAction): Promise<void> {
@@ -665,6 +736,67 @@ onMounted(() => {
 .user-profile__action--primary {
   background: var(--ion-color-primary);
   color: var(--ion-color-primary-contrast);
+}
+
+.user-profile__menu-wrap {
+  position: relative;
+}
+
+.user-profile__menu-trigger {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 50%;
+  background: rgba(8, 19, 31, 0.78);
+  color: #fff;
+  cursor: pointer;
+}
+
+.user-profile__menu-trigger ion-icon {
+  font-size: 22px;
+}
+
+.user-profile__menu {
+  position: absolute;
+  z-index: 4;
+  top: 48px;
+  right: 0;
+  width: 190px;
+  padding: 6px;
+  border: 1px solid var(--gora-line);
+  border-radius: 12px;
+  background: var(--gora-surface-raised);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.35);
+}
+
+.user-profile__menu button {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ion-text-color);
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+.user-profile__menu button:hover,
+.user-profile__menu button:focus-visible {
+  background: var(--gora-surface);
+}
+
+.user-profile__menu .user-profile__menu-danger {
+  color: #ff8585;
+}
+
+.user-profile__menu button ion-icon {
+  font-size: 18px;
 }
 
 .user-profile__blocked {

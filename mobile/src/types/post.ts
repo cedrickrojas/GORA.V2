@@ -49,12 +49,16 @@ export interface FeedPost {
   createdAt: string;
   /** When the author last edited the caption, sport, or location ("Edited"). */
   editedAt?: string | null;
+  archivedAt?: string | null;
   /** Stored in PostgreSQL (from the posts API); demo posts leave this unset. */
   fromServer?: boolean;
   likes: number;
   comments: number;
   shares: number;
   likedByViewer: boolean;
+  interestedByViewer?: boolean;
+  notInterestedByViewer?: boolean;
+  savedByViewer?: boolean;
 }
 
 /** Edit Post: caption, sport, and location. Privacy and tags have their own editors. */
@@ -89,7 +93,11 @@ export interface ApiPost {
   commentCount: number;
   shareCount: number;
   likedByViewer: boolean;
+  interestedByViewer?: boolean;
+  notInterestedByViewer?: boolean;
+  savedByViewer?: boolean;
   editedAt: string | null;
+  archivedAt?: string | null;
   createdAt: string;
   updatedAt: string;
   /** Only sent to the author. */

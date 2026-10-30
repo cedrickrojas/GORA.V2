@@ -48,6 +48,7 @@ export class AdminService {
       reels,
       pendingReports,
       reviewingReports,
+      pendingHelpMessages,
       registrations,
     ] = await Promise.all([
       this.prisma.user.count(),
@@ -56,8 +57,9 @@ export class AdminService {
       this.prisma.game.count(),
       this.prisma.club.count(),
       this.prisma.reel.count(),
-      this.prisma.report.count({ where: { status: 'PENDING' } }),
-      this.prisma.report.count({ where: { status: 'REVIEWING' } }),
+      this.prisma.report.count({ where: { status: 'PENDING', reason: { not: 'HELP_REQUEST' } } }),
+      this.prisma.report.count({ where: { status: 'REVIEWING', reason: { not: 'HELP_REQUEST' } } }),
+      this.prisma.report.count({ where: { status: 'PENDING', reason: 'HELP_REQUEST' } }),
       this.prisma.$queryRaw<{ day: string; total: bigint }[]>`
         SELECT to_char("createdAt", 'YYYY-MM-DD') AS day, count(*) AS total
         FROM "User" WHERE "createdAt" >= ${start} GROUP BY day ORDER BY day`,
@@ -80,6 +82,7 @@ export class AdminService {
       reels,
       pendingReports,
       reviewingReports,
+      pendingHelpMessages,
       dailyRegistrations,
     };
   }
@@ -169,9 +172,10 @@ export class AdminService {
   }
 
   async reports(query: AdminReportsQuery) {
-    const where: Prisma.ReportWhereInput = query.status
-      ? { status: query.status }
-      : {};
+    const where: Prisma.ReportWhereInput = {
+      ...(query.reason ? { reason: query.reason } : { reason: { not: 'HELP_REQUEST' } }),
+      ...(query.status ? { status: query.status } : {}),
+    };
     const [items, total] = await this.prisma.$transaction([
       this.prisma.report.findMany({
         where,

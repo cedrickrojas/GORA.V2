@@ -40,7 +40,11 @@ const SOCIAL_HOSTS = {
 
 export const MEMBERSHIP_TYPE_OPTIONS: { id: ClubMembershipType; label: string; hint: string }[] = [
   { id: 'OPEN', label: 'Open', hint: 'Anyone can join instantly while there is room.' },
-  { id: 'APPROVAL_REQUIRED', label: 'Approval Required', hint: 'People request to join; you or an admin approve them.' },
+  {
+    id: 'APPROVAL_REQUIRED',
+    label: 'Approval Required',
+    hint: 'People request to join; you or an admin approve them.',
+  },
   { id: 'INVITE_ONLY', label: 'Invite Only', hint: 'Only people you or an admin invite can join.' },
 ];
 
@@ -59,6 +63,9 @@ export const ACTIVITY_DAY_LABELS: Record<ClubActivityDay, string> = {
   SATURDAY: 'Saturday',
   SUNDAY: 'Sunday',
 };
+
+export type ClubFormSection =
+  'identity' | 'photos' | 'sports' | 'location' | 'membership' | 'rules' | 'schedule' | 'contact';
 
 export type ClubFormField = keyof ClubForm | 'location';
 export type ClubFormErrors = Partial<Record<ClubFormField, string>>;
@@ -120,11 +127,7 @@ export function normalizeClubTag(value: string): string {
 }
 
 /** The typed maximum-members value, or the message explaining what is wrong with it. */
-export function checkMaxMembers(
-  value: string,
-  limit = CLUB_MAX_MEMBERS_LIMIT,
-  currentMembers = 0,
-): string | null {
+export function checkMaxMembers(value: string, limit = CLUB_MAX_MEMBERS_LIMIT, currentMembers = 0): string | null {
   const trimmed = value.trim();
 
   if (trimmed === '') {
@@ -242,7 +245,10 @@ export function validateClubForm(form: ClubForm, context: ClubFormContext = {}):
   } else if (lat !== '') {
     const latitude = Number(lat);
     const longitude = Number(lng);
-    set('location', !Number.isFinite(latitude) || Math.abs(latitude) > 90 ? 'Latitude must be between -90 and 90.' : null);
+    set(
+      'location',
+      !Number.isFinite(latitude) || Math.abs(latitude) > 90 ? 'Latitude must be between -90 and 90.' : null,
+    );
     set(
       'location',
       !Number.isFinite(longitude) || Math.abs(longitude) > 180 ? 'Longitude must be between -180 and 180.' : null,

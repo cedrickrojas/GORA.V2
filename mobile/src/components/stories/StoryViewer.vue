@@ -143,6 +143,16 @@ watch(
   --background: #000;
 }
 
+/* Keep the desktop player in a centered portrait frame that fits the laptop height. */
+@media (min-width: 768px) and (min-height: 600px) {
+  .story-viewer-modal {
+    --height: min(calc(100dvh - 48px), 900px);
+    --width: min(calc((100dvh - 48px) * 0.5625), 506.25px);
+    --border-radius: 18px;
+    --backdrop-opacity: 0.85;
+  }
+}
+
 .story-viewer {
   position: relative;
   width: 100%;
@@ -157,9 +167,11 @@ watch(
 }
 
 .story-viewer__image {
+  display: block;
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  background: #000;
+  object-fit: contain;
 }
 
 .story-viewer__placeholder {
@@ -228,10 +240,17 @@ watch(
 
 .story-viewer__meta {
   display: flex;
+  min-width: 0;
   flex: 1;
   flex-direction: column;
   font-size: 0.85rem;
   line-height: 1.25;
+}
+
+.story-viewer__meta strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .story-viewer__meta span {

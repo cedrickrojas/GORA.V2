@@ -35,3 +35,15 @@ export async function getProfile(token: string, username: string): Promise<OwnPr
     await apiRequest<OwnProfile | OtherProfile>(`/profiles/${encodeURIComponent(username)}`, { token }),
   );
 }
+
+export async function reportUser(token: string, username: string, reason: string, description: string): Promise<void> {
+  await apiRequest(`/profiles/${encodeURIComponent(username)}/report`, {
+    method: 'POST',
+    body: { reason, description },
+    token,
+  });
+}
+
+export async function sendHelpRequest(token: string, message: string): Promise<void> {
+  await apiRequest('/profiles/help', { method: 'POST', body: { message }, token });
+}

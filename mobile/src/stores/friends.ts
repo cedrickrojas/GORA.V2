@@ -4,6 +4,7 @@ import { fetchFriends } from '@/services/catalog.service';
 import { fetchFriendRequests } from '@/services/social.service';
 import {
   acceptFriendRequest,
+  blockFriend,
   dismissFriendRequest,
   getFriends,
   removeFriend,
@@ -176,6 +177,16 @@ export const useFriendsStore = defineStore('friends', () => {
     return mutate(username, (token) => removeFriend(token, username));
   }
 
+  async function block(userId: string, username: string): Promise<boolean> {
+    if (auth.accessToken) return mutate(userId, (token) => blockFriend(token, username));
+    if (blockedIds.value.includes(userId)) return true;
+    blockedIds.value = [...blockedIds.value, userId];
+    friends.value = friends.value.filter((friend) => friend.id !== userId);
+    requests.value = requests.value.filter((request) => request.player.id !== userId);
+    revision.value++;
+    return true;
+  }
+
   async function unblock(userId: string, username?: string): Promise<boolean> {
     if (auth.accessToken && username) return mutate(userId, (token) => unblockFriend(token, username));
     blockedIds.value = blockedIds.value.filter((id) => id !== userId);
@@ -204,6 +215,7 @@ export const useFriendsStore = defineStore('friends', () => {
     relationshipWith,
     sendRequest,
     unfriend,
+    block,
     unblock,
   };
 });

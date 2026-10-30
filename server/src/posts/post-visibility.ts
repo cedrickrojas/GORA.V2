@@ -47,6 +47,7 @@ export function visibleTaggedUserWhere(
 export function visiblePostsWhere(viewerId: string): Prisma.PostWhereInput {
   return {
     deletedAt: null,
+    archivedAt: null,
     OR: [
       { userId: viewerId },
       {

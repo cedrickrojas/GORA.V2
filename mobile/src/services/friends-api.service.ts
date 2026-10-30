@@ -20,6 +20,8 @@ export const removeFriend = (token: string, username: string) =>
   apiRequest<FriendsSnapshot>(`/friends/${encodeURIComponent(username)}`, { method: 'DELETE', token });
 export const unblockFriend = (token: string, username: string) =>
   apiRequest<FriendsSnapshot>(`/friends/blocks/${encodeURIComponent(username)}`, { method: 'DELETE', token });
+export const blockFriend = (token: string, username: string) =>
+  apiRequest<FriendsSnapshot>(`/friends/blocks/${encodeURIComponent(username)}`, { method: 'POST', token });
 
 export async function searchPlayers(token: string, query: string): Promise<PlayerSummary[]> {
   const users = await apiRequest<

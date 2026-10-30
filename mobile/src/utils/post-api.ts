@@ -32,11 +32,15 @@ export function toFeedPost(post: ApiPost): FeedPost {
     location: post.location,
     createdAt: post.createdAt,
     editedAt: post.editedAt,
+    archivedAt: post.archivedAt,
     fromServer: true,
     likes: post.likeCount,
     comments: post.commentCount,
     shares: post.shareCount,
     likedByViewer: post.likedByViewer,
+    interestedByViewer: post.interestedByViewer ?? false,
+    notInterestedByViewer: post.notInterestedByViewer ?? false,
+    savedByViewer: post.savedByViewer ?? false,
   };
 }
 

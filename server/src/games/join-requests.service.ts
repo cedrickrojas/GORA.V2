@@ -22,7 +22,7 @@ import {
   withCapacityGuard,
   type GameFacts,
 } from './game-roster';
-import { hasGameStarted, localMoment } from './game-schedule';
+import { formatGameDate, hasGameStarted, localMoment, toGameDate } from './game-schedule';
 import { visibleGamesWhere } from './game-visibility';
 import { GAME_NOT_FOUND_MESSAGE } from './games.service';
 import type {
@@ -111,6 +111,7 @@ export class JoinRequestsService {
     gameId: string,
     dto: CreateJoinRequestDto,
   ): Promise<JoinRequestView> {
+    await this.autoCancelExpiredUnfilled(gameId);
     try {
       return await withCapacityGuard(() =>
         this.prisma.$transaction(async (tx) => {
@@ -237,6 +238,7 @@ export class JoinRequestsService {
     hostId: string,
     gameId: string,
   ): Promise<HostJoinRequestView[]> {
+    await this.autoCancelExpiredUnfilled(gameId);
     await this.findHostedGame(hostId, gameId);
 
     const requests = await this.prisma.joinRequest.findMany({
@@ -261,6 +263,7 @@ export class JoinRequestsService {
     gameId: string,
     requestId: string,
   ): Promise<HostJoinRequestView> {
+    await this.autoCancelExpiredUnfilled(gameId);
     await this.findHostedGame(hostId, gameId);
 
     await withCapacityGuard(() =>
@@ -366,6 +369,25 @@ export class JoinRequestsService {
     ) {
       throw new ConflictException(CLOSED_GAME_MESSAGES.ACTIVE);
     }
+  }
+
+  private async autoCancelExpiredUnfilled(gameId: string): Promise<void> {
+    const today = localMoment(this.timeZone).date;
+    const game = await this.prisma.game.findUnique({
+      where: { id: gameId },
+      select: {
+        gameDate: true,
+        requiredPlayers: true,
+        status: true,
+        _count: { select: { participants: { where: { status: ACTIVE_PLAYER_STATUS } } } },
+      },
+    });
+    if (!game || (game.status !== 'OPEN' && game.status !== 'FULL')) return;
+    if (formatGameDate(game.gameDate) >= today || game._count.participants >= game.requiredPlayers) return;
+    await this.prisma.game.updateMany({
+      where: { id: gameId, status: { in: ['OPEN', 'FULL'] }, gameDate: { lt: toGameDate(today) } },
+      data: { status: 'CANCELLED' },
+    });
   }
 
   private async findVisibleGame(

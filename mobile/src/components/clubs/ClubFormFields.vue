@@ -1,7 +1,7 @@
 <template>
   <div class="club-form">
     <!-- Club identity -->
-    <section class="club-form__section">
+    <section v-if="section === 'all' || section === 'identity'" class="club-form__section">
       <h2 class="club-form__heading">Club identity</h2>
 
       <div class="club-form__field" @focusout="touch('name')">
@@ -35,6 +35,25 @@
         <p v-else class="club-form__hint">Lowercase letters, numbers, and single hyphens. Must be unique.</p>
       </div>
 
+      <div class="club-form__field" @focusout="touch('description')">
+        <label class="club-form__label" for="club-description">
+          Short description *
+          <span class="club-form__counter">{{ form.description.trim().length }} / {{ CLUB_DESCRIPTION_MAX }}</span>
+        </label>
+        <input
+          id="club-description"
+          v-model="form.description"
+          class="club-form__input"
+          :maxlength="CLUB_DESCRIPTION_MAX"
+          placeholder="Weekend volleyball for every level in Manila."
+        />
+        <p v-if="shown('description')" class="club-form__error">{{ errors.description }}</p>
+      </div>
+    </section>
+
+    <section v-if="section === 'all' || section === 'photos'" class="club-form__section">
+      <h2 class="club-form__heading">Photos &amp; about</h2>
+
       <div class="club-form__field" @focusout="touch('profileImageUrl')">
         <label class="club-form__label" for="club-photo">Profile photo URL</label>
         <input
@@ -59,21 +78,6 @@
         <p v-if="shown('coverImageUrl')" class="club-form__error">{{ errors.coverImageUrl }}</p>
       </div>
 
-      <div class="club-form__field" @focusout="touch('description')">
-        <label class="club-form__label" for="club-description">
-          Short description *
-          <span class="club-form__counter">{{ form.description.trim().length }} / {{ CLUB_DESCRIPTION_MAX }}</span>
-        </label>
-        <input
-          id="club-description"
-          v-model="form.description"
-          class="club-form__input"
-          :maxlength="CLUB_DESCRIPTION_MAX"
-          placeholder="Weekend volleyball for every level in Manila."
-        />
-        <p v-if="shown('description')" class="club-form__error">{{ errors.description }}</p>
-      </div>
-
       <div class="club-form__field" @focusout="touch('about')">
         <label class="club-form__label" for="club-about">About the club</label>
         <textarea
@@ -89,7 +93,7 @@
     </section>
 
     <!-- Sports -->
-    <section class="club-form__section">
+    <section v-if="section === 'all' || section === 'sports'" class="club-form__section">
       <h2 class="club-form__heading">Sports</h2>
 
       <div class="club-form__field" @focusout="touch('primarySportId')">
@@ -121,7 +125,7 @@
     </section>
 
     <!-- Location -->
-    <section class="club-form__section">
+    <section v-if="section === 'all' || section === 'location'" class="club-form__section">
       <h2 class="club-form__heading">Location</h2>
       <div class="club-form__grid">
         <div class="club-form__field">
@@ -158,11 +162,23 @@
       <div class="club-form__grid" @focusout="touch('location')">
         <div class="club-form__field">
           <label class="club-form__label" for="club-lat">Latitude (optional)</label>
-          <input id="club-lat" v-model="form.latitude" class="club-form__input" inputmode="decimal" placeholder="14.5636" />
+          <input
+            id="club-lat"
+            v-model="form.latitude"
+            class="club-form__input"
+            inputmode="decimal"
+            placeholder="14.5636"
+          />
         </div>
         <div class="club-form__field">
           <label class="club-form__label" for="club-lng">Longitude (optional)</label>
-          <input id="club-lng" v-model="form.longitude" class="club-form__input" inputmode="decimal" placeholder="120.9917" />
+          <input
+            id="club-lng"
+            v-model="form.longitude"
+            class="club-form__input"
+            inputmode="decimal"
+            placeholder="120.9917"
+          />
         </div>
       </div>
       <p v-if="shown('location')" class="club-form__error">{{ errors.location }}</p>
@@ -170,7 +186,7 @@
     </section>
 
     <!-- Membership -->
-    <section class="club-form__section">
+    <section v-if="section === 'all' || section === 'membership'" class="club-form__section">
       <h2 class="club-form__heading">Membership</h2>
       <div class="club-form__field" @focusout="touch('maxMembers')">
         <label class="club-form__label" for="club-max">Maximum members *</label>
@@ -236,7 +252,7 @@
     </section>
 
     <!-- Rules -->
-    <section class="club-form__section">
+    <section v-if="section === 'all' || section === 'rules'" class="club-form__section">
       <h2 class="club-form__heading">Club rules</h2>
       <ol v-if="form.rules.length" class="club-form__rules">
         <li v-for="(_, index) in form.rules" :key="index" class="club-form__rule">
@@ -248,7 +264,12 @@
             :aria-label="`Rule ${index + 1}`"
             placeholder="Be on time"
           />
-          <button type="button" class="club-form__remove" :aria-label="`Remove rule ${index + 1}`" @click="removeRule(index)">
+          <button
+            type="button"
+            class="club-form__remove"
+            :aria-label="`Remove rule ${index + 1}`"
+            @click="removeRule(index)"
+          >
             <ion-icon :icon="closeOutline" aria-hidden="true" />
           </button>
         </li>
@@ -265,7 +286,7 @@
     </section>
 
     <!-- Tags -->
-    <section class="club-form__section">
+    <section v-if="section === 'all' || section === 'rules'" class="club-form__section">
       <h2 class="club-form__heading">Tags</h2>
       <div class="club-form__tag-entry">
         <input
@@ -291,7 +312,7 @@
     </section>
 
     <!-- Activity -->
-    <section class="club-form__section">
+    <section v-if="section === 'all' || section === 'schedule'" class="club-form__section">
       <h2 class="club-form__heading">Activity schedule</h2>
       <div class="club-form__grid club-form__grid--three">
         <div class="club-form__field">
@@ -328,7 +349,7 @@
     </section>
 
     <!-- Contact -->
-    <section class="club-form__section">
+    <section v-if="section === 'all' || section === 'contact'" class="club-form__section">
       <h2 class="club-form__heading">Contact</h2>
       <div v-for="field in CONTACT_FIELDS" :key="field.key" class="club-form__field" @focusout="touch(field.key)">
         <label class="club-form__label" :for="`club-${field.key}`">{{ field.label }}</label>
@@ -367,6 +388,7 @@ import {
   CLUB_TRAINING_SCHEDULE_MAX,
   CLUB_USERNAME_MAX,
   type ClubFormErrors,
+  type ClubFormSection,
   type ClubFormField,
   MEMBERSHIP_TYPE_OPTIONS,
   normalizeClubTag,
@@ -393,6 +415,8 @@ const form = defineModel<ClubForm>({ required: true });
 const props = withDefaults(
   defineProps<{
     errors: ClubFormErrors;
+    /** Omit for the full Manage Club form. Create shows one section per step. */
+    section?: ClubFormSection | 'all';
     sportOptions: readonly SportOption[];
     /** Show every error, e.g. after pressing submit. Otherwise only fields the person has left. */
     showAll?: boolean;
@@ -402,7 +426,7 @@ const props = withDefaults(
     currentMembers?: number;
     limit?: number;
   }>(),
-  { showAll: false, suggestUsername: false, currentMembers: 0, limit: CLUB_MAX_MEMBERS_LIMIT },
+  { section: 'all', showAll: false, suggestUsername: false, currentMembers: 0, limit: CLUB_MAX_MEMBERS_LIMIT },
 );
 
 const touched = ref(new Set<ClubFormField>());

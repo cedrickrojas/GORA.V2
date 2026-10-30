@@ -24,6 +24,7 @@ export interface AdminOverview {
   reels: number;
   pendingReports: number;
   reviewingReports: number;
+  pendingHelpMessages: number;
   dailyRegistrations: { day: string; total: number }[];
 }
 export interface AdminReport {

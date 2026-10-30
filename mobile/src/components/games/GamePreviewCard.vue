@@ -1,5 +1,11 @@
 <template>
-  <article class="game-preview">
+  <article
+    class="game-preview"
+    :class="{
+      'game-preview--cancelled': game.status === 'CANCELLED',
+      'game-preview--successful': game.status === 'COMPLETED',
+    }"
+  >
     <div
       class="game-preview__banner"
       :class="{
@@ -114,6 +120,16 @@ const visual = computed(() => getSportVisual(props.game.sport.name));
   border-radius: var(--gora-radius-card);
   background: var(--gora-surface);
   box-shadow: var(--gora-shadow);
+}
+
+.game-preview--cancelled {
+  filter: grayscale(0.78);
+  opacity: 0.72;
+}
+
+.game-preview--successful {
+  border: 2px solid #d8ad43;
+  box-shadow: 0 0 0 2px rgb(216 173 67 / 16%), 0 8px 24px rgb(216 173 67 / 16%);
 }
 
 .game-preview__banner {

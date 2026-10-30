@@ -42,7 +42,7 @@ export const GAME_CLUB_MEMBERS_ONLY_MESSAGE =
 
 /** Statuses a listing shows when no status filter is given. */
 const LISTED_STATUSES: readonly GameStatus[] = ['OPEN', 'FULL', 'ACTIVE'];
-const EDITABLE_STATUSES: readonly GameStatus[] = ['OPEN', 'FULL'];
+const EDITABLE_STATUSES: readonly GameStatus[] = ['OPEN', 'FULL', 'CANCELLED'];
 const CANCELLABLE_STATUSES: readonly GameStatus[] = ['OPEN', 'FULL', 'ACTIVE'];
 
 const GAME_BASE_SELECT = {
@@ -151,11 +151,13 @@ export class GamesService {
   }
 
   async get(viewerId: string, gameId: string): Promise<GameView> {
+    await this.autoCancelExpiredUnfilled();
     const game = await this.findVisible(viewerId, gameId);
     return toGameView(game, viewerId);
   }
 
   async list(viewerId: string, query: ListGamesQueryDto): Promise<GameView[]> {
+    await this.autoCancelExpiredUnfilled();
     const today = localMoment(this.timeZone).date;
     const dateFilter = query.gameDate ?? 'upcoming';
     const gameDate: Prisma.DateTimeFilter =
@@ -185,6 +187,7 @@ export class GamesService {
 
   /** Every game the viewer hosts, whatever its status or date. */
   async listHosted(viewerId: string): Promise<GameView[]> {
+    await this.autoCancelExpiredUnfilled();
     const games = await this.prisma.game.findMany({
       where: { hostId: viewerId },
       select: gameSelect(viewerId),
@@ -196,6 +199,7 @@ export class GamesService {
 
   /** Every visible game the viewer is an ACTIVE player in. LEFT and REMOVED are left out. */
   async listPlaying(viewerId: string): Promise<GameView[]> {
+    await this.autoCancelExpiredUnfilled();
     const games = await this.prisma.game.findMany({
       where: {
         AND: [
@@ -216,6 +220,7 @@ export class GamesService {
 
   /** Own joins and requests, including past, left, removed, and cancelled entries. */
   async listJoined(viewerId: string): Promise<JoinedGameView[]> {
+    await this.autoCancelExpiredUnfilled();
     const games = await this.prisma.game.findMany({
       where: {
         AND: [
@@ -318,6 +323,7 @@ export class GamesService {
       data.gameDate = toGameDate(schedule.gameDate);
       data.startTime = toGameDateTime(schedule.gameDate, schedule.startTime);
       data.endTime = toGameDateTime(schedule.gameDate, schedule.endTime);
+      if (game.status === 'CANCELLED') data.status = 'OPEN';
     }
 
     if (Object.keys(data).length === 0) {
@@ -389,6 +395,31 @@ export class GamesService {
     }
 
     return game;
+  }
+
+  /** Persist cancellation for expired games that never reached their required roster. */
+  private async autoCancelExpiredUnfilled(): Promise<void> {
+    const today = localMoment(this.timeZone).date;
+    const expiredGames = await this.prisma.game.findMany({
+      where: { status: { in: ['OPEN', 'FULL'] }, gameDate: { lt: toGameDate(today) } },
+      select: {
+        id: true,
+        requiredPlayers: true,
+        _count: { select: { participants: { where: { status: ACTIVE_PLAYER_STATUS } } } },
+      },
+    });
+    const unfilledIds = expiredGames
+      .filter((game) => game._count.participants < game.requiredPlayers)
+      .map((game) => game.id);
+    if (unfilledIds.length === 0) return;
+    await this.prisma.game.updateMany({
+      where: {
+        id: { in: unfilledIds },
+        status: { in: ['OPEN', 'FULL'] },
+        gameDate: { lt: toGameDate(today) },
+      },
+      data: { status: 'CANCELLED' },
+    });
   }
 
   private assertSchedule(schedule: GameSchedule): void {

@@ -226,6 +226,16 @@ export const routes: RouteRecordRaw[] = [
         component: () => import('../views/profile/ActivityPage.vue'),
       },
       {
+        path: 'profile/archive',
+        name: 'profile-archive',
+        component: () => import('../views/profile/ArchivePage.vue'),
+      },
+      {
+        path: 'profile/saved',
+        name: 'saved-posts',
+        component: () => import('../views/profile/SavedPostsPage.vue'),
+      },
+      {
         path: 'profile/settings',
         name: 'settings',
         component: () => import('../views/profile/SettingsPage.vue'),
@@ -239,8 +249,7 @@ export const routes: RouteRecordRaw[] = [
       },
       {
         path: 'users/:username',
-        redirect: (to) =>
-          `/profile/${encodeURIComponent(String(to.params.username))}`,
+        redirect: (to) => `/profile/${encodeURIComponent(String(to.params.username))}`,
       },
     ],
   },

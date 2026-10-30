@@ -5,6 +5,9 @@
       :class="{ 'profile-header__cover--default': !profile.coverImageUrl }"
       :style="profile.coverImageUrl ? { backgroundImage: `url(${JSON.stringify(profile.coverImageUrl)})` } : undefined"
     >
+      <div class="profile-header__cover-actions">
+        <slot name="cover-actions" />
+      </div>
       <button v-if="editable" type="button" class="profile-header__cover-edit" @click="coverOpen = true">
         <ion-icon :icon="cameraOutline" aria-hidden="true" />
         <span>{{ profile.coverImageUrl ? 'Edit cover' : 'Add cover photo' }}</span>
@@ -76,6 +79,13 @@ const coverOpen = ref(false);
 .profile-header__cover--default {
   border-bottom: 2px solid var(--ion-color-primary);
   background: var(--gora-surface-raised);
+}
+
+.profile-header__cover-actions {
+  position: absolute;
+  z-index: 3;
+  top: 12px;
+  right: 12px;
 }
 
 @media (min-width: 768px) {

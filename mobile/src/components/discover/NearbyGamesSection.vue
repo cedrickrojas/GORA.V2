@@ -49,6 +49,9 @@
       <template v-if="discovery.locationStatus === 'granted'">
         <span>📍 Distances are from your current location (never shared or saved).</span>
       </template>
+      <template v-else-if="!settings.values.useDeviceLocation">
+        <span>Device location is turned off in your settings.</span>
+      </template>
       <template v-else-if="discovery.locationStatus === 'locating'">
         <span>Finding your location…</span>
       </template>
@@ -135,6 +138,7 @@ import { useDiscoveryJoin } from '@/composables/useDiscoveryJoin';
 import { useDiscoveryStore } from '@/stores/discovery';
 import { useFiltersStore } from '@/stores/filters';
 import { useSportsStore } from '@/stores/sports';
+import { useSettingsStore } from '@/stores/settings';
 import type { DiscoveryDateFilter, DiscoveryViewMode } from '@/types/discovery';
 import { DISCOVERY_DATE_FILTERS } from '@/utils/map-discovery';
 import { DISTANCE_FILTERS, type DistanceFilter, formatDistanceFilter } from '@/utils/search';
@@ -148,6 +152,7 @@ const router = useRouter();
 const discovery = useDiscoveryStore();
 const filters = useFiltersStore();
 const sportsStore = useSportsStore();
+const settings = useSettingsStore();
 const { joiningGame, joinError, busyGameId, joinActionOf, openJoin, closeJoin, sendJoin } = useDiscoveryJoin(
   computed(() => discovery.games),
   (gameId, status, game) => discovery.applyJoinRequest(gameId, status, game),
@@ -208,8 +213,8 @@ watch(() => [filters.sport, filters.maxDistanceKm], refresh);
 
 onMounted(async () => {
   void sportsStore.fetchSports();
-  refresh();
   await discovery.initLocation();
+  refresh();
 
   if (discovery.userLocation) {
     refresh();

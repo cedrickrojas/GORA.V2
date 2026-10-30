@@ -1,13 +1,4 @@
-import {
-  Controller,
-  Delete,
-  Get,
-  Param,
-  ParseUUIDPipe,
-  Post,
-  Query,
-  UseGuards,
-} from '@nestjs/common';
+import { Controller, Delete, Get, Param, ParseUUIDPipe, Post, Query, UseGuards } from '@nestjs/common';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import type { CurrentUser as Viewer } from '../users/user.types';
@@ -35,24 +26,23 @@ export class FriendsController {
   }
 
   @Post('requests/:id/accept')
-  accept(
-    @CurrentUser() viewer: Viewer,
-    @Param('id', ParseUUIDPipe) id: string,
-  ) {
+  accept(@CurrentUser() viewer: Viewer, @Param('id', ParseUUIDPipe) id: string) {
     return this.friends.accept(viewer.id, id);
   }
 
   @Delete('requests/:id')
-  dismiss(
-    @CurrentUser() viewer: Viewer,
-    @Param('id', ParseUUIDPipe) id: string,
-  ) {
+  dismiss(@CurrentUser() viewer: Viewer, @Param('id', ParseUUIDPipe) id: string) {
     return this.friends.dismiss(viewer.id, id);
   }
 
   @Delete('blocks/:username')
   unblock(@CurrentUser() viewer: Viewer, @Param('username') username: string) {
     return this.friends.remove(viewer.id, username, true);
+  }
+
+  @Post('blocks/:username')
+  block(@CurrentUser() viewer: Viewer, @Param('username') username: string) {
+    return this.friends.block(viewer.id, username);
   }
 
   @Delete(':username')
