@@ -4,7 +4,10 @@ import { AppModule } from './app.module';
 import { configureApp } from './bootstrap/configure-app';
 
 async function bootstrap(): Promise<void> {
-  const app = await NestFactory.create(AppModule);
+  // configureApp registers route-specific JSON limits (including the larger
+  // profile photo payload), so don't let Nest install its default 100 KB
+  // parser ahead of those routes.
+  const app = await NestFactory.create(AppModule, { bodyParser: false });
   const configService = app.get(ConfigService);
   const port = configService.get<number>('app.port', 3000);
 
