@@ -3,17 +3,6 @@
     <AppHeader />
 
     <ion-content :fullscreen="true">
-      <div class="home__intro">
-        <div>
-          <span class="home__eyebrow">YOUR COMMUNITY</span>
-          <h1>Stay in the game.</h1>
-          <p>Catch up with your people. Find your next game.</p>
-        </div>
-        <router-link to="/profile/friends" class="home__friends-link"
-          ><ion-icon :icon="peopleOutline" aria-hidden="true" /> {{ friendsStore.friends.length }}
-          {{ friendsStore.friends.length === 1 ? 'friend' : 'friends' }}</router-link
-        >
-      </div>
       <StoryRail
         :viewer="storiesStore.viewer"
         :own="storyFeed.own"
@@ -123,7 +112,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue';
-import { RouterLink, useRouter } from 'vue-router';
+import { useRouter } from 'vue-router';
 import { IonContent, IonIcon, IonPage, onIonViewWillEnter, onIonViewDidLeave } from '@ionic/vue';
 import { imageOutline, peopleOutline, refreshOutline, newspaperOutline } from 'ionicons/icons';
 import UserAvatar from '@/components/common/UserAvatar.vue';
@@ -276,43 +265,6 @@ async function loadHomeData(): Promise<void> {
 </script>
 
 <style scoped>
-.home__intro {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 26px 16px 12px;
-}
-.home__eyebrow {
-  color: var(--ion-color-primary);
-  font-size: 0.65rem;
-  font-weight: 800;
-  letter-spacing: 0.16em;
-}
-.home__intro h1 {
-  margin: 5px 0 6px;
-  font-size: clamp(1.45rem, 3vw, 1.9rem);
-  font-weight: 800;
-  letter-spacing: -0.04em;
-}
-.home__intro p {
-  margin: 0;
-  color: var(--gora-muted);
-  font-size: 0.8rem;
-  line-height: 1.5;
-}
-.home__friends-link {
-  display: flex;
-  flex-shrink: 0;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 12px;
-  border: 1px solid var(--gora-line);
-  border-radius: 999px;
-  color: var(--gora-muted);
-  text-decoration: none;
-  font-size: 0.75rem;
-}
 .home__feed-heading {
   display: flex;
   align-items: center;
@@ -430,14 +382,6 @@ async function loadHomeData(): Promise<void> {
 @media (prefers-reduced-motion: reduce) {
   .home__spinning {
     animation: none;
-  }
-}
-@media (max-width: 420px) {
-  .home__friends-link {
-    padding: 8px;
-  }
-  .home__intro {
-    gap: 8px;
   }
 }
 .home__composer {
