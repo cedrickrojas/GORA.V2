@@ -20,20 +20,11 @@
           <UserAvatar :user="summary" :size="112" />
         </span>
       </div>
-      <h1 class="profile-header__name">{{ profile.displayName }}</h1>
-      <p class="profile-header__username">@{{ profile.username }}</p>
-      <div class="profile-header__points" :aria-label="`${profile.goraPoints} GORA points`">
-        <span class="profile-header__torch-wrap">
-          <svg class="profile-header__torch" viewBox="0 0 36 44" aria-hidden="true">
-            <path d="M18 1C11 9 6 14 7 22c.5 4 3 7 6 8-1-5 1-8 5-11 0 5 4 7 4 12 4-2 7-6 7-11C29 13 22 7 18 1Z" fill="#ff6a00" />
-            <path d="M18 13c-3 4-5 7-4 11 .4 2 1.5 3.5 3.5 4.3-.3-2.4.8-4.1 2.5-5.5.4 2.5 2 3.8 2.7 5.5 1.4-1.5 2-3.4 1.5-5.4-.7-4.2-4.1-7.3-10.2-10.9Z" fill="#ffb02e" />
-            <path d="M12 32h12l-1.4 4H13.4L12 32Zm2 5h8l1 5H13l1-5Z" fill="#bd5a12" />
-            <path d="M13 33h10" stroke="#ffd184" stroke-width="1" />
-          </svg>
-          <strong>{{ profile.goraPoints }}</strong>
-        </span>
-        <span>GORA Points</span>
+      <div class="profile-header__name-row">
+        <h1 class="profile-header__name">{{ profile.displayName }}</h1>
+        <GoraPointsBadge :points="profile.goraPoints" />
       </div>
+      <p class="profile-header__username">@{{ profile.username }}</p>
       <p v-if="profile.city" class="profile-header__city">
         <ion-icon :icon="locationOutline" aria-hidden="true" />
         <span>{{ profile.city }}</span>
@@ -62,6 +53,7 @@ import { computed, ref } from 'vue';
 import { IonIcon } from '@ionic/vue';
 import { addOutline, cameraOutline, locationOutline } from 'ionicons/icons';
 import UserAvatar from '@/components/common/UserAvatar.vue';
+import GoraPointsBadge from '@/components/common/GoraPointsBadge.vue';
 import type { ProfileIdentity } from '@/types/profile';
 import { toUserSummary } from '@/utils/display-name';
 import CoverPhotoModal from './CoverPhotoModal.vue';
@@ -87,24 +79,6 @@ const coverOpen = ref(false);
   background-position: center;
   background-size: cover;
 }
-
-.profile-header__points {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  margin-top: 12px;
-  padding: 6px 12px 6px 7px;
-  border: 1px solid rgba(255, 138, 40, .45);
-  border-radius: 999px;
-  color: #a84700;
-  background: linear-gradient(120deg, #fff4e8, #fffaf4);
-  box-shadow: 0 3px 12px rgba(214, 92, 0, .12);
-}
-
-.profile-header__torch-wrap { position: relative; display: grid; place-items: center; width: 32px; height: 38px; flex: none; }
-.profile-header__torch { position: absolute; inset: 0; width: 32px; height: 39px; }
-.profile-header__torch-wrap strong { position: relative; z-index: 1; margin-top: -3px; color: #fff; font-size: .58rem; font-variant-numeric: tabular-nums; text-shadow: 0 1px 2px #853700; }
-.profile-header__points span { color: #79502d; font-size: .76rem; font-weight: 650; }
 
 .profile-header__cover--default {
   border-bottom: 2px solid var(--ion-color-primary);
@@ -178,8 +152,18 @@ const coverOpen = ref(false);
   background: var(--ion-background-color);
 }
 
+.profile-header__name-row {
+  display: flex;
+  min-width: 0;
+  max-width: 100%;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+
 .profile-header__name {
-  margin: 10px 0 0;
+  min-width: 0;
+  margin: 0;
   font-size: 1.6rem;
   font-weight: 800;
   letter-spacing: -0.02em;

@@ -3,7 +3,10 @@
     <nav class="desktop-side__navigation" aria-label="Your shortcuts">
       <router-link v-if="currentUser" to="/profile" class="desktop-side__row" :title="currentUser.displayName">
         <UserAvatar :user="currentUser" :size="48" />
-        <strong>{{ currentUser.displayName }}</strong>
+        <span class="desktop-side__identity">
+          <strong>{{ currentUser.displayName }}</strong>
+          <GoraPointsBadge :points="profileStore.currentProfile?.goraPoints ?? 0" />
+        </span>
       </router-link>
       <router-link v-for="link in PROFILE_SECTION_LINKS" :key="link.to" :to="link.to" class="desktop-side__row">
         <span class="desktop-side__icon"><ion-icon :icon="link.icon" aria-hidden="true" /></span>
@@ -38,6 +41,7 @@ import { RouterLink } from 'vue-router';
 import { IonIcon } from '@ionic/vue';
 import ClubAvatar from '@/components/clubs/ClubAvatar.vue';
 import UserAvatar from '@/components/common/UserAvatar.vue';
+import GoraPointsBadge from '@/components/common/GoraPointsBadge.vue';
 import { useClubsStore } from '@/stores/clubs';
 import { useProfileStore } from '@/stores/profile';
 import { useSessionStore } from '@/stores/session';
@@ -59,5 +63,22 @@ const myClubs = computed(() => {
 onMounted(() => {
   void sessionStore.load();
   void clubsStore.load();
+  if (!profileStore.currentProfile) void profileStore.fetchMyProfile();
 });
 </script>
+
+<style scoped>
+.desktop-side__identity {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+}
+
+.desktop-side__identity strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+</style>

@@ -71,7 +71,7 @@ import { useChatStore } from '@/stores/chat';
 import { useClubChatStore } from '@/stores/club-chat';
 
 /** Feed pages get Facebook-style sidebars on wide screens (CSS decides the width). */
-const SIDEBAR_PATHS = ['/home', '/discover'];
+const SIDEBAR_PATHS = ['/home', '/discover', '/create/game'];
 
 const route = useRoute();
 const router = useRouter();
@@ -81,7 +81,7 @@ const chatStore = useChatStore();
 const clubChatStore = useClubChatStore();
 useNotificationPolling();
 
-const showSidebars = computed(() => SIDEBAR_PATHS.includes(route.path));
+const showSidebars = computed(() => SIDEBAR_PATHS.includes(route.path) || route.name === 'edit-game');
 // Conversation pages keep the composer directly above the keyboard.
 const isMessageThread = computed(() =>
   ['chat-thread', 'chat-request', 'club-chat', 'post-details'].includes(String(route.name)),
