@@ -5,6 +5,7 @@ import {
   Header,
   Param,
   ParseUUIDPipe,
+  Post,
   Patch,
   Query,
   UseGuards,
@@ -16,6 +17,7 @@ import {
   AdminPageQuery,
   AdminReportsQuery,
   AdminUsersQuery,
+  CreateSportDto,
   UpdateAdminUserDto,
   UpdateReportDto,
   UpdateSportStatusDto,
@@ -68,6 +70,11 @@ export class AdminController {
   @Header('Cache-Control', 'no-store')
   sports() {
     return this.admin.sports();
+  }
+
+  @Post('sports')
+  createSport(@CurrentUser() actor: User, @Body() body: CreateSportDto) {
+    return this.admin.createSport(actor.id, body);
   }
 
   @Patch('sports/:id')

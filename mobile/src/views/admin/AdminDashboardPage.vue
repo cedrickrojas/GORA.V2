@@ -89,13 +89,23 @@
                 <h1>{{ currentSection.title }}</h1>
                 <p>{{ currentSection.description }}</p>
               </div>
-              <button
-                class="button secondary"
-                :disabled="loading || busy"
-                @click="load"
-              >
-                <ion-icon :icon="refreshOutline" aria-hidden="true" />Refresh
-              </button>
+              <div class="heading-actions">
+                <button
+                  v-if="section === 'sports'"
+                  class="button primary"
+                  :disabled="loading || busy"
+                  @click="addSport"
+                >
+                  <ion-icon :icon="addOutline" aria-hidden="true" />Add sport
+                </button>
+                <button
+                  class="button secondary refresh-button"
+                  :disabled="loading || busy"
+                  @click="load"
+                >
+                  <ion-icon :icon="refreshOutline" aria-hidden="true" />Refresh
+                </button>
+              </div>
             </div>
             <p v-if="notice" class="notice" role="status">{{ notice }}</p>
             <div v-if="error" class="error" role="alert">
@@ -117,7 +127,8 @@
                 Loading {{ currentSection.label.toLowerCase() }}…
               </p>
 
-              <template v-if="section === 'overview' && overview">
+              <template v-if="(section === 'overview' || section === 'analytics') && overview">
+                <div v-if="section === 'overview'">
                 <div class="stat-grid">
                   <article
                     v-for="stat in stats"
@@ -204,6 +215,69 @@
                     ><span>{{ item.label }}</span>
                   </div>
                 </section>
+                </div>
+                <div v-if="section === 'analytics'">
+                <section class="analytics-metrics" aria-label="Game and post analytics">
+                  <article class="panel analytics-metric">
+                    <span>Games created</span>
+                    <strong>{{ number(overview.games) }}</strong>
+                    <small>All sports · all time</small>
+                  </article>
+                  <article class="panel analytics-metric">
+                    <span>Game hosts</span>
+                    <strong>{{ number(overview.gameCreators) }}</strong>
+                    <small>Unique accounts that hosted</small>
+                  </article>
+                  <article class="panel analytics-metric">
+                    <span>Sport-related posts</span>
+                    <strong>{{ number(overview.postsAboutGames) }}</strong>
+                    <small>Posts tagged with a sport</small>
+                  </article>
+                  <article class="panel analytics-metric">
+                    <span>People who posted</span>
+                    <strong>{{ number(overview.gamePosters) }}</strong>
+                    <small>Unique accounts posting by sport</small>
+                  </article>
+                  <article class="panel analytics-metric">
+                    <span>Active game participants</span>
+                    <strong>{{ number(overview.activeGameParticipants) }}</strong>
+                    <small>Current accepted participants</small>
+                  </article>
+                </section>
+                <section class="panel sport-analytics" aria-labelledby="sports-analytics-title">
+                  <div class="panel-heading sport-analytics__heading">
+                    <div>
+                      <h2 id="sports-analytics-title">Sports activity</h2>
+                      <p>Ranked by games created and sport-related posts · all time</p>
+                    </div>
+                    <span v-if="topSport" class="period">MOST ACTIVE · {{ topSport.name.toUpperCase() }}</span>
+                  </div>
+                  <div v-if="overview.sportAnalytics.length" class="sport-analytics__list">
+                    <article
+                      v-for="(sport, index) in overview.sportAnalytics"
+                      :key="sport.id"
+                      class="sport-analytics__row"
+                    >
+                      <div class="sport-analytics__name">
+                        <span class="sport-analytics__rank">{{ String(index + 1).padStart(2, '0') }}</span>
+                        <strong>{{ sport.name }}</strong>
+                        <span class="status" :class="sport.isActive ? 'green' : 'muted'">
+                          {{ sport.isActive ? 'Active' : 'Retired' }}
+                        </span>
+                      </div>
+                      <div class="sport-analytics__bar" aria-hidden="true">
+                        <span :style="{ width: `${sportBarWidth(sport.activity)}%` }"></span>
+                      </div>
+                      <div class="sport-analytics__counts">
+                        <span><strong>{{ number(sport.gamesCreated) }}</strong> games · {{ number(sport.gameCreators) }} hosts</span>
+                        <span><strong>{{ number(sport.postsAboutSport) }}</strong> posts · {{ number(sport.postCreators) }} posters</span>
+                        <span><strong>{{ number(sport.players) }}</strong> players</span>
+                      </div>
+                    </article>
+                  </div>
+                  <p v-else class="empty-message">Sports activity will appear when games and posts are created.</p>
+                </section>
+                </div>
               </template>
 
               <template v-if="section === 'users'">
@@ -460,8 +534,7 @@
                   v-if="sports && !sports.length && !loading"
                   class="panel empty-message"
                 >
-                  No sports yet. Run the existing database seed to populate the
-                  catalog.
+                  No sports yet. Add a sport to make it available across GORA.
                 </p>
               </template>
 
@@ -581,6 +654,31 @@
               reports.
             </p></template
           >
+          <template v-if="dialog.createSport">
+            <label class="admin-dialog-field">
+              Sport name
+              <input
+                v-model="sportName"
+                type="text"
+                maxlength="60"
+                minlength="2"
+                required
+                autocomplete="off"
+                placeholder="e.g. Badminton"
+                :disabled="busy"
+              />
+            </label>
+            <label class="admin-dialog-field">
+              Description <span class="muted">Optional</span>
+              <textarea
+                v-model="sportDescription"
+                maxlength="300"
+                rows="3"
+                placeholder="A short description for players"
+                :disabled="busy"
+              ></textarea>
+            </label>
+          </template>
           <p v-if="dialogError" class="error" role="alert">{{ dialogError }}</p>
           <div class="dialog-actions">
             <button
@@ -594,7 +692,7 @@
               class="button primary"
               :disabled="busy || dialog.user?.id === auth.currentUser?.id"
             >
-              {{ busy ? 'Saving…' : dialog.user ? 'Save changes' : 'Confirm' }}
+              {{ busy ? 'Saving…' : dialog.createSport ? 'Add sport' : dialog.user ? 'Save changes' : 'Confirm' }}
             </button>
           </div>
         </form>
@@ -620,6 +718,7 @@ import {
   barChartOutline,
   checkmarkCircleOutline,
   chevronForwardOutline,
+  addOutline,
   flagOutline,
   footballOutline,
   informationCircleOutline,
@@ -652,6 +751,13 @@ const sections = [
     label: 'Overview',
     title: 'Platform overview',
     description: 'A clear view of your community, activity, and moderation.',
+    icon: barChartOutline,
+  },
+  {
+    id: 'analytics',
+    label: 'Analytics',
+    title: 'Know what’s moving.',
+    description: 'Track sports activity, game creation, and posts across the community.',
     icon: barChartOutline,
   },
   {
@@ -778,6 +884,11 @@ const platformStats = computed(() =>
         },
       ],
 );
+const topSport = computed(() => overview.value?.sportAnalytics.find((sport) => sport.activity > 0) ?? null);
+const maxSportActivity = computed(() =>
+  Math.max(1, ...(overview.value?.sportAnalytics.map((sport) => sport.activity) ?? [])),
+);
+const sportBarWidth = (activity: number) => (activity > 0 ? Math.max(2, (activity / maxSportActivity.value) * 100) : 0);
 const registrationTotal = computed(
   () =>
     overview.value?.dailyRegistrations.reduce((sum, d) => sum + d.total, 0) ??
@@ -986,6 +1097,7 @@ interface ActionDialog {
   title: string;
   description: string;
   user?: AdminUser;
+  createSport?: boolean;
   run?: (token: string) => Promise<unknown>;
 }
 const dialogEl = ref<HTMLDialogElement | null>(null);
@@ -993,6 +1105,8 @@ const dialog = ref<ActionDialog | null>(null);
 const dialogError = ref('');
 const editRole = ref<UserRole>('USER');
 const editActive = ref(true);
+const sportName = ref('');
+const sportDescription = ref('');
 async function openDialog(value: ActionDialog) {
   dialog.value = value;
   dialogError.value = '';
@@ -1026,6 +1140,15 @@ function confirmSport(sport: AdminSport) {
     run: (token) => adminApi.updateSport(token, sport.id, !sport.isActive),
   });
 }
+function addSport() {
+  sportName.value = '';
+  sportDescription.value = '';
+  void openDialog({
+    title: 'Add a sport',
+    description: 'Add a sport to the GORA catalog. It will be available for new games, posts, and profiles right away.',
+    createSport: true,
+  });
+}
 function onDialogCancel(event: Event) {
   if (busy.value) event.preventDefault();
 }
@@ -1041,10 +1164,17 @@ async function submitDialog() {
         role: editRole.value,
         isActive: editActive.value,
       });
+    else if (action.createSport)
+      await adminApi.createSport(token, {
+        name: sportName.value.trim(),
+        ...(sportDescription.value.trim() ? { description: sportDescription.value.trim() } : {}),
+      });
     else await action.run?.(token);
     if (token !== auth.accessToken) return;
     dialogEl.value?.close();
-    notice.value = 'Changes saved. The audit log has been updated.';
+    notice.value = action.createSport
+      ? 'Sport added. The audit log has been updated.'
+      : 'Changes saved. The audit log has been updated.';
     await load();
   } catch (cause) {
     dialogError.value =
@@ -1274,6 +1404,13 @@ ion-icon {
   justify-content: space-between;
   gap: 18px;
   margin-bottom: 30px;
+}
+.heading-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
 }
 .eyebrow {
   color: #fc8359;
@@ -1552,6 +1689,89 @@ button:disabled {
   font-size: 11px;
   display: block;
   margin-top: 6px;
+}
+.analytics-metrics {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+}
+.analytics-metric {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  padding: 18px;
+}
+.analytics-metric > span,
+.analytics-metric > small {
+  color: var(--admin-muted);
+  font-size: 10px;
+}
+.analytics-metric > strong {
+  color: #f3f4f5;
+  font-size: 26px;
+  line-height: 1.1;
+}
+.sport-analytics {
+  margin-top: 20px;
+  padding: 24px;
+}
+.sport-analytics__heading {
+  margin-bottom: 16px;
+}
+.sport-analytics__list {
+  display: flex;
+  flex-direction: column;
+}
+.sport-analytics__row {
+  display: grid;
+  grid-template-columns: minmax(140px, 0.75fr) minmax(100px, 1fr) minmax(310px, 1.35fr);
+  align-items: center;
+  gap: 18px;
+  padding: 14px 0;
+  border-top: 1px solid var(--admin-border);
+}
+.sport-analytics__name {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.sport-analytics__name > strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sport-analytics__rank {
+  color: #858e99;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+.sport-analytics__bar {
+  height: 7px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #2b2f34;
+}
+.sport-analytics__bar > span {
+  display: block;
+  height: 100%;
+  min-width: 3px;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #ff642e, #ffa175);
+}
+.sport-analytics__counts {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px 16px;
+  color: var(--admin-muted);
+  font-size: 10px;
+}
+.sport-analytics__counts strong {
+  color: #eef1f5;
+  font-variant-numeric: tabular-nums;
 }
 .filters {
   display: flex;
@@ -1989,6 +2209,25 @@ pre {
   font-size: 12px;
   color: #d5dae1;
 }
+.admin-dialog-field input,
+.admin-dialog-field textarea {
+  width: 100%;
+  padding: 11px 12px;
+  border: 1px solid #3b4148;
+  border-radius: 7px;
+  background: #111315;
+  color: #f3f4f5;
+  font: inherit;
+  font-size: 13px;
+}
+.admin-dialog-field textarea {
+  resize: vertical;
+}
+.admin-dialog-field input:focus,
+.admin-dialog-field textarea:focus {
+  outline: 2px solid #ff642e;
+  outline-offset: 1px;
+}
 .dialog-actions {
   display: flex;
   justify-content: flex-end;
@@ -2099,6 +2338,16 @@ pre {
     padding-left: 0;
     border-left: 0;
   }
+  .analytics-metrics {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .sport-analytics__row {
+    grid-template-columns: minmax(130px, 0.8fr) minmax(100px, 1fr);
+  }
+  .sport-analytics__counts {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+  }
 }
 @media (max-width: 620px) {
   .sidebar {
@@ -2124,11 +2373,11 @@ pre {
     gap: 10px;
     margin-bottom: 24px;
   }
-  .page-heading > .button {
+  .heading-actions .refresh-button {
     font-size: 0;
     padding: 10px;
   }
-  .page-heading > .button ion-icon {
+  .heading-actions .refresh-button ion-icon {
     font-size: 17px;
   }
   .page-heading p:not(.eyebrow) {
@@ -2174,6 +2423,31 @@ pre {
   .platform span {
     font-size: 9px;
     line-height: 1.6;
+  }
+  .analytics-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .analytics-metric {
+    padding: 15px;
+  }
+  .analytics-metric:last-child {
+    grid-column: 1 / -1;
+  }
+  .sport-analytics {
+    padding: 18px;
+  }
+  .sport-analytics__heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .sport-analytics__row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+  }
+  .sport-analytics__counts {
+    grid-column: auto;
+    justify-content: flex-start;
+    gap: 6px 12px;
   }
   .sports-grid {
     grid-template-columns: minmax(0, 1fr);

@@ -1,23 +1,21 @@
 import type { Badge } from '@/types/achievement';
 import type { ActivityStats } from '@/types/activity';
 import type { FollowSummary, PublicProfile, UserProfile } from '@/types/profile';
-import { buildMockFollowSummary, buildMockProfile, mockActivityStats, mockBadges } from './mock/mock-profile';
-import { buildMockPublicProfiles } from './mock/mock-public-profiles';
+import { mockActivityStats, mockBadges } from './mock/mock-profile';
 import { apiRequest } from './api-client';
 
 /**
- * Stands in for GET /users/:username (plus /relationship). Null means "not found", which is
- * also what the server answers when that user blocked the viewer.
+ * Profiles are only loaded from the authenticated profiles API. Never substitute a sample
+ * profile when a username is missing from the database.
  */
 export async function fetchPublicProfile(username: string): Promise<PublicProfile | null> {
-  const key = username.trim().toLowerCase();
-
-  return buildMockPublicProfiles().find((profile) => profile.username === key) ?? null;
+  void username;
+  return null;
 }
 
-/** Demo profile (highlights) for the pages whose server data does not exist yet. */
-export async function fetchCurrentProfile(): Promise<UserProfile> {
-  return buildMockProfile();
+/** No static account profile; account data comes from GET /profiles/me. */
+export async function fetchCurrentProfile(): Promise<UserProfile | null> {
+  return null;
 }
 
 export async function fetchActivityStats(): Promise<ActivityStats> {
@@ -33,7 +31,7 @@ export async function fetchBadges(goraPoints = 0): Promise<Badge[]> {
 }
 
 export async function fetchFollowSummary(): Promise<FollowSummary> {
-  return buildMockFollowSummary();
+  return { followersCount: 0, followingCount: 0, followingIds: [] };
 }
 
 /** Creates or removes a UserFollow row. The server rejects following yourself. */

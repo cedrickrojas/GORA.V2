@@ -26,6 +26,21 @@ export interface AdminOverview {
   reviewingReports: number;
   pendingHelpMessages: number;
   dailyRegistrations: { day: string; total: number }[];
+  gameCreators: number;
+  postsAboutGames: number;
+  gamePosters: number;
+  activeGameParticipants: number;
+  sportAnalytics: {
+    id: string;
+    name: string;
+    isActive: boolean;
+    players: number;
+    gamesCreated: number;
+    gameCreators: number;
+    postsAboutSport: number;
+    postCreators: number;
+    activity: number;
+  }[];
 }
 export interface AdminReport {
   id: string;
@@ -59,6 +74,10 @@ export interface AdminSport {
   description: string | null;
   isActive: boolean;
   _count: { players: number; games: number };
+}
+export interface CreateAdminSportInput {
+  name: string;
+  description?: string;
 }
 export interface AdminAudit {
   id: string;
@@ -105,6 +124,8 @@ export const adminApi = {
     }),
   sports: (token: string) =>
     apiRequest<AdminSport[]>('/admin/sports', { token }),
+  createSport: (token: string, input: CreateAdminSportInput) =>
+    apiRequest<AdminSport>('/admin/sports', { token, method: 'POST', body: input }),
   updateSport: (token: string, id: string, isActive: boolean) =>
     apiRequest(`/admin/sports/${id}`, {
       token,

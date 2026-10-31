@@ -3,14 +3,13 @@ import type { PlayerSummary } from '@/types/player';
 import type { SportCategory, SportsLocation } from '@/types/sport';
 import {
   buildMockActivities,
-  mockFriends,
   mockLocations,
-  mockPlayers,
   mockSports,
 } from './mock/mock-catalog';
 
 export async function fetchPlayers(): Promise<PlayerSummary[]> {
-  return mockPlayers.map((player) => ({ ...player }));
+  // Real accounts are loaded through the authenticated player search API.
+  return [];
 }
 
 export async function fetchSports(): Promise<SportCategory[]> {
@@ -27,5 +26,5 @@ export async function fetchActivities(): Promise<FeedActivity[]> {
 }
 
 export async function fetchFriends(): Promise<PlayerSummary[]> {
-  return mockFriends.map((friend) => ({ ...friend }));
+  return [];
 }

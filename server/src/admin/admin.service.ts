@@ -12,6 +12,7 @@ import {
   AdminPageQuery,
   AdminReportsQuery,
   AdminUsersQuery,
+  CreateSportDto,
   UpdateAdminUserDto,
   UpdateReportDto,
 } from './admin.dto';
@@ -50,6 +51,12 @@ export class AdminService {
       reviewingReports,
       pendingHelpMessages,
       registrations,
+      sportRows,
+      gamesBySport,
+      gameCreatorsBySport,
+      postsBySport,
+      postCreatorsBySport,
+      activeGameParticipants,
     ] = await Promise.all([
       this.prisma.user.count(),
       this.prisma.user.count({ where: { isActive: true } }),
@@ -63,6 +70,22 @@ export class AdminService {
       this.prisma.$queryRaw<{ day: string; total: bigint }[]>`
         SELECT to_char("createdAt", 'YYYY-MM-DD') AS day, count(*) AS total
         FROM "User" WHERE "createdAt" >= ${start} GROUP BY day ORDER BY day`,
+      this.prisma.sport.findMany({
+        orderBy: { name: 'asc' },
+        select: { id: true, name: true, isActive: true, _count: { select: { players: true } } },
+      }),
+      this.prisma.game.groupBy({ by: ['sportId'], _count: { _all: true } }),
+      this.prisma.game.groupBy({ by: ['sportId', 'hostId'] }),
+      this.prisma.post.groupBy({
+        by: ['sportId'],
+        where: { sportId: { not: null }, deletedAt: null },
+        _count: { _all: true },
+      }),
+      this.prisma.post.groupBy({
+        by: ['sportId', 'userId'],
+        where: { sportId: { not: null }, deletedAt: null },
+      }),
+      this.prisma.gameParticipant.count({ where: { status: 'ACTIVE' } }),
     ]);
     const dailyRegistrations = Array.from({ length: 7 }, (_, i) => {
       const date = new Date(start);
@@ -73,6 +96,40 @@ export class AdminService {
         total: Number(registrations.find((row) => row.day === day)?.total ?? 0),
       };
     });
+    const gameTotals = new Map(gamesBySport.map((row) => [row.sportId, row._count._all]));
+    const sportGameCreators = new Map<string, Set<string>>();
+    for (const row of gameCreatorsBySport) {
+      const creators = sportGameCreators.get(row.sportId) ?? new Set<string>();
+      creators.add(row.hostId);
+      sportGameCreators.set(row.sportId, creators);
+    }
+    const postTotals = new Map(postsBySport.flatMap((row) => (row.sportId ? [[row.sportId, row._count._all] as const] : [])));
+    const sportPostCreators = new Map<string, Set<string>>();
+    for (const row of postCreatorsBySport) {
+      if (!row.sportId) continue;
+      const creators = sportPostCreators.get(row.sportId) ?? new Set<string>();
+      creators.add(row.userId);
+      sportPostCreators.set(row.sportId, creators);
+    }
+    const sportAnalytics = sportRows
+      .map((sport) => {
+        const gamesCreated = gameTotals.get(sport.id) ?? 0;
+        const postsAboutSport = postTotals.get(sport.id) ?? 0;
+        const gameCreators = sportGameCreators.get(sport.id)?.size ?? 0;
+        const postCreators = sportPostCreators.get(sport.id)?.size ?? 0;
+        return {
+          id: sport.id,
+          name: sport.name,
+          isActive: sport.isActive,
+          players: sport._count.players,
+          gamesCreated,
+          gameCreators,
+          postsAboutSport,
+          postCreators,
+          activity: gamesCreated + postsAboutSport,
+        };
+      })
+      .sort((a, b) => b.activity - a.activity || a.name.localeCompare(b.name));
     return {
       users,
       activeUsers,
@@ -84,6 +141,11 @@ export class AdminService {
       reviewingReports,
       pendingHelpMessages,
       dailyRegistrations,
+      gameCreators: new Set(gameCreatorsBySport.map((row) => row.hostId)).size,
+      postsAboutGames: postsBySport.reduce((total, row) => total + row._count._all, 0),
+      gamePosters: new Set(postCreatorsBySport.map((row) => row.userId)).size,
+      activeGameParticipants,
+      sportAnalytics,
     };
   }
 
@@ -277,6 +339,45 @@ export class AdminService {
         _count: { select: { players: true, games: true } },
       },
     });
+  }
+
+  async createSport(actorId: string, input: CreateSportDto) {
+    try {
+      return await this.prisma.$transaction(async (tx) => {
+        await lockAdminAccounts(tx);
+        await this.assertActor(tx, actorId);
+        const sport = await tx.sport.create({
+          data: {
+            name: input.name,
+            description: input.description ?? null,
+          },
+          select: {
+            id: true,
+            name: true,
+            description: true,
+            isActive: true,
+            _count: { select: { players: true, games: true } },
+          },
+        });
+        await tx.adminAuditLog.create({
+          data: {
+            actorId,
+            action: 'SPORT_CREATED',
+            targetId: sport.id,
+            details: { name: sport.name, description: sport.description },
+          },
+        });
+        return sport;
+      });
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2002'
+      ) {
+        throw new ConflictException('A sport with this name already exists.');
+      }
+      throw error;
+    }
   }
 
   async updateSport(actorId: string, id: string, isActive: boolean) {

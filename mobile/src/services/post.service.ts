@@ -1,17 +1,9 @@
 import type { FeedPost, PostDraft, PostVisibility } from '@/types/post';
 import type { UserSummary } from '@/types/user';
-import { buildMockPosts } from './mock/mock-catalog';
-import { mockCurrentUser, mockUsers } from './mock/mock-users';
 
 export async function fetchPosts(): Promise<FeedPost[]> {
-  return buildMockPosts(Date.now());
-}
-
-/** The API returns tagged people as user summaries; the mock looks them up in the same order. */
-function mockPeople(ids: readonly string[]): UserSummary[] {
-  const people = new Map([mockCurrentUser, ...Object.values(mockUsers)].map((person) => [person.id, person]));
-
-  return ids.flatMap((id) => people.get(id) ?? []);
+  // Feed posts must come from the database-backed posts API, never seeded sample content.
+  return [];
 }
 
 /** Stands in for PATCH /posts/:id/visibility, which only the author may call. */
@@ -29,7 +21,7 @@ export async function updatePostVisibility(
 
 /** Stands in for PUT /posts/:id/tags, which only the author may call. The list replaces the tags. */
 export async function updatePostTags(post: FeedPost, taggedUserIds: string[]): Promise<FeedPost> {
-  return { ...post, tags: mockPeople(taggedUserIds) };
+  return { ...post, tags: (post.tags ?? []).filter((person) => taggedUserIds.includes(person.id)) };
 }
 
 /**
@@ -47,7 +39,7 @@ export async function publishPost(author: UserSummary, draft: PostDraft): Promis
     media: draft.photoUrls.map((url, index) => ({ id: `${id}-media-${index + 1}`, type: 'image', url })),
     visibility: draft.visibility,
     customViewerIds: draft.visibility === 'CUSTOM' ? [...draft.customViewerIds] : undefined,
-    tags: mockPeople(draft.taggedUserIds),
+    tags: [],
     location: draft.location ? { ...draft.location, name: draft.location.name.trim() } : null,
     createdAt: new Date().toISOString(),
     likes: 0,
