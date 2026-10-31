@@ -2,7 +2,6 @@ import type { FeedActivity } from '@/types/feed';
 import type { PlayerSummary } from '@/types/player';
 import type { SportCategory, SportsLocation } from '@/types/sport';
 import {
-  buildMockActivities,
   mockLocations,
   mockSports,
 } from './mock/mock-catalog';
@@ -22,7 +21,7 @@ export async function fetchLocations(): Promise<SportsLocation[]> {
 
 /** Game completions, joins, and badge unlocks from people the viewer follows or is friends with. */
 export async function fetchActivities(): Promise<FeedActivity[]> {
-  return buildMockActivities(Date.now());
+  return [];
 }
 
 export async function fetchFriends(): Promise<PlayerSummary[]> {

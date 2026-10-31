@@ -1,7 +1,6 @@
 import type { Story } from '@/types/story';
-import { buildMockStories } from './mock/mock-stories';
 
-/** Returns every story, including expired ones. Callers filter for display. */
+/** Stories are shown only when loaded from a real account-backed source. */
 export async function fetchStories(): Promise<Story[]> {
-  return buildMockStories(Date.now());
+  return [];
 }

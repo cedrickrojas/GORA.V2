@@ -1,24 +1,23 @@
 import type { ClubChatMessage } from '@/types/chat';
 import type { Club, ClubMemberEntry } from '@/types/club';
-import { MOCK_CLUB_CHAT_UNREAD, buildMockClubChatMessages } from './mock/mock-club-chats';
-import { buildMockClubMembers, buildMockClubs } from './mock/mock-clubs';
 
-/** The demo clubs; clubs created in GORA come from the server (club-api.service). */
+/** Clubs are shown only when loaded from the database-backed clubs API. */
 export async function fetchClubs(): Promise<Club[]> {
-  return buildMockClubs(Date.now());
+  return [];
 }
 
-/** Demo club chat history; clubs stored on the server use club-chat-api.service instead. */
+/** No demo chat history; real club chats use club-chat-api.service. */
 export async function fetchDemoClubChats(): Promise<{
   messages: Record<string, ClubChatMessage[]>;
   unread: Record<string, number>;
 }> {
-  return { messages: buildMockClubChatMessages(Date.now()), unread: { ...MOCK_CLUB_CHAT_UNREAD } };
+  return { messages: {}, unread: {} };
 }
 
 /** Active members, as GET /clubs/:id/members will return them. */
 export async function fetchClubMembers(clubId: string): Promise<ClubMemberEntry[]> {
-  return buildMockClubMembers(clubId, Date.now());
+  void clubId;
+  return [];
 }
 
 /** Demo clubs only; server clubs join through club-api.service. */
