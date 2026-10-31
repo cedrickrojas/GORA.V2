@@ -38,6 +38,16 @@ export interface AppNotification {
   read: boolean;
   /** In-app route to open, when there is one. */
   link: string | null;
+  /** Current server-side state for actionable game requests, if applicable. */
+  actionStatus?:
+    | "join-accepted"
+    | "join-rejected"
+    | "join-cancelled"
+    | "leave-approved"
+    | "leave-rejected"
+    | "leave-cancelled"
+    | "resolved"
+    | null;
 }
 
 export interface NotificationsPage {

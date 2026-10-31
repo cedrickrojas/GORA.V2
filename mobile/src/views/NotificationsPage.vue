@@ -91,7 +91,7 @@
               {{ actionBusyId === item.id ? 'Accepting…' : 'Accept' }}
             </button>
             <button
-              v-else-if="item.type === 'GAME_JOIN_REQUEST' && !gameActionStatus[item.id]"
+              v-else-if="item.type === 'GAME_JOIN_REQUEST' && !getGameActionStatus(item)"
               type="button"
               class="notification__action notification__action--primary"
               :disabled="isMarkingAll || !!actionBusyId"
@@ -99,10 +99,11 @@
             >
               {{ actionBusyId === item.id ? 'Accepting…' : 'Accept Join Request' }}
             </button>
-            <span v-else-if="item.type === 'GAME_JOIN_REQUEST' && gameActionStatus[item.id]" class="notification__action-status">Request Accepted</span>
+            <span v-else-if="item.type === 'GAME_JOIN_REQUEST' && getGameActionStatus(item)" class="notification__action-status">{{ joinRequestStatusLabel(getGameActionStatus(item)) }}</span>
             <template v-else-if="item.type === 'GAME_LEAVE_REQUEST'">
-              <span v-if="gameActionStatus[item.id] === 'leave-approved'" class="notification__action-status">Player Removed</span>
-              <span v-else-if="gameActionStatus[item.id] === 'leave-rejected'" class="notification__action-status">Request Declined</span>
+              <span v-if="getGameActionStatus(item) === 'leave-approved'" class="notification__action-status">Player Removed</span>
+              <span v-else-if="getGameActionStatus(item) === 'leave-rejected'" class="notification__action-status">Request Declined</span>
+              <span v-else-if="getGameActionStatus(item)" class="notification__action-status">Request No Longer Pending</span>
               <template v-else>
                 <button type="button" class="notification__action notification__action--primary" :disabled="isMarkingAll || !!actionBusyId" @click="respondToLeave(item, 'approve')">
                   {{ actionBusyId === item.id ? 'Removing…' : 'Approve & Remove Player' }}
@@ -251,6 +252,17 @@ function hasNotificationAction(item: AppNotification): boolean {
   if (item.type === 'GAME_JOIN_REQUEST') return item.actor !== null && gameIdFor(item) !== null;
   if (item.type === 'GAME_LEAVE_REQUEST') return item.actor !== null && gameIdFor(item) !== null;
   return item.type === 'GAME_JOIN_REJECTED' && gameIdFor(item) !== null;
+}
+
+function getGameActionStatus(item: AppNotification): GameNotificationAction | 'join-rejected' | 'join-cancelled' | 'resolved' | null {
+  return gameActionStatus.value[item.id] ?? item.actionStatus ?? null;
+}
+
+function joinRequestStatusLabel(status: ReturnType<typeof getGameActionStatus>): string {
+  if (status === 'join-accepted') return 'Request Accepted';
+  if (status === 'join-rejected') return 'Request Declined';
+  if (status === 'join-cancelled') return 'Request Cancelled';
+  return 'Request No Longer Pending';
 }
 
 async function completeNotificationAction(item: AppNotification, message: string): Promise<void> {

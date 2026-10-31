@@ -18,6 +18,7 @@ const SELECT = {
   storyId: true,
   actor: { select: AUTHOR_SELECT },
   game: { select: { title: true } },
+  joinRequest: { select: { status: true } },
   badge: { select: { name: true } },
   reportId: true,
   reportStatus: true,
@@ -113,8 +114,54 @@ export class NotificationsService {
       }),
       this.prisma.notification.count({ where }),
     ]);
+    const leaveRequestNotifications = rows.filter(
+      (row) => row.type === 'GAME_LEAVE_REQUEST' && row.gameId && row.actor,
+    );
+    const leaveRequests = leaveRequestNotifications.length
+      ? await this.prisma.gameLeaveRequest.findMany({
+          where: {
+            OR: leaveRequestNotifications.map((row) => ({
+              gameId: row.gameId!,
+              userId: row.actor!.id,
+            })),
+          },
+          select: { gameId: true, userId: true, status: true },
+        })
+      : [];
+    const leaveStatusByPair = new Map(
+      leaveRequests.map((request) => [`${request.gameId}:${request.userId}`, request.status]),
+    );
+
     return {
-      items: rows.map(toView),
+      items: rows.map((row) => {
+        if (row.type === 'GAME_JOIN_REQUEST') {
+          const status = row.joinRequest?.status;
+          const actionStatus = status === 'ACCEPTED'
+            ? 'join-accepted'
+            : status === 'REJECTED'
+              ? 'join-rejected'
+              : status === 'CANCELLED'
+                ? 'join-cancelled'
+                : status === 'PENDING'
+                  ? null
+                  : 'resolved';
+          return toView(row, actionStatus);
+        }
+        if (row.type === 'GAME_LEAVE_REQUEST' && row.gameId && row.actor) {
+          const status = leaveStatusByPair.get(`${row.gameId}:${row.actor.id}`);
+          const actionStatus = status === 'APPROVED'
+            ? 'leave-approved'
+            : status === 'REJECTED'
+              ? 'leave-rejected'
+              : status === 'CANCELLED'
+                ? 'leave-cancelled'
+                : status === 'PENDING'
+                  ? null
+                  : 'resolved';
+          return toView(row, actionStatus);
+        }
+        return toView(row);
+      }),
       unreadCount,
       hasMore: offset + rows.length < total,
       nextOffset: offset + rows.length,
@@ -152,7 +199,7 @@ export class NotificationsService {
   }
 }
 
-function toView(row: Row) {
+function toView(row: Row, actionStatus: string | null = null) {
   const actor = row.actor
     ? {
         id: row.actor.id,
@@ -220,5 +267,6 @@ function toView(row: Row) {
     createdAt: row.createdAt.toISOString(),
     read: row.isRead,
     link,
+    actionStatus,
   };
 }

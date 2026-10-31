@@ -64,12 +64,21 @@
           />
 
           <template v-else>
-            <p v-if="games.length === 0" class="sport__empty">
+            <p v-if="mapLoading" class="sport__empty">Loading games…</p>
+            <p v-else-if="mapError" class="sport__empty" role="alert">{{ mapError }}</p>
+            <p v-else-if="games.length === 0" class="sport__empty">
               No {{ date === 'ALL' ? 'upcoming ' : '' }}{{ sport.name.toLowerCase() }} games
               {{ date === 'ALL' ? '' : `${dateLabel.toLowerCase()} ` }}{{ distanceLabel.toLowerCase() }}.
             </p>
             <div v-else class="sport__stack">
-              <GameCard v-for="game in games" :key="game.id" :game="game" :now-ms="now" @join="joinGame" />
+              <DiscoveredGameCard
+                v-for="game in games"
+                :key="game.id"
+                :game="game"
+                :join-action="joinActionOf(game)"
+                :busy="busyGameId === game.id"
+                @join="openJoin"
+              />
             </div>
           </template>
         </section>
@@ -149,20 +158,19 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { IonContent, IonIcon, IonPage, IonSearchbar } from '@ionic/vue';
+import { IonContent, IonIcon, IonPage, IonSearchbar, onIonViewWillEnter } from '@ionic/vue';
 import { locationOutline } from 'ionicons/icons';
 import ClubRow from '@/components/clubs/ClubRow.vue';
 import SectionHeader from '@/components/common/SectionHeader.vue';
 import SegmentTabs from '@/components/common/SegmentTabs.vue';
 import JoinRequestModal from '@/components/games/JoinRequestModal.vue';
+import DiscoveredGameCard from '@/components/map/DiscoveredGameCard.vue';
 import PlayerRow from '@/components/discover/PlayerRow.vue';
 import PostCard from '@/components/feed/PostCard.vue';
-import GameCard from '@/components/games/GameCard.vue';
 import GameDiscoveryMap from '@/components/map/GameDiscoveryMap.vue';
 import AppHeader from '@/components/layout/AppHeader.vue';
 import ReelThumb from '@/components/reels/ReelThumb.vue';
 import { useDiscoveryJoin } from '@/composables/useDiscoveryJoin';
-import { useJoinGame } from '@/composables/useJoinGame';
 import { useNow } from '@/composables/useNow';
 import { usePostActions } from '@/composables/usePostActions';
 import { useCatalogStore } from '@/stores/catalog';
@@ -180,7 +188,7 @@ import type { DiscoveredGame } from '@/types/discovery';
 import { describeApiError } from '@/utils/api-errors';
 import { rankPopularClubs } from '@/utils/clubs';
 import { isWithinDistance, matchesSport } from '@/utils/filters';
-import { DISCOVERY_DATES, buildDiscoveryQuery, selectSportDiscoveryGames, type DiscoveryDate } from '@/utils/map-discovery';
+import { DISCOVERY_DATES, buildDiscoveryQuery, type DiscoveryDate } from '@/utils/map-discovery';
 import { formatDistanceFilter, matchesSearchQuery } from '@/utils/search';
 import { getSportImage, toSportSlug } from '@/utils/sports';
 import { formatCompactNumber, formatDistanceKm } from '@/utils/time';
@@ -206,7 +214,6 @@ const sportsStore = useSportsStore();
 const auth = useAuthStore();
 const discovery = useDiscoveryStore();
 const authorized = createAuthorizedCall(auth);
-const { joinGame } = useJoinGame();
 const { likePost, commentOnPost, sharePost } = usePostActions();
 const now = useNow();
 
@@ -240,7 +247,7 @@ const dateLabel = computed(() => DISCOVERY_DATES.find((option) => option.id === 
 const sportMapGames = computed(() => mapGames.value.filter((game) =>
   matches(game.title, game.locationName, game.host.displayName),
 ));
-const visibleGameCount = computed(() => view.value === 'MAP' ? sportMapGames.value.length : games.value.length);
+const visibleGameCount = computed(() => sportMapGames.value.length);
 const distanceLabel = computed(() =>
   filters.maxDistanceKm === null ? 'Any distance' : `Within ${formatDistanceFilter(filters.maxDistanceKm)}`,
 );
@@ -306,22 +313,14 @@ async function refreshSportMap(): Promise<void> {
 }
 
 watch([date, () => filters.maxDistanceKm, () => discovery.userLocation], () => {
-  if (view.value === 'MAP') void refreshSportMap();
+  void refreshSportMap();
 }, { deep: true });
 
 watch(view, (selectedView) => {
   if (selectedView === 'MAP' && !mapGames.value.length && !mapLoading.value) void refreshSportMap();
 });
 
-const games = computed(() =>
-  selectSportDiscoveryGames(
-    gamesStore.games,
-    { sport: sportName.value, date: date.value, maxDistanceKm: filters.maxDistanceKm },
-    now.value,
-  ).filter((game) =>
-    matches(game.title, game.description ?? '', game.location.name, game.location.city, game.host.displayName),
-  ),
-);
+const games = sportMapGames;
 
 const players = computed(() =>
   catalog.players.filter(
@@ -371,7 +370,11 @@ const resultCount = computed(
     locations.value.length,
 );
 
+const pageLoaded = ref(false);
 onMounted(() => void loadSportPage());
+onIonViewWillEnter(() => {
+  if (pageLoaded.value) void refreshSportMap();
+});
 
 async function loadSportPage(): Promise<void> {
   await auth.initialize();
@@ -383,6 +386,7 @@ async function loadSportPage(): Promise<void> {
     reelsStore.load(),
   ]);
   await refreshSportMap();
+  pageLoaded.value = true;
 }
 </script>
 

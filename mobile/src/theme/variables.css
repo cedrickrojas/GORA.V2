@@ -118,7 +118,7 @@ ion-action-sheet.gora-sheet {
   --background: var(--gora-surface);
   --button-background-hover: var(--gora-accent-soft);
   --button-background-selected: var(--gora-accent-soft);
-  --button-color: #f5f6f8;
+  --button-color: var(--ion-text-color);
   --color: var(--gora-muted);
 }
 
