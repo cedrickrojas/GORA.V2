@@ -271,7 +271,7 @@
                       <div class="sport-analytics__counts">
                         <span><strong>{{ number(sport.gamesCreated) }}</strong> games · {{ number(sport.gameCreators) }} hosts</span>
                         <span><strong>{{ number(sport.postsAboutSport) }}</strong> posts · {{ number(sport.postCreators) }} posters</span>
-                        <span><strong>{{ number(sport.players) }}</strong> players</span>
+                        <span><strong>{{ number(sport.players) }}</strong> users</span>
                       </div>
                     </article>
                   </div>
@@ -494,7 +494,9 @@
                     v-for="sport in sports"
                     :key="sport.id"
                     class="panel sport-card"
+                    :class="{ 'is-selected': selectedSportId === sport.id }"
                   >
+                    <button type="button" class="sport-card__select" :aria-pressed="selectedSportId === sport.id" @click="selectSport(sport.id)">
                     <div class="sport-top">
                       <span class="sport-symbol">{{
                         sport.name.slice(0, 2).toUpperCase()
@@ -521,6 +523,7 @@
                         games</span
                       >
                     </div>
+                    </button>
                     <button
                       class="button secondary full"
                       :disabled="busy || loading"
@@ -530,6 +533,22 @@
                     </button>
                   </article>
                 </div>
+                <section v-if="selectedSport" class="panel sport-breakdown" :aria-label="`${selectedSport.name} analytics`">
+                  <div class="sport-breakdown__heading">
+                    <div>
+                      <span class="eyebrow">SPORT BREAKDOWN</span>
+                      <h3>{{ selectedSport.name }} analytics</h3>
+                    </div>
+                    <button type="button" class="text-button" @click="selectedSportId = null">Close</button>
+                  </div>
+                  <div class="sport-breakdown__grid">
+                    <article v-for="metric in sportBreakdownMetrics" :key="metric.label" class="sport-breakdown__metric">
+                      <span>{{ metric.label }}</span>
+                      <strong>{{ number(metric.value) }}</strong>
+                      <small>{{ metric.note }}</small>
+                    </article>
+                  </div>
+                </section>
                 <p
                   v-if="sports && !sports.length && !loading"
                   class="panel empty-message"
@@ -825,6 +844,7 @@ const busy = ref(false);
 const error = ref('');
 const notice = ref('');
 const accessDenied = ref(false);
+const selectedSportId = ref<string | null>(null);
 let generation = 0;
 let notificationPoll: number | null = null;
 const reportStatuses: ReportStatus[] = [
@@ -885,6 +905,18 @@ const platformStats = computed(() =>
       ],
 );
 const topSport = computed(() => overview.value?.sportAnalytics.find((sport) => sport.activity > 0) ?? null);
+const selectedSport = computed(() => overview.value?.sportAnalytics.find((sport) => sport.id === selectedSportId.value) ?? null);
+const sportBreakdownMetrics = computed(() => {
+  const sport = selectedSport.value;
+  if (!sport) return [];
+  return [
+    { label: 'Users', value: sport.players, note: 'Accounts registered for this sport' },
+    { label: 'Clubs', value: sport.clubs, note: 'Clubs that play this sport' },
+    { label: 'Posts', value: sport.postsAboutSport, note: `${number(sport.postCreators)} people posted` },
+    { label: 'Games', value: sport.gamesCreated, note: `${number(sport.gameCreators)} unique hosts` },
+    { label: 'Active participants', value: sport.activeParticipants, note: 'Accepted players in current games' },
+  ];
+});
 const maxSportActivity = computed(() =>
   Math.max(1, ...(overview.value?.sportAnalytics.map((sport) => sport.activity) ?? [])),
 );
@@ -1139,6 +1171,9 @@ function confirmSport(sport: AdminSport) {
       : 'This sport will become available for new selections across GORA.',
     run: (token) => adminApi.updateSport(token, sport.id, !sport.isActive),
   });
+}
+function selectSport(sportId: string) {
+  selectedSportId.value = selectedSportId.value === sportId ? null : sportId;
 }
 function addSport() {
   sportName.value = '';
@@ -1725,12 +1760,75 @@ button:disabled {
   flex-direction: column;
 }
 .sport-analytics__row {
+  width: 100%;
   display: grid;
   grid-template-columns: minmax(140px, 0.75fr) minmax(100px, 1fr) minmax(310px, 1.35fr);
   align-items: center;
   gap: 18px;
   padding: 14px 0;
+  color: inherit;
+  text-align: left;
+  background: transparent;
+  border: 0;
   border-top: 1px solid var(--admin-border);
+  cursor: pointer;
+  transition: background-color 140ms ease;
+}
+.sport-analytics__row:hover,
+.sport-analytics__row.is-selected {
+  background: color-mix(in srgb, #ff642e 8%, transparent);
+}
+.sport-analytics__row:focus-visible {
+  outline: 2px solid #ff642e;
+  outline-offset: 2px;
+}
+.sport-breakdown {
+  margin-top: 18px;
+  padding: 18px;
+  border: 1px solid var(--admin-border);
+  border-radius: 14px;
+  background: var(--admin-surface-soft, #191c20);
+}
+.sport-breakdown__heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.sport-breakdown__heading .eyebrow {
+  color: #ff642e;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: .14em;
+}
+.sport-breakdown__heading h3 {
+  margin: 5px 0 0;
+  font-size: 17px;
+}
+.sport-breakdown__grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+}
+.sport-breakdown__metric {
+  display: grid;
+  align-content: start;
+  gap: 7px;
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid var(--admin-border);
+  border-radius: 11px;
+}
+.sport-breakdown__metric > span,
+.sport-breakdown__metric > small {
+  color: var(--admin-muted);
+  font-size: 10px;
+}
+.sport-breakdown__metric > strong {
+  font-size: 23px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
 }
 .sport-analytics__name {
   display: flex;
@@ -2015,6 +2113,24 @@ code {
 .sport-card {
   padding: 22px;
 }
+.sport-card.is-selected {
+  border-color: #ff642e;
+}
+.sport-card__select {
+  display: block;
+  width: 100%;
+  padding: 0;
+  color: inherit;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+.sport-card__select:focus-visible {
+  outline: 2px solid #ff642e;
+  outline-offset: 5px;
+  border-radius: 4px;
+}
 .sport-top {
   display: flex;
   justify-content: space-between;
@@ -2033,7 +2149,7 @@ code {
   font-size: 12px;
   font-weight: 700;
 }
-.sport-card > p {
+.sport-card__select > p {
   color: #a0a9b5;
   font-size: 12px;
   min-height: 40px;
@@ -2348,6 +2464,9 @@ pre {
     grid-column: 1 / -1;
     justify-content: flex-start;
   }
+  .sport-breakdown__grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }
 @media (max-width: 620px) {
   .sidebar {
@@ -2448,6 +2567,12 @@ pre {
     grid-column: auto;
     justify-content: flex-start;
     gap: 6px 12px;
+  }
+  .sport-breakdown {
+    padding: 14px;
+  }
+  .sport-breakdown__grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .sports-grid {
     grid-template-columns: minmax(0, 1fr);

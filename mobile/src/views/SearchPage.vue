@@ -13,7 +13,19 @@
           show-clear-button="focus"
         />
 
-        <div class="search__chips" role="group" aria-label="Search in">
+        <div
+          ref="searchChips"
+          class="search__chips"
+          :class="{ 'search__chips--dragging': isDraggingCategories }"
+          role="group"
+          aria-label="Search in"
+          @wheel="scrollCategoriesWithWheel"
+          @pointerdown="startCategoryDrag"
+          @pointermove="moveCategoryDrag"
+          @pointerup="endCategoryDrag"
+          @pointercancel="endCategoryDrag"
+          @click.capture="preventClickAfterDrag"
+        >
           <button
             v-for="option in SEARCH_CATEGORIES"
             :key="option.id"
@@ -187,6 +199,11 @@ const now = useNow();
 
 const query = ref('');
 const category = ref<SearchCategory>('ALL');
+const searchChips = ref<HTMLDivElement | null>(null);
+const isDraggingCategories = ref(false);
+let categoryDragStartX = 0;
+let categoryDragScrollLeft = 0;
+let categoryWasDragged = false;
 
 watch([query, category, () => auth.accessToken], ([text, category, token], _, onCleanup) => {
   let current = true;
@@ -237,6 +254,46 @@ const resultCount = computed(
   () => countResults(results.value) + apiPlayers.value.length + (searchingPlayers.value ? 1 : 0),
 );
 
+function scrollCategoriesWithWheel(event: WheelEvent): void {
+  const element = searchChips.value;
+  if (!element || element.scrollWidth <= element.clientWidth || Math.abs(event.deltaY) <= Math.abs(event.deltaX)) return;
+  event.preventDefault();
+  element.scrollLeft += event.deltaY;
+}
+
+function startCategoryDrag(event: PointerEvent): void {
+  if (event.pointerType !== 'mouse' || event.button !== 0 || !searchChips.value) return;
+  isDraggingCategories.value = true;
+  categoryWasDragged = false;
+  categoryDragStartX = event.clientX;
+  categoryDragScrollLeft = searchChips.value.scrollLeft;
+  const button = event.target instanceof HTMLElement ? event.target.closest('button') : null;
+  (button ?? searchChips.value).setPointerCapture(event.pointerId);
+}
+
+function moveCategoryDrag(event: PointerEvent): void {
+  if (!isDraggingCategories.value || !searchChips.value) return;
+  const delta = event.clientX - categoryDragStartX;
+  if (Math.abs(delta) > 4) categoryWasDragged = true;
+  if (categoryWasDragged) {
+    event.preventDefault();
+    searchChips.value.scrollLeft = categoryDragScrollLeft - delta;
+  }
+}
+
+function endCategoryDrag(): void {
+  if (!isDraggingCategories.value) return;
+  isDraggingCategories.value = false;
+  if (categoryWasDragged) window.setTimeout(() => { categoryWasDragged = false; }, 0);
+}
+
+function preventClickAfterDrag(event: MouseEvent): void {
+  if (!categoryWasDragged) return;
+  event.preventDefault();
+  event.stopPropagation();
+  categoryWasDragged = false;
+}
+
 function browseSport(sport: SportCategory): void {
   void router.push(`/search/${toSportSlug(sport.name)}`);
 }
@@ -281,7 +338,26 @@ onIonViewWillEnter(() => {
   gap: 8px;
   margin-top: 12px;
   overflow-x: auto;
-  scrollbar-width: none;
+  padding: 2px 0 7px;
+  cursor: grab;
+  scrollbar-color: var(--gora-muted) transparent;
+  scrollbar-width: thin;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.search__chips::-webkit-scrollbar {
+  height: 6px;
+}
+
+.search__chips::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: var(--gora-muted);
+}
+
+.search__chips--dragging {
+  cursor: grabbing;
+  user-select: none;
 }
 
 .chip {
@@ -301,6 +377,16 @@ onIonViewWillEnter(() => {
   border-color: var(--ion-color-primary);
   background: var(--ion-color-primary);
   color: var(--ion-color-primary-contrast);
+}
+
+@media (max-width: 640px) {
+  .search__chips {
+    scrollbar-width: none;
+  }
+
+  .search__chips::-webkit-scrollbar {
+    display: none;
+  }
 }
 
 .search__section {

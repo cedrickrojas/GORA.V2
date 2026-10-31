@@ -40,12 +40,14 @@ import { IonButton, IonContent, IonIcon, IonPage, IonSpinner, onIonViewWillEnter
 import SubPageHeader from '@/components/layout/SubPageHeader.vue';
 import { getMyHelpRequests } from '@/services/profile-api.service';
 import { useAuthStore } from '@/stores/auth';
+import { useNotificationsStore } from '@/stores/notifications';
 import { captureSession, createAuthorizedCall } from '@/stores/authorized';
 import type { HelpRequestItem, HelpRequestStatus } from '@/types/help-request';
 import { describeApiError } from '@/utils/api-errors';
 import { helpCircleOutline } from 'ionicons/icons';
 
 const auth = useAuthStore();
+const notifications = useNotificationsStore();
 const items = ref<HelpRequestItem[]>([]);
 const isLoading = ref(false);
 const hasLoaded = ref(false);
@@ -61,6 +63,7 @@ async function load(): Promise<void> {
     if (!isCurrent()) return;
     items.value = response.items;
     hasLoaded.value = true;
+    await notifications.markHelpRequestsRead();
   } catch (caught) {
     if (isCurrent()) error.value = describeApiError(caught, 'Could not load your help requests.');
   } finally {

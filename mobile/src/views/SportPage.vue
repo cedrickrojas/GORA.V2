@@ -90,13 +90,6 @@
           </ul>
         </section>
 
-        <section v-if="clubs.length" class="sport__section">
-          <SectionHeader title="Clubs" />
-          <ul class="sport__list">
-            <ClubRow v-for="club in clubs" :key="club.id" :club="club" />
-          </ul>
-        </section>
-
         <section v-if="reels.length" class="sport__section">
           <SectionHeader title="Reels" />
           <div class="sport__reels">
@@ -104,19 +97,13 @@
           </div>
         </section>
 
-        <section v-if="locations.length" class="sport__section">
-          <SectionHeader title="Locations" />
+        <section v-if="!isSearching || clubs.length" class="sport__section">
+          <SectionHeader title="Available Clubs">
+            <span class="sport__meta">{{ clubs.length }} {{ clubs.length === 1 ? 'club' : 'clubs' }}</span>
+          </SectionHeader>
+          <p v-if="clubs.length === 0" class="sport__empty">No available {{ sport.name.toLowerCase() }} clubs yet.</p>
           <ul class="sport__list">
-            <li v-for="location in locations" :key="location.id" class="sport__location">
-              <span class="sport__location-icon">
-                <ion-icon :icon="locationOutline" aria-hidden="true" />
-              </span>
-              <span class="sport__location-text">
-                <strong>{{ location.name }}</strong>
-                <span>{{ location.city }}</span>
-              </span>
-              <span class="sport__location-distance">{{ formatDistanceKm(location.distanceKm) }}</span>
-            </li>
+            <ClubRow v-for="club in clubs" :key="club.id" :club="club" />
           </ul>
         </section>
 
@@ -158,8 +145,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { IonContent, IonIcon, IonPage, IonSearchbar, onIonViewWillEnter } from '@ionic/vue';
-import { locationOutline } from 'ionicons/icons';
+import { IonContent, IonPage, IonSearchbar, onIonViewWillEnter } from '@ionic/vue';
 import ClubRow from '@/components/clubs/ClubRow.vue';
 import SectionHeader from '@/components/common/SectionHeader.vue';
 import SegmentTabs from '@/components/common/SegmentTabs.vue';
@@ -186,12 +172,12 @@ import { discoverGames } from '@/services/games-api.service';
 import { createAuthorizedCall } from '@/stores/authorized';
 import type { DiscoveredGame } from '@/types/discovery';
 import { describeApiError } from '@/utils/api-errors';
-import { rankPopularClubs } from '@/utils/clubs';
+import { getClubJoinState } from '@/utils/clubs';
 import { isWithinDistance, matchesSport } from '@/utils/filters';
 import { DISCOVERY_DATES, buildDiscoveryQuery, type DiscoveryDate } from '@/utils/map-discovery';
 import { formatDistanceFilter, matchesSearchQuery } from '@/utils/search';
 import { getSportImage, toSportSlug } from '@/utils/sports';
-import { formatCompactNumber, formatDistanceKm } from '@/utils/time';
+import { formatCompactNumber } from '@/utils/time';
 
 type SportView = 'MAP' | 'LIST';
 
@@ -331,9 +317,12 @@ const players = computed(() =>
   ),
 );
 const clubs = computed(() =>
-  rankPopularClubs(clubsStore.clubs, { sport: sportName.value, maxDistanceKm: filters.maxDistanceKm }, 10).filter(
-    (club) => matches(club.name, club.slug, club.city ?? '', club.locationName ?? ''),
-  ),
+  clubsStore.feedClubs
+    .filter((club) => matchesSport([...(club.sport ? [club.sport] : []), ...club.additionalSports.map(({ name }) => name)], sportName.value))
+    .filter((club) => ['JOIN', 'REQUEST'].includes(getClubJoinState(club)))
+    .filter((club) => matches(club.name, club.slug, club.city ?? '', club.locationName ?? ''))
+    .sort((a, b) => b.memberCount - a.memberCount)
+    .slice(0, 10),
 );
 const reels = computed(() =>
   reelsStore.feedReels.filter(
@@ -352,28 +341,19 @@ const posts = computed(() =>
     )
     .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt)),
 );
-const locations = computed(() =>
-  catalog.locations.filter(
-    (location) =>
-      matchesSport(location.sports, sportName.value) &&
-      isWithinDistance(location.distanceKm, filters.maxDistanceKm) &&
-      matches(location.name, location.city),
-  ),
-);
 const resultCount = computed(
   () =>
     visibleGameCount.value +
     players.value.length +
     clubs.value.length +
     reels.value.length +
-    posts.value.length +
-    locations.value.length,
+    posts.value.length,
 );
 
 const pageLoaded = ref(false);
 onMounted(() => void loadSportPage());
 onIonViewWillEnter(() => {
-  if (pageLoaded.value) void refreshSportMap();
+  if (pageLoaded.value) void Promise.all([refreshSportMap(), clubsStore.refreshFeedClubs()]);
 });
 
 async function loadSportPage(): Promise<void> {

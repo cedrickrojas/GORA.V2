@@ -38,13 +38,6 @@
             <p>Send a message to the GORA admin team</p>
           </ion-label>
         </ion-item>
-        <ion-item router-link="/profile/help" :detail="true">
-          <ion-icon slot="start" :icon="helpCircleOutline" aria-hidden="true" />
-          <ion-label>
-            My Help Requests
-            <p>Check the admin review status of your messages</p>
-          </ion-label>
-        </ion-item>
         <ion-item
           v-for="item in SETTINGS_ITEMS"
           :key="item.label"
@@ -190,6 +183,20 @@
         </ion-toolbar>
       </ion-header>
       <ion-content>
+        <ion-list inset>
+          <ion-item button :detail="true" @click="openHelpRequests">
+            <span slot="start" class="help-message-icon">
+              <ion-icon :icon="mailOutline" aria-hidden="true" />
+              <span v-if="unreadHelpRequestCount > 0" class="help-unread-badge" :aria-label="`${unreadHelpRequestCount} unread help messages`">
+                {{ unreadHelpRequestCount > 99 ? '99+' : unreadHelpRequestCount }}
+              </span>
+            </span>
+            <ion-label>
+              My Help Requests
+              <p>Check replies and review status from the admin team</p>
+            </ion-label>
+          </ion-item>
+        </ion-list>
         <form class="settings-help" @submit.prevent="sendHelp">
           <p>Tell us what you need help with. Your message will be sent to the admin inbox.</p>
           <ion-textarea
@@ -233,6 +240,7 @@ import {
   IonTitle,
   IonToggle,
   IonToolbar,
+  onIonViewWillEnter,
 } from '@ionic/vue';
 import { alertController } from '@ionic/vue';
 import {
@@ -244,12 +252,14 @@ import {
   locationOutline,
   lockClosedOutline,
   logOutOutline,
+  mailOutline,
   notificationsOutline,
   personOutline,
   shieldCheckmarkOutline,
 } from 'ionicons/icons';
 import SubPageHeader from '@/components/layout/SubPageHeader.vue';
 import { useAuthStore } from '@/stores/auth';
+import { useNotificationsStore } from '@/stores/notifications';
 import { captureSession, createAuthorizedCall } from '@/stores/authorized';
 import {
   changeMyAccountEmail,
@@ -278,12 +288,14 @@ const SETTINGS_ITEMS = [
 const DISTANCE_OPTIONS = DISTANCE_FILTERS.filter((distance): distance is Exclude<typeof distance, null> => distance !== null);
 
 const auth = useAuthStore();
+const notifications = useNotificationsStore();
 const settings = useSettingsStore();
 const appPreferences = useAppPreferencesStore();
 const discovery = useDiscoveryStore();
 const filters = useFiltersStore();
 const router = useRouter();
 const isLoggingOut = ref(false);
+const unreadHelpRequestCount = computed(() => notifications.unreadHelpRequestCount);
 const isHelpOpen = ref(false);
 const isSendingHelp = ref(false);
 const helpMessage = ref('');
@@ -301,7 +313,11 @@ const currentPassword = ref('');
 const newPassword = ref('');
 const confirmNewPassword = ref('');
 
-onMounted(() => { void settings.load().catch(() => showNotice('Could not load your settings. Please try again.')); });
+onMounted(() => {
+  void settings.load().catch(() => showNotice('Could not load your settings. Please try again.'));
+  void notifications.load(true);
+});
+onIonViewWillEnter(() => void notifications.load(true));
 
 async function openSetting(id: (typeof SETTINGS_ITEMS)[number]['id']): Promise<void> {
   activeSetting.value = id;
@@ -432,6 +448,12 @@ function openHelp(): void {
   helpMessage.value = '';
   helpError.value = '';
   isHelpOpen.value = true;
+  void notifications.load(true);
+}
+
+async function openHelpRequests(): Promise<void> {
+  isHelpOpen.value = false;
+  await router.push('/profile/help');
 }
 
 async function sendHelp(): Promise<void> {
@@ -546,6 +568,38 @@ async function logOut(): Promise<void> {
 .settings-help__error {
   margin: 0;
   color: #ff8585;
+}
+
+.help-unread-badge {
+  position: absolute;
+  top: -5px;
+  right: -8px;
+  display: inline-flex;
+  min-width: 22px;
+  height: 22px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--ion-color-primary, #ff642e);
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.help-message-icon {
+  position: relative;
+  display: inline-flex;
+  width: 28px;
+  height: 28px;
+  align-items: center;
+  justify-content: center;
+  color: var(--ion-color-primary);
+}
+
+.help-message-icon ion-icon {
+  font-size: 22px;
 }
 
 .settings-description {

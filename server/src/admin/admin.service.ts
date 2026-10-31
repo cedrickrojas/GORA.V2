@@ -111,6 +111,25 @@ export class AdminService {
       creators.add(row.userId);
       sportPostCreators.set(row.sportId, creators);
     }
+    const sportCommunityCounts = await Promise.all(
+      sportRows.map(async (sport) => {
+        const [clubs, activeParticipants] = await Promise.all([
+          this.prisma.club.count({
+            where: {
+              OR: [
+                { sportId: sport.id },
+                { additionalSports: { some: { sportId: sport.id } } },
+              ],
+            },
+          }),
+          this.prisma.gameParticipant.count({
+            where: { status: 'ACTIVE', game: { sportId: sport.id } },
+          }),
+        ]);
+        return [sport.id, { clubs, activeParticipants }] as const;
+      }),
+    );
+    const sportCommunityCountMap = new Map(sportCommunityCounts);
     const sportAnalytics = sportRows
       .map((sport) => {
         const gamesCreated = gameTotals.get(sport.id) ?? 0;
@@ -122,10 +141,12 @@ export class AdminService {
           name: sport.name,
           isActive: sport.isActive,
           players: sport._count.players,
+          clubs: sportCommunityCountMap.get(sport.id)?.clubs ?? 0,
           gamesCreated,
           gameCreators,
           postsAboutSport,
           postCreators,
+          activeParticipants: sportCommunityCountMap.get(sport.id)?.activeParticipants ?? 0,
           activity: gamesCreated + postsAboutSport,
         };
       })

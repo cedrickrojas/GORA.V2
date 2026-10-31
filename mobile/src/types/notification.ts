@@ -53,6 +53,7 @@ export interface AppNotification {
 export interface NotificationsPage {
   items: AppNotification[];
   unreadCount: number;
+  unreadHelpRequestCount: number;
   hasMore: boolean;
   nextOffset: number;
 }

@@ -35,10 +35,12 @@ export interface AdminOverview {
     name: string;
     isActive: boolean;
     players: number;
+    clubs: number;
     gamesCreated: number;
     gameCreators: number;
     postsAboutSport: number;
     postCreators: number;
+    activeParticipants: number;
     activity: number;
   }[];
 }

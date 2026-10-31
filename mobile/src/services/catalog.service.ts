@@ -9,7 +9,10 @@ export async function fetchPlayers(): Promise<PlayerSummary[]> {
 }
 
 export async function fetchLocations(): Promise<SportsLocation[]> {
-  return mockLocations.map((location) => ({ ...location }));
+  const hiddenLocationIds = new Set(['loc-qmc', 'loc-ultra']);
+  return mockLocations
+    .filter((location) => !hiddenLocationIds.has(location.id))
+    .map((location) => ({ ...location }));
 }
 
 /** Game completions, joins, and badge unlocks from people the viewer follows or is friends with. */

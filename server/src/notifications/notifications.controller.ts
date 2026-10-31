@@ -26,6 +26,10 @@ export class NotificationsController {
   markAllRead(@CurrentUser() viewer: Viewer) {
     return this.notifications.markAllRead(viewer.id);
   }
+  @Patch('help-requests/read-all')
+  markHelpRequestsRead(@CurrentUser() viewer: Viewer) {
+    return this.notifications.markHelpRequestsRead(viewer.id);
+  }
   @Patch(':id/read')
   markRead(
     @CurrentUser() viewer: Viewer,
