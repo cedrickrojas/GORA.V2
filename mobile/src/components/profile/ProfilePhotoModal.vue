@@ -1,13 +1,13 @@
 <template>
-  <ion-modal :is-open="isOpen" :can-dismiss="!profile.saving" @did-dismiss="emit('close')">
+  <ion-modal :is-open="isOpen" :can-dismiss="!busy" @did-dismiss="emit('close')">
     <ion-header>
       <ion-toolbar>
         <ion-title>Profile photo</ion-title>
-        <ion-buttons slot="end"><ion-button :disabled="profile.saving" @click="emit('close')">Close</ion-button></ion-buttons>
+        <ion-buttons slot="end"><ion-button :disabled="busy" @click="emit('close')">Close</ion-button></ion-buttons>
       </ion-toolbar>
     </ion-header>
     <ion-content>
-      <div class="photo-editor" :aria-busy="profile.saving">
+      <div class="photo-editor" :aria-busy="busy">
         <p class="photo-editor__hint">Drag the photo to position it, then adjust the zoom.</p>
         <div
           ref="viewport"
@@ -27,14 +27,29 @@
           <span>Zoom</span>
           <input v-model.number="zoom" type="range" min="1" max="3" step="0.01" aria-label="Zoom profile photo" />
         </label>
-        <input ref="fileInput" class="photo-editor__file" type="file" accept="image/jpeg,image/png,image/webp,image/gif" @change="select" />
+        <input ref="fileInput" class="photo-editor__file" type="file" accept="image/jpeg,image/png,image/webp,image/gif" :disabled="busy" @change="select" />
         <p v-if="error" class="photo-editor__error" role="alert">{{ error }}</p>
+        <label v-if="selectedFile" class="photo-editor__share">
+          <input v-model="shareToFeed" type="checkbox" :disabled="busy" />
+          <span>Share this profile photo to your feed</span>
+        </label>
+        <label v-if="selectedFile && shareToFeed" class="photo-editor__caption-label" for="profile-photo-caption">Caption</label>
+        <textarea
+          v-if="selectedFile && shareToFeed"
+          id="profile-photo-caption"
+          v-model="caption"
+          class="photo-editor__caption"
+          maxlength="2200"
+          placeholder="Add a caption for your feed post"
+          :disabled="busy"
+        />
+        <span v-if="selectedFile && shareToFeed" class="photo-editor__counter">{{ caption.length }}/2200</span>
         <div class="photo-editor__actions">
-          <ion-button fill="outline" :disabled="profile.saving" @click="fileInput?.click()">{{ preview ? 'Choose another photo' : 'Choose photo' }}</ion-button>
-          <ion-button v-if="currentUrl && !selectedFile" fill="clear" color="danger" :disabled="profile.saving" @click="remove">Remove photo</ion-button>
-          <ion-button :disabled="!selectedFile || profile.saving" @click="save">
-            <ion-spinner v-if="profile.saving" slot="start" name="crescent" />
-            {{ profile.saving ? 'Saving…' : 'Save photo' }}
+          <ion-button fill="outline" :disabled="busy" @click="fileInput?.click()">{{ preview ? 'Choose another photo' : 'Choose photo' }}</ion-button>
+          <ion-button v-if="currentUrl && !selectedFile" fill="clear" color="danger" :disabled="busy" @click="remove">Remove photo</ion-button>
+          <ion-button :disabled="!selectedFile || busy || (shareToFeed && !caption.trim())" @click="save">
+            <ion-spinner v-if="busy" slot="start" name="crescent" />
+            {{ busy ? (isPosting ? 'Posting…' : 'Saving…') : photoSaved && shareToFeed ? 'Retry post' : photoSaved ? 'Done' : shareToFeed ? 'Save & share' : 'Save photo' }}
           </ion-button>
         </div>
       </div>
@@ -46,6 +61,7 @@
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { IonModal, IonHeader, IonToolbar, IonTitle, IonButtons, IonButton, IonContent, IonSpinner } from '@ionic/vue';
 import { useProfileStore } from '@/stores/profile';
+import { usePostsStore } from '@/stores/posts';
 import { useAuthStore } from '@/stores/auth';
 import { captureSession } from '@/stores/authorized';
 import { PROFILE_PHOTO_SOURCE_MAX_BYTES, prepareProfilePhoto } from '@/utils/profile-photo';
@@ -54,6 +70,7 @@ import { showNotice } from '@/utils/notice';
 const props = defineProps<{ isOpen: boolean; currentUrl: string | null }>();
 const emit = defineEmits<{ close: []; saved: [url: string | null] }>();
 const profile = useProfileStore();
+const posts = usePostsStore();
 const auth = useAuthStore();
 const fileInput = ref<HTMLInputElement | null>(null);
 const viewport = ref<HTMLElement | null>(null);
@@ -61,6 +78,12 @@ const imageElement = ref<HTMLImageElement | null>(null);
 const selectedFile = ref<File | null>(null);
 const preview = ref('');
 const error = ref('');
+const shareToFeed = ref(false);
+const caption = ref('');
+const isPosting = ref(false);
+const photoSaved = ref(false);
+const preparedPhotoData = ref('');
+const busy = computed(() => profile.saving || isPosting.value);
 const zoom = ref(1);
 const offset = ref({ x: 0, y: 0 });
 const drag = ref<{ pointerId: number; x: number; y: number; offsetX: number; offsetY: number } | null>(null);
@@ -73,6 +96,11 @@ function reset(): void {
   error.value = '';
   zoom.value = 1;
   offset.value = { x: 0, y: 0 };
+  shareToFeed.value = false;
+  caption.value = '';
+  isPosting.value = false;
+  photoSaved.value = false;
+  preparedPhotoData.value = '';
 }
 
 function select(event: Event): void {
@@ -113,26 +141,39 @@ function endDrag(event: PointerEvent): void {
 }
 
 async function save(): Promise<void> {
-  if (!selectedFile.value || profile.saving || !viewport.value) return;
+  if (!selectedFile.value || busy.value || !viewport.value) return;
   const isCurrent = captureSession(auth);
   error.value = '';
   try {
-    const photo = await prepareProfilePhoto(selectedFile.value, zoom.value, offset.value.x, offset.value.y, viewport.value.clientWidth);
-    if (!isCurrent()) return;
-    const result = await profile.updateProfilePhoto(photo);
-    if (!isCurrent()) return;
-    if (!result.ok) { error.value = result.message; return; }
-    const url = profile.currentProfile?.profileImageUrl ?? null;
-    emit('saved', url);
-    void showNotice('Profile photo updated.');
+    if (!photoSaved.value) {
+      preparedPhotoData.value = await prepareProfilePhoto(selectedFile.value, zoom.value, offset.value.x, offset.value.y, viewport.value.clientWidth);
+      if (!isCurrent()) return;
+      const result = await profile.updateProfilePhoto(preparedPhotoData.value);
+      if (!isCurrent()) return;
+      if (!result.ok) { error.value = result.message; return; }
+      photoSaved.value = true;
+      emit('saved', profile.currentProfile?.profileImageUrl ?? null);
+    }
+    if (shareToFeed.value) {
+      isPosting.value = true;
+      const postError = await posts.publishPhotoUpdate(caption.value, preparedPhotoData.value);
+      isPosting.value = false;
+      if (!isCurrent()) return;
+      if (postError) {
+        error.value = `Profile photo saved, but sharing it failed: ${postError}`;
+        return;
+      }
+    }
+    void showNotice(shareToFeed.value ? 'Profile photo shared to your feed.' : 'Profile photo updated.');
     emit('close');
   } catch (caught) {
+    isPosting.value = false;
     error.value = caught instanceof Error ? caught.message : 'That photo could not be saved.';
   }
 }
 
 async function remove(): Promise<void> {
-  if (profile.saving || !props.currentUrl) return;
+  if (busy.value || !props.currentUrl) return;
   const isCurrent = captureSession(auth);
   error.value = '';
   const result = await profile.updateProfilePhoto(null);
@@ -160,6 +201,11 @@ onBeforeUnmount(reset);
 .photo-editor__zoom { display: flex; width: min(100%, 360px); align-items: center; gap: 12px; color: var(--ion-text-color); font-size: .86rem; font-weight: 700; }
 .photo-editor__zoom input { flex: 1; accent-color: var(--ion-color-primary); }
 .photo-editor__file { position: absolute; width: 1px; height: 1px; overflow: hidden; opacity: 0; }
+.photo-editor__share { display: flex; align-items: center; gap: 10px; color: var(--ion-text-color); font-size: .9rem; font-weight: 700; }
+.photo-editor__share input { width: 18px; height: 18px; accent-color: var(--ion-color-primary); }
+.photo-editor__caption-label { width: 100%; color: var(--gora-muted); font-size: .85rem; font-weight: 700; }
+.photo-editor__caption { width: 100%; min-height: 92px; padding: 12px; border: 1px solid var(--gora-line-strong); border-radius: 10px; background: var(--gora-surface-raised); color: var(--ion-text-color); resize: vertical; }
+.photo-editor__counter { width: 100%; color: var(--gora-muted); text-align: right; font-size: .78rem; }
 .photo-editor__error { width: 100%; margin: 0; color: #ff8585; font-size: .86rem; text-align: center; }
 .photo-editor__actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; width: 100%; }
 </style>

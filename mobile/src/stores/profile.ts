@@ -128,12 +128,12 @@ export const useProfileStore = defineStore('profile', () => {
     }
   }
 
-  async function updateCover(file: File | null): Promise<ActionResult> {
+  async function updateCover(file: File | null, preparedPhoto?: string): Promise<ActionResult> {
     if (saving.value) return { ok: false, message: 'Please wait for the current change to finish.' };
     const isCurrent = captureSession(auth);
     saving.value = true;
     try {
-      const photo = file ? await preparePostPhoto(file) : null;
+      const photo = file ? preparedPhoto ?? await preparePostPhoto(file) : null;
       if (!isCurrent()) return { ok: false, message: 'The account changed. Try again.' };
       currentProfile.value = await authorized((token) => (photo ? uploadMyCover(token, photo) : removeMyCover(token)));
       return { ok: true };

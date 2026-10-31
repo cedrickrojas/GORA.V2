@@ -331,6 +331,30 @@ export const usePostsStore = defineStore('posts', () => {
     }
   }
 
+  /** Publish a prepared profile or cover photo as a public feed post. */
+  async function publishPhotoUpdate(caption: string, photo: string): Promise<string | null> {
+    if (!savesToServer.value) return 'Sign in to share this photo to your feed.';
+    if (!caption.trim()) return 'Add a caption before sharing this photo.';
+
+    const isCurrent = captureSession(auth);
+    try {
+      const created = await authorized((token) =>
+        createPostRequest(token, {
+          caption: caption.trim(),
+          photos: [photo],
+          visibility: 'PUBLIC',
+        }),
+      );
+      if (!isCurrent()) return 'The account changed. Try again.';
+      const post = toFeedPost(created);
+      serverPosts.value = [post, ...serverPosts.value.filter((item) => item.id !== post.id)];
+      friendPosts.value = [post, ...friendPosts.value.filter((item) => item.id !== post.id)];
+      return null;
+    } catch (caught) {
+      return describePostError(caught);
+    }
+  }
+
   async function loadPost(postId: string): Promise<FeedPost> {
     const result = toFeedPost(await authorized((token) => getPost(token, postId)));
     rememberProfilePosts([result]);
@@ -638,6 +662,7 @@ export const usePostsStore = defineStore('posts', () => {
     refresh,
     byAuthor,
     publish,
+    publishPhotoUpdate,
     editPost,
     deletePost,
     updateVisibility,
