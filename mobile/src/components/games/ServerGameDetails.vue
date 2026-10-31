@@ -1000,21 +1000,33 @@ async function confirmCancelRequest(): Promise<void> {
 @media (min-width: 1000px) {
   .server-game {
     display: grid;
-    grid-template-columns: minmax(0, 1.2fr) minmax(300px, 0.8fr);
+    grid-template-columns: minmax(0, 1.25fr) minmax(340px, 0.85fr);
     align-items: start;
-    column-gap: 20px;
-    row-gap: 18px;
+    column-gap: 24px;
+    row-gap: 22px;
   }
 
-  .server-game__hero { grid-column: 1 / -1; grid-row: 1; }
+  .server-game__hero {
+    grid-column: 1 / -1;
+    grid-row: 1;
+    min-height: 280px;
+    border-radius: 28px;
+    padding: 34px 42px;
+  }
   .server-game__facts { grid-column: 1; grid-row: 2; }
   .server-game__capacity { grid-column: 2; grid-row: 2; }
   .server-game > .game-location-preview { grid-column: 1; grid-row: 3; }
   .server-game__section--host { grid-column: 2; grid-row: 3; }
   .server-game__section--roster { grid-column: 1; grid-row: 4; }
-  .server-game__requests { grid-column: 2; grid-row: 4; }
+  .server-game__requests { grid-column: 2; }
   .server-game__notice { grid-column: 1 / -1; }
-  .server-game__actions { grid-column: 2; grid-row: 5; }
+  .server-game__actions {
+    grid-column: 2;
+    align-self: start;
+    position: sticky;
+    top: 20px;
+  }
+  .server-game :deep(.game-location-preview__map) { height: 320px; }
 }
 
 @media (max-width: 420px) {

@@ -1,8 +1,17 @@
 <template>
   <ion-page>
-    <SubPageHeader class="game-details-header" :title="pageTitle" back-href="/home" />
+    <SubPageHeader
+      class="game-details-header"
+      :class="{ 'game-details-header--server': isServerGame }"
+      :title="pageTitle"
+      back-href="/home"
+    />
 
-    <ion-content class="game-details-content" :fullscreen="true">
+    <ion-content
+      class="game-details-content"
+      :class="{ 'game-details-content--server': isServerGame }"
+      :fullscreen="true"
+    >
       <ServerGameDetails v-if="isServerGame" :game-id="gameId" />
 
       <p v-else-if="isLoaded && !details" class="game__missing">This game is not available.</p>
@@ -483,6 +492,16 @@ ion-header.game-details-header ion-toolbar {
   ion-header.game-details-header ion-toolbar {
     --padding-start: max(24px, calc((100% - var(--gora-column, 680px)) / 2));
     --padding-end: max(24px, calc((100% - var(--gora-column, 680px)) / 2));
+  }
+
+  ion-content.game-details-content--server {
+    --padding-start: max(24px, calc((100% - 1228px) / 2));
+    --padding-end: max(24px, calc((100% - 1228px) / 2));
+  }
+
+  ion-header.game-details-header--server ion-toolbar {
+    --padding-start: max(24px, calc((100% - 1228px) / 2));
+    --padding-end: max(24px, calc((100% - 1228px) / 2));
   }
 
   .game__cta {
