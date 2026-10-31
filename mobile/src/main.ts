@@ -2,6 +2,7 @@ import { createApp } from 'vue';
 import { createPinia } from 'pinia';
 import App from './App.vue';
 import router from './router';
+import { initializeAppPreferences } from './stores/app-preferences';
 
 import { IonicVue } from '@ionic/vue';
 
@@ -19,6 +20,8 @@ import '@ionic/vue/css/display.css';
 import './theme/variables.css';
 import './theme/responsive.css';
 import './theme/keyboard.css';
+
+initializeAppPreferences();
 
 // The shared viewport handler also covers native HTML inputs and overlay forms.
 const app = createApp(App).use(IonicVue, { scrollAssist: false, scrollPadding: false }).use(createPinia()).use(router);

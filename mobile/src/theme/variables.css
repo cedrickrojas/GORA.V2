@@ -44,8 +44,38 @@
   --gora-motion: 160ms ease;
 }
 
+html.gora-theme-light {
+  color-scheme: light;
+  --ion-background-color: #f4f6f8;
+  --ion-background-color-rgb: 244, 246, 248;
+  --ion-text-color: #191c20;
+  --ion-text-color-rgb: 25, 28, 32;
+  --ion-color-primary-contrast: #fff;
+  --ion-color-primary-contrast-rgb: 255, 255, 255;
+  --ion-toolbar-background: #fff;
+  --ion-toolbar-color: #191c20;
+  --ion-tab-bar-background: #fff;
+  --ion-tab-bar-border-color: rgba(25, 28, 32, 0.12);
+  --ion-tab-bar-color: #65707c;
+  --ion-item-background: #fff;
+  --ion-backdrop-color: #15191f;
+  --gora-surface: #fff;
+  --gora-surface-raised: #f0f2f5;
+  --gora-surface-hover: #e7eaee;
+  --gora-muted: #606a76;
+  --gora-line: rgba(25, 28, 32, 0.12);
+  --gora-line-strong: rgba(25, 28, 32, 0.25);
+  --gora-ring-spent: rgba(96, 106, 118, 0.5);
+  --gora-shadow: 0 4px 16px rgba(24, 34, 46, 0.1);
+}
+
 body {
   -webkit-font-smoothing: antialiased;
+}
+
+html.gora-theme-light body {
+  background: var(--ion-background-color);
+  color: var(--ion-text-color);
 }
 
 ion-button {

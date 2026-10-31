@@ -1,4 +1,6 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import * as argon2 from 'argon2';
+import { randomUUID } from 'node:crypto';
 import { Prisma, ReportReason } from '../generated/prisma/client';
 import { visiblePostsWhere } from '../posts/post-visibility';
 import { visibleGamesWhere } from '../games/game-visibility';
@@ -14,6 +16,9 @@ import { formatDisplayName } from '../users/display-name';
 import { PROFILE_USER_SELECT } from '../users/user.types';
 import type { UpdateProfileDto } from './dto/update-profile.dto';
 import type { UpdateUserSettingsDto } from './dto/update-user-settings.dto';
+import type { AccountEmailDto } from './dto/account-email.dto';
+import type { AccountPhoneDto } from './dto/account-phone.dto';
+import type { ChangePasswordDto } from './dto/change-password.dto';
 import { ProfileCoverService } from './profile-cover.service';
 import type { OwnProfileView, ProfileSections, ProfileStats, PublicProfileView } from './profile.types';
 
@@ -37,6 +42,105 @@ export class ProfilesService {
     private readonly covers: ProfileCoverService,
     private readonly points: GoraPointsService,
   ) {}
+
+  async getAccount(userId: string) {
+    const user = await this.prisma.user.findFirst({
+      where: { id: userId, isActive: true },
+      select: { email: true, phoneNumber: true },
+    });
+    if (!user) throw new NotFoundException(PROFILE_NOT_FOUND_MESSAGE);
+    return user;
+  }
+
+  async updateAccountEmail(userId: string, dto: AccountEmailDto) {
+    const user = await this.requireValidCurrentPassword(userId, dto.currentPassword);
+    const email = dto.email.trim().toLowerCase();
+    if (email === user.email) return this.getAccount(userId);
+    try {
+      await this.prisma.user.update({ where: { id: userId }, data: { email } });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        throw new ConflictException('That email address is already in use.');
+      }
+      throw error;
+    }
+    return this.getAccount(userId);
+  }
+
+  async updateAccountPhone(userId: string, dto: AccountPhoneDto) {
+    await this.requireValidCurrentPassword(userId, dto.currentPassword);
+    try {
+      return await this.prisma.user.update({
+        where: { id: userId },
+        data: { phoneNumber: dto.phoneNumber },
+        select: { email: true, phoneNumber: true },
+      });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        throw new ConflictException('That phone number is already connected to another account.');
+      }
+      throw error;
+    }
+  }
+
+  async changeAccountPassword(userId: string, dto: ChangePasswordDto) {
+    await this.requireValidCurrentPassword(userId, dto.currentPassword);
+    if (dto.currentPassword === dto.newPassword) {
+      throw new BadRequestException('Choose a new password that differs from your current password.');
+    }
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { passwordHash: await argon2.hash(dto.newPassword, { type: argon2.argon2id }) },
+    });
+    return { changed: true };
+  }
+
+  async deactivateAccount(userId: string, currentPassword: string) {
+    await this.requireValidCurrentPassword(userId, currentPassword);
+    await this.prisma.user.update({ where: { id: userId }, data: { isActive: false } });
+    return { deactivated: true };
+  }
+
+  async deleteAccount(userId: string, currentPassword: string) {
+    await this.requireValidCurrentPassword(userId, currentPassword);
+    // Keep authored games, posts, and messages intact while removing the account's
+    // identifying and sign-in data. The tombstone prevents broken foreign keys.
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        isActive: false,
+        username: `deleted_${userId.replaceAll('-', '')}`,
+        email: `deleted_${userId}@deleted.gora.invalid`,
+        passwordHash: await argon2.hash(randomUUID(), { type: argon2.argon2id }),
+        firstName: 'Deleted',
+        lastName: 'User',
+        phoneNumber: null,
+        bio: null,
+        city: null,
+        profileImageUrl: null,
+        profilePhotoData: null,
+        profilePhotoType: null,
+        profilePhotoRevision: null,
+        coverImageUrl: null,
+        coverPhotoData: null,
+        coverPhotoType: null,
+        coverPhotoRevision: null,
+      },
+    });
+    return { deleted: true };
+  }
+
+  private async requireValidCurrentPassword(userId: string, currentPassword: string) {
+    const user = await this.prisma.user.findFirst({
+      where: { id: userId, isActive: true },
+      select: { email: true, passwordHash: true },
+    });
+    if (!user) throw new NotFoundException(PROFILE_NOT_FOUND_MESSAGE);
+    if (!(await argon2.verify(user.passwordHash, currentPassword).catch(() => false))) {
+      throw new UnauthorizedException('Your current password is incorrect.');
+    }
+    return user;
+  }
 
   async getSettings(userId: string) {
     return this.prisma.userSettings.upsert({

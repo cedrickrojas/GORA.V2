@@ -20,6 +20,7 @@ import {
 import type { GameLeaveRequestView, GameRosterView, MyParticipationView } from './game-player.types';
 import { visibleGamesWhere } from './game-visibility';
 import { GAME_NOT_FOUND_MESSAGE } from './games.service';
+import { successfulGamePoints } from './game-completion-points';
 
 export const PLAYER_NOT_FOUND_MESSAGE = 'Player not found.';
 export const NOT_A_PLAYER_MESSAGE = "You're not a player in this game.";
@@ -219,8 +220,13 @@ export class GamePlayersService {
       if (!updated.count) throw new ConflictException('Attendance has already been reviewed.');
 
       if (attended) {
-        // Existing completion awards make this idempotent for games completed before attendance review existed.
-        await this.points.awardInTransaction(tx, userId, 'GAME_COMPLETED_PLAYER', gameId, 3);
+        await this.points.awardInTransaction(
+          tx,
+          userId,
+          'GAME_COMPLETED_PLAYER',
+          gameId,
+          successfulGamePoints(game.requiredPlayers),
+        );
       } else {
         await this.points.awardInTransaction(tx, userId, 'GAME_NO_SHOW_PLAYER', participant.id, -2);
       }

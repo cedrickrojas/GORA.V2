@@ -119,6 +119,63 @@
             </ion-item>
             <p class="settings-description">You can change the distance any time from the games search filters.</p>
           </template>
+          <template v-else-if="activeSetting === 'more' && !isAccountSection">
+            <ion-item>
+              <ion-icon slot="start" :icon="languageOutline" aria-hidden="true" />
+              <ion-label>Language<p>Choose your preferred language</p></ion-label>
+              <ion-select :value="appPreferences.language" interface="popover" aria-label="Language" @ionChange="setLanguage($event.detail.value)">
+                <ion-select-option value="en">English</ion-select-option>
+                <ion-select-option value="fil">Filipino</ion-select-option>
+              </ion-select>
+            </ion-item>
+            <ion-item>
+              <ion-icon slot="start" :icon="colorPaletteOutline" aria-hidden="true" />
+              <ion-label>Display<p>Choose light or dark mode</p></ion-label>
+              <ion-select :value="appPreferences.displayMode" interface="popover" aria-label="Display mode" @ionChange="setDisplayMode($event.detail.value)">
+                <ion-select-option value="dark">Dark</ion-select-option>
+                <ion-select-option value="light">Light</ion-select-option>
+              </ion-select>
+            </ion-item>
+            <p class="settings-description">These preferences are saved on this device.</p>
+            <ion-item button :detail="true" @click="openAccount">
+              <ion-icon slot="start" :icon="personOutline" aria-hidden="true" />
+              <ion-label>Account<p>Change your email, password, and phone number</p></ion-label>
+            </ion-item>
+          </template>
+          <template v-else-if="activeSetting === 'more' && isAccountSection">
+            <ion-item button :detail="false" @click="isAccountSection = false">
+              <ion-label color="primary">‹ More Settings</ion-label>
+            </ion-item>
+            <p v-if="accountLoading" class="settings-description">Loading account details…</p>
+            <template v-else>
+              <form class="account-form" @submit.prevent="saveAccountEmail">
+                <h2>Email</h2>
+                <ion-input v-model="accountEmail" type="email" label="Email address" label-placement="stacked" autocomplete="email" required />
+                <ion-input v-model="emailPassword" type="password" label="Current password" label-placement="stacked" autocomplete="current-password" required />
+                <ion-button type="submit" expand="block" :disabled="accountBusy || !emailPassword">Save email</ion-button>
+              </form>
+              <form class="account-form" @submit.prevent="saveAccountPhone">
+                <h2>Phone number</h2>
+                <ion-input v-model="accountPhone" type="tel" label="Phone with country code" label-placement="stacked" placeholder="+639123456789" autocomplete="tel" required />
+                <p class="settings-description">Phone number is stored for your account. SMS verification is not available yet.</p>
+                <ion-input v-model="phonePassword" type="password" label="Current password" label-placement="stacked" autocomplete="current-password" required />
+                <ion-button type="submit" expand="block" :disabled="accountBusy || !phonePassword">Save phone number</ion-button>
+              </form>
+              <form class="account-form" @submit.prevent="saveAccountPassword">
+                <h2>Password</h2>
+                <ion-input v-model="currentPassword" type="password" label="Current password" label-placement="stacked" autocomplete="current-password" required />
+                <ion-input v-model="newPassword" type="password" label="New password (at least 8 characters)" label-placement="stacked" autocomplete="new-password" :minlength="8" required />
+                <ion-input v-model="confirmNewPassword" type="password" label="Confirm new password" label-placement="stacked" autocomplete="new-password" :minlength="8" required />
+                <ion-button type="submit" expand="block" :disabled="accountBusy || !currentPassword || !newPassword || !confirmNewPassword">Change password</ion-button>
+              </form>
+              <section class="account-danger">
+                <h2>Account status</h2>
+                <p>Deactivation hides your account until an administrator reactivates it. Deletion permanently removes your sign-in details and profile photos; posts and games remain attributed to “Deleted User.”</p>
+                <ion-button expand="block" fill="outline" color="warning" :disabled="accountBusy" @click="confirmAccountAction('deactivate')">Deactivate account</ion-button>
+                <ion-button expand="block" color="danger" :disabled="accountBusy" @click="confirmAccountAction('delete')">Delete account</ion-button>
+              </section>
+            </template>
+          </template>
         </ion-list>
       </ion-content>
     </ion-modal>
@@ -162,6 +219,7 @@ import {
   IonButton,
   IonButtons,
   IonContent,
+  IonInput,
   IonHeader,
   IonIcon,
   IonItem,
@@ -176,10 +234,13 @@ import {
   IonToggle,
   IonToolbar,
 } from '@ionic/vue';
+import { alertController } from '@ionic/vue';
 import {
   addCircleOutline,
   bookmarkOutline,
+  colorPaletteOutline,
   helpCircleOutline,
+  languageOutline,
   locationOutline,
   lockClosedOutline,
   logOutOutline,
@@ -190,7 +251,15 @@ import {
 import SubPageHeader from '@/components/layout/SubPageHeader.vue';
 import { useAuthStore } from '@/stores/auth';
 import { captureSession, createAuthorizedCall } from '@/stores/authorized';
-import { sendHelpRequest } from '@/services/profile-api.service';
+import {
+  changeMyAccountEmail,
+  changeMyAccountPassword,
+  changeMyAccountPhone,
+  deactivateMyAccount,
+  deleteMyAccount,
+  getMyAccountSettings,
+  sendHelpRequest,
+} from '@/services/profile-api.service';
 import { describeApiError } from '@/utils/api-errors';
 import { showNotice } from '@/utils/notice';
 import { useSettingsStore } from '@/stores/settings';
@@ -198,16 +267,19 @@ import type { UserSettings } from '@/types/user-settings';
 import { DISTANCE_FILTERS } from '@/utils/search';
 import { useDiscoveryStore } from '@/stores/discovery';
 import { useFiltersStore } from '@/stores/filters';
+import { useAppPreferencesStore, type AppLanguage, type DisplayMode } from '@/stores/app-preferences';
 
 const SETTINGS_ITEMS = [
   { id: 'notifications', label: 'Notification Settings', summary: 'Choose what updates you receive', icon: notificationsOutline },
   { id: 'privacy', label: 'Privacy', summary: 'Control who can view your profile', icon: lockClosedOutline },
   { id: 'location', label: 'Location & Distance', summary: 'Set your nearby games search preferences', icon: locationOutline },
+  { id: 'more', label: 'More Settings', summary: 'Language, display, and account options', icon: colorPaletteOutline },
 ] as const;
 const DISTANCE_OPTIONS = DISTANCE_FILTERS.filter((distance): distance is Exclude<typeof distance, null> => distance !== null);
 
 const auth = useAuthStore();
 const settings = useSettingsStore();
+const appPreferences = useAppPreferencesStore();
 const discovery = useDiscoveryStore();
 const filters = useFiltersStore();
 const router = useRouter();
@@ -217,17 +289,129 @@ const isSendingHelp = ref(false);
 const helpMessage = ref('');
 const helpError = ref('');
 const activeSetting = ref<(typeof SETTINGS_ITEMS)[number]['id'] | null>(null);
-const activeSettingTitle = computed(() => SETTINGS_ITEMS.find((item) => item.id === activeSetting.value)?.label ?? 'Settings');
+const isAccountSection = ref(false);
+const activeSettingTitle = computed(() => isAccountSection.value ? 'Account' : SETTINGS_ITEMS.find((item) => item.id === activeSetting.value)?.label ?? 'Settings');
+const accountLoading = ref(false);
+const accountBusy = ref(false);
+const accountEmail = ref('');
+const accountPhone = ref('');
+const emailPassword = ref('');
+const phonePassword = ref('');
+const currentPassword = ref('');
+const newPassword = ref('');
+const confirmNewPassword = ref('');
 
 onMounted(() => { void settings.load().catch(() => showNotice('Could not load your settings. Please try again.')); });
 
 async function openSetting(id: (typeof SETTINGS_ITEMS)[number]['id']): Promise<void> {
   activeSetting.value = id;
+  isAccountSection.value = false;
+  if (id === 'more') return;
   try {
     await settings.load();
   } catch {
     await showNotice('Could not load your settings. Please try again.');
   }
+}
+
+async function openAccount(): Promise<void> {
+  isAccountSection.value = true;
+  const isCurrent = captureSession(auth);
+  accountLoading.value = true;
+  try {
+    const account = await createAuthorizedCall(auth)(getMyAccountSettings);
+    if (!isCurrent()) return;
+    accountEmail.value = account.email;
+    accountPhone.value = account.phoneNumber ?? '';
+  } catch (error) {
+    if (isCurrent()) await showNotice(describeApiError(error, 'Could not load account details.'));
+  } finally {
+    if (isCurrent()) accountLoading.value = false;
+  }
+}
+
+async function saveAccountEmail(): Promise<void> {
+  await withAccountAction(async (token) => {
+    const result = await changeMyAccountEmail(token, accountEmail.value, emailPassword.value);
+    accountEmail.value = result.email;
+    emailPassword.value = '';
+    await auth.loadCurrentUser();
+    await showNotice('Email address updated.');
+  }, 'Could not update email address.');
+}
+
+async function saveAccountPhone(): Promise<void> {
+  await withAccountAction(async (token) => {
+    const result = await changeMyAccountPhone(token, accountPhone.value, phonePassword.value);
+    accountPhone.value = result.phoneNumber ?? '';
+    phonePassword.value = '';
+    await showNotice('Phone number saved.');
+  }, 'Could not save phone number.');
+}
+
+async function saveAccountPassword(): Promise<void> {
+  if (newPassword.value !== confirmNewPassword.value) {
+    await showNotice('The new passwords do not match.');
+    return;
+  }
+  await withAccountAction(async (token) => {
+    await changeMyAccountPassword(token, currentPassword.value, newPassword.value);
+    currentPassword.value = '';
+    newPassword.value = '';
+    confirmNewPassword.value = '';
+    await showNotice('Password changed.');
+  }, 'Could not change password.');
+}
+
+async function withAccountAction(action: (token: string) => Promise<void>, fallback: string): Promise<void> {
+  const isCurrent = captureSession(auth);
+  accountBusy.value = true;
+  try {
+    await createAuthorizedCall(auth)(action);
+  } catch (error) {
+    if (isCurrent()) await showNotice(describeApiError(error, fallback));
+  } finally {
+    if (isCurrent()) accountBusy.value = false;
+  }
+}
+
+async function confirmAccountAction(action: 'deactivate' | 'delete'): Promise<void> {
+  const deleting = action === 'delete';
+  const alert = await alertController.create({
+    header: deleting ? 'Delete your account?' : 'Deactivate your account?',
+    message: deleting
+      ? 'This cannot be undone. Your profile details will be removed and your posts and games will show as Deleted User.'
+      : 'Your account will be hidden and you will be signed out. Contact an administrator if you need it reactivated.',
+    inputs: [
+      ...(deleting ? [{ name: 'confirmation', type: 'text' as const, placeholder: 'Type DELETE to continue' }] : []),
+      { name: 'currentPassword', type: 'password' as const, placeholder: 'Current password' },
+    ],
+    buttons: [{ text: 'Cancel', role: 'cancel' }, { text: deleting ? 'Delete account' : 'Deactivate', role: 'confirm' }],
+  });
+  await alert.present();
+  const { role, data } = await alert.onDidDismiss<{ currentPassword?: string; confirmation?: string }>();
+  if (role !== 'confirm') return;
+  const password = data?.currentPassword ?? '';
+  if (!password || (deleting && data?.confirmation !== 'DELETE')) {
+    await showNotice(deleting ? 'Enter your password and type DELETE to confirm.' : 'Enter your current password to continue.');
+    return;
+  }
+  await withAccountAction(async (token) => {
+    if (deleting) await deleteMyAccount(token, password);
+    else await deactivateMyAccount(token, password);
+    await auth.logout();
+    activeSetting.value = null;
+    isAccountSection.value = false;
+    await router.replace('/login');
+  }, deleting ? 'Could not delete account.' : 'Could not deactivate account.');
+}
+
+function setLanguage(language: AppLanguage): void {
+  if (language === 'en' || language === 'fil') appPreferences.setLanguage(language);
+}
+
+function setDisplayMode(mode: DisplayMode): void {
+  if (mode === 'light' || mode === 'dark') appPreferences.setDisplayMode(mode);
 }
 
 async function saveSetting(changes: Partial<UserSettings>): Promise<void> {
@@ -304,6 +488,45 @@ async function logOut(): Promise<void> {
 
 .settings-logout ion-icon {
   color: #ef5b5b;
+}
+
+.account-form,
+.account-danger {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 18px 20px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--ion-color-step-150, #333);
+}
+
+.account-form h2,
+.account-danger h2 {
+  margin: 4px 0;
+  color: var(--ion-text-color);
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.account-form ion-input {
+  --background: var(--ion-card-background, #1c1c1e);
+  --padding-start: 12px;
+  --padding-end: 12px;
+  border: 1px solid var(--ion-color-step-200, #3a3a3c);
+  border-radius: 10px;
+}
+
+.account-danger {
+  border: 1px solid color-mix(in srgb, var(--ion-color-danger) 40%, transparent);
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.account-danger p {
+  margin: 0 0 4px;
+  color: var(--gora-muted);
+  font-size: 0.86rem;
+  line-height: 1.45;
 }
 
 .settings-help {

@@ -28,6 +28,10 @@ import { HelpRequestDto } from './dto/help-request.dto';
 import { UpdateUserSettingsDto } from './dto/update-user-settings.dto';
 import { UploadProfilePhotoDto } from './dto/upload-profile-photo.dto';
 import { ProfilePhotoService } from './profile-photo.service';
+import { AccountEmailDto } from './dto/account-email.dto';
+import { AccountPhoneDto } from './dto/account-phone.dto';
+import { ChangePasswordDto } from './dto/change-password.dto';
+import { ConfirmAccountActionDto } from './dto/confirm-account-action.dto';
 
 /**
  * Every write targets the signed-in user ("me"), so nobody can edit another profile:
@@ -62,6 +66,36 @@ export class ProfilesController {
   @Patch('me/settings')
   updateMySettings(@CurrentUser() viewer: CurrentUserContext, @Body() dto: UpdateUserSettingsDto) {
     return this.profiles.updateSettings(viewer.id, dto);
+  }
+
+  @Get('me/account')
+  getMyAccount(@CurrentUser() viewer: CurrentUserContext) {
+    return this.profiles.getAccount(viewer.id);
+  }
+
+  @Patch('me/account/email')
+  updateMyEmail(@CurrentUser() viewer: CurrentUserContext, @Body() dto: AccountEmailDto) {
+    return this.profiles.updateAccountEmail(viewer.id, dto);
+  }
+
+  @Patch('me/account/phone')
+  updateMyPhone(@CurrentUser() viewer: CurrentUserContext, @Body() dto: AccountPhoneDto) {
+    return this.profiles.updateAccountPhone(viewer.id, dto);
+  }
+
+  @Patch('me/account/password')
+  changeMyPassword(@CurrentUser() viewer: CurrentUserContext, @Body() dto: ChangePasswordDto) {
+    return this.profiles.changeAccountPassword(viewer.id, dto);
+  }
+
+  @Post('me/account/deactivate')
+  deactivateMyAccount(@CurrentUser() viewer: CurrentUserContext, @Body() dto: ConfirmAccountActionDto) {
+    return this.profiles.deactivateAccount(viewer.id, dto.currentPassword);
+  }
+
+  @Delete('me/account')
+  deleteMyAccount(@CurrentUser() viewer: CurrentUserContext, @Body() dto: ConfirmAccountActionDto) {
+    return this.profiles.deleteAccount(viewer.id, dto.currentPassword);
   }
 
   @Put('me/cover')

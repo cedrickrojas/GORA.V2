@@ -35,6 +35,7 @@ import {
 } from './game-schedule';
 import type { GameView, JoinedGameView } from './game.types';
 import { visibleGamesWhere } from './game-visibility';
+import { successfulGamePoints } from './game-completion-points';
 
 export const GAME_NOT_FOUND_MESSAGE = 'Game not found.';
 export const GAME_HOST_ONLY_MESSAGE = 'Only the host can change this game.';
@@ -439,10 +440,16 @@ export class GamesService {
         });
         if (!result.count) return null;
         await tx.gameParticipant.updateMany({ where: { gameId, status: 'ACTIVE' }, data: { status: 'COMPLETED', completedAt: new Date() } });
-        const completedGame = await tx.game.findUnique({ where: { id: gameId }, select: { hostId: true } });
+        const completedGame = await tx.game.findUnique({ where: { id: gameId }, select: { hostId: true, requiredPlayers: true } });
         if (!completedGame) return null;
         if (!this.points) return completedGame;
-        await this.points.awardInTransaction(tx, completedGame.hostId, 'GAME_COMPLETED_HOST', gameId, 3);
+        await this.points.awardInTransaction(
+          tx,
+          completedGame.hostId,
+          'GAME_COMPLETED_HOST',
+          gameId,
+          successfulGamePoints(completedGame.requiredPlayers),
+        );
         return completedGame;
       });
     }

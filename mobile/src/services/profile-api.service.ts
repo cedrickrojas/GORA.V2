@@ -62,6 +62,35 @@ export async function sendHelpRequest(token: string, message: string): Promise<v
   await apiRequest('/profiles/help', { method: 'POST', body: { message }, token });
 }
 
+export interface MyAccountSettings {
+  email: string;
+  phoneNumber: string | null;
+}
+
+export function getMyAccountSettings(token: string): Promise<MyAccountSettings> {
+  return apiRequest<MyAccountSettings>('/profiles/me/account', { token });
+}
+
+export function changeMyAccountEmail(token: string, email: string, currentPassword: string): Promise<MyAccountSettings> {
+  return apiRequest<MyAccountSettings>('/profiles/me/account/email', { method: 'PATCH', body: { email, currentPassword }, token });
+}
+
+export function changeMyAccountPhone(token: string, phoneNumber: string, currentPassword: string): Promise<MyAccountSettings> {
+  return apiRequest<MyAccountSettings>('/profiles/me/account/phone', { method: 'PATCH', body: { phoneNumber, currentPassword }, token });
+}
+
+export function changeMyAccountPassword(token: string, currentPassword: string, newPassword: string): Promise<{ changed: boolean }> {
+  return apiRequest<{ changed: boolean }>('/profiles/me/account/password', { method: 'PATCH', body: { currentPassword, newPassword }, token });
+}
+
+export function deactivateMyAccount(token: string, currentPassword: string): Promise<{ deactivated: boolean }> {
+  return apiRequest<{ deactivated: boolean }>('/profiles/me/account/deactivate', { method: 'POST', body: { currentPassword }, token });
+}
+
+export function deleteMyAccount(token: string, currentPassword: string): Promise<{ deleted: boolean }> {
+  return apiRequest<{ deleted: boolean }>('/profiles/me/account', { method: 'DELETE', body: { currentPassword }, token });
+}
+
 export function getMyHelpRequests(token: string): Promise<HelpRequestsResponse> {
   return apiRequest<HelpRequestsResponse>('/profiles/me/help', { token });
 }
