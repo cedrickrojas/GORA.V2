@@ -7,6 +7,10 @@ export interface SportView {
   description: string | null;
   iconUrl: string | null;
   isActive: boolean;
+  /** Active user profiles that list this sport. */
+  activePlayers: number;
+  /** Upcoming games with open join slots. */
+  openGames: number;
 }
 
 /** One sport on a user's profile (a UserSport row joined with its Sport). */

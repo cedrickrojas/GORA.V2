@@ -58,6 +58,8 @@ export interface SportOption {
   description: string | null;
   iconUrl: string | null;
   isActive: boolean;
+  activePlayers?: number;
+  openGames?: number;
 }
 
 /** A UserSport row as the API returns it. */

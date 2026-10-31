@@ -333,7 +333,7 @@ async function refreshDiscoverData(): Promise<void> {
   if (!discoverDataLoaded) return;
   await session.load();
   await Promise.all([
-    catalog.load(),
+    catalog.refreshSports(),
     gamesStore.refreshFeedGames(),
     reelsStore.refresh(),
     postsStore.refresh(),

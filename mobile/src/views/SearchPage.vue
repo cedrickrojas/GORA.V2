@@ -138,7 +138,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
-import { IonContent, IonIcon, IonPage, IonSearchbar } from '@ionic/vue';
+import { IonContent, IonIcon, IonPage, IonSearchbar, onIonViewWillEnter } from '@ionic/vue';
 import { locationOutline } from 'ionicons/icons';
 import ClubRow from '@/components/clubs/ClubRow.vue';
 import SectionHeader from '@/components/common/SectionHeader.vue';
@@ -247,6 +247,10 @@ onMounted(() => {
   void gamesStore.load();
   void postsStore.load();
   void reelsStore.load();
+});
+
+onIonViewWillEnter(() => {
+  if (catalog.isLoaded) void catalog.refreshSports();
 });
 </script>
 

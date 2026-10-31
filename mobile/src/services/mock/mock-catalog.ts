@@ -3,7 +3,7 @@ import type { Game, GameStatus } from '@/types/game';
 import type { PlayerSummary } from '@/types/player';
 import type { FeedPost, PostLocation, PostMediaItem } from '@/types/post';
 import type { Reel } from '@/types/reel';
-import type { SportCategory, SportsLocation } from '@/types/sport';
+import type { SportsLocation } from '@/types/sport';
 import { summarizeGameCapacity } from '@/utils/games';
 import { DAY_MS, HOUR_MS } from '@/utils/time';
 import { mockClubSummaries } from './mock-clubs';
@@ -18,21 +18,6 @@ export const mockPlayers: PlayerSummary[] = [
   { ...mockUsers.kim, primarySport: 'Running', city: 'Marikina', distanceKm: 18.3, followers: 6120, gamesCompleted: 96, featured: true },
   { ...mockUsers.paolo, primarySport: 'Pickleball', city: 'Alabang', distanceKm: 31.5, followers: 980, gamesCompleted: 28, featured: false },
   { ...mockUsers.bea, primarySport: 'Swimming', city: 'Antipolo', distanceKm: 72.0, followers: 3470, gamesCompleted: 63, featured: false },
-];
-
-export const mockSports: SportCategory[] = [
-  { id: 'sport-basketball', name: 'Basketball', activePlayers: 12840, openGames: 96, trendingScore: 98 },
-  { id: 'sport-volleyball', name: 'Volleyball', activePlayers: 9120, openGames: 71, trendingScore: 94 },
-  { id: 'sport-pickleball', name: 'Pickleball', activePlayers: 3310, openGames: 44, trendingScore: 91 },
-  { id: 'sport-football', name: 'Football', activePlayers: 7050, openGames: 38, trendingScore: 82 },
-  { id: 'sport-badminton', name: 'Badminton', activePlayers: 6480, openGames: 52, trendingScore: 79 },
-  { id: 'sport-running', name: 'Running', activePlayers: 5230, openGames: 27, trendingScore: 74 },
-  { id: 'sport-tennis', name: 'Tennis', activePlayers: 2910, openGames: 19, trendingScore: 63 },
-  { id: 'sport-swimming', name: 'Swimming', activePlayers: 1870, openGames: 9, trendingScore: 48 },
-  { id: 'sport-table-tennis', name: 'Table Tennis', activePlayers: 1540, openGames: 12, trendingScore: 45 },
-  { id: 'sport-cycling', name: 'Cycling', activePlayers: 2260, openGames: 8, trendingScore: 42 },
-  { id: 'sport-esports', name: 'Esports', activePlayers: 0, openGames: 0, trendingScore: 0 },
-  { id: 'sport-other', name: 'Other', activePlayers: 640, openGames: 5, trendingScore: 20 },
 ];
 
 export const mockLocations: SportsLocation[] = [

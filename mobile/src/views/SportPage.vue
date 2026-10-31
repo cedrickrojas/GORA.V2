@@ -275,7 +275,7 @@ async function refreshSportMap(): Promise<void> {
   mapLoading.value = true;
   mapError.value = null;
   try {
-    const result = await sportsStore.fetchSports();
+    const result = await catalog.refreshSports();
     if (request !== mapRequest) return;
     if (!result.ok) {
       mapGames.value = [];
