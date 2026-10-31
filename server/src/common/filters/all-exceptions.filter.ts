@@ -7,7 +7,6 @@ import {
   Logger,
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
-import { API_GLOBAL_PREFIX } from '../constants/api.constants';
 
 interface ErrorBody {
   success: false;
@@ -30,17 +29,8 @@ export class AllExceptionsFilter implements ExceptionFilter {
     const serverErrorStatus: number = HttpStatus.INTERNAL_SERVER_ERROR;
 
     if (status >= serverErrorStatus) {
-      const details =
-        exception instanceof Error
-          ? `${exception.name}: ${exception.message}\n${exception.stack ?? ''}`
-          : String(exception);
-      const isProfilePhotoUpload =
-        request.method === 'PUT' &&
-        request.path === `/${API_GLOBAL_PREFIX}/profiles/me/photo`;
       this.logger.error(
-        isProfilePhotoUpload
-          ? `${request.method} ${request.url}\n${details}`
-          : `${request.method} ${request.url}`,
+        `${request.method} ${request.url}`,
         exception instanceof Error ? exception.stack : String(exception),
       );
     }
