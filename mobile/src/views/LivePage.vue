@@ -53,6 +53,38 @@
             {{ busy ? 'Connecting...' : watching ? 'Reconnect' : 'Try connecting again' }}
           </button>
         </template>
+        <section v-if="live?.status === 'LIVE'" class="live-comments" aria-label="Live comments">
+          <header class="live-comments__header">
+            <h2>Live comments</h2>
+            <span>{{ comments.length }}</span>
+          </header>
+          <p v-if="!comments.length" class="live-comments__empty">Be the first to say something.</p>
+          <div v-else class="live-comments__list" aria-live="polite">
+            <article v-for="comment in comments" :key="comment.id" class="live-comments__item">
+              <UserAvatar :user="comment.author" :size="34" />
+              <div class="live-comments__body">
+                <div class="live-comments__meta">
+                  <strong>{{ comment.author.displayName }}</strong>
+                  <time :datetime="comment.createdAt">{{ formatCommentTime(comment.createdAt) }}</time>
+                </div>
+                <p>{{ comment.content }}</p>
+              </div>
+            </article>
+          </div>
+          <form class="live-comments__form" @submit.prevent="sendComment">
+            <input
+              v-model="commentDraft"
+              maxlength="500"
+              aria-label="Write a live comment"
+              placeholder="Write a comment..."
+              :disabled="commentSending"
+            />
+            <button class="live-comments__send" type="submit" :disabled="commentSending || !commentDraft.trim()">
+              {{ commentSending ? 'Sending...' : 'Send' }}
+            </button>
+          </form>
+          <p v-if="commentError" class="live-page__error" role="alert">{{ commentError }}</p>
+        </section>
         <router-link v-if="!isCreate && live?.status !== 'LIVE'" to="/home">Back to Home</router-link>
       </main>
     </ion-content>
@@ -67,12 +99,26 @@ import { videocamOutline } from 'ionicons/icons';
 import SubPageHeader from '@/components/layout/SubPageHeader.vue';
 import UserAvatar from '@/components/common/UserAvatar.vue';
 import { useLive } from '@/composables/useLive';
+import { liveApi, type LiveComment } from '@/services/live-api.service';
+import { createAuthorizedCall } from '@/stores/authorized';
+import { useAuthStore } from '@/stores/auth';
 
 const route = useRoute();
 const isCreate = computed(() => route.name === 'create-live');
 const title = ref('');
 const muted = ref(true);
 const video = ref<HTMLVideoElement>();
+const comments = ref<LiveComment[]>([]);
+const commentDraft = ref('');
+const commentSending = ref(false);
+const commentError = ref('');
+const auth = useAuthStore();
+const authorized = createAuthorizedCall(auth);
+let commentsTimer: ReturnType<typeof setInterval> | undefined;
+let commentsRequest = false;
+function formatCommentTime(value: string) {
+  return new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' }).format(new Date(value));
+}
 const {
   live,
   localStream,
@@ -94,6 +140,53 @@ const {
   toggle,
   dispose,
 } = useLive();
+async function refreshComments() {
+  if (!live.value || live.value.status !== 'LIVE' || commentsRequest) return;
+  const id = live.value.id;
+  commentsRequest = true;
+  try {
+    const rows = await authorized((token) => liveApi.comments(token, id));
+    if (live.value?.id === id) {
+      comments.value = rows;
+      commentError.value = '';
+    }
+  } catch {
+    // Preserve the existing comments during brief connection interruptions.
+  } finally {
+    commentsRequest = false;
+  }
+}
+async function sendComment() {
+  const text = commentDraft.value.trim();
+  const id = live.value?.id;
+  if (!text || !id || commentSending.value) return;
+  commentSending.value = true;
+  commentError.value = '';
+  try {
+    const created = await authorized((token) => liveApi.comment(token, id, text));
+    if (live.value?.id === id) {
+      comments.value = [...comments.value, created].slice(-100);
+      commentDraft.value = '';
+    }
+  } catch (caught) {
+    commentError.value = caught instanceof Error ? caught.message : 'Could not send your comment.';
+  } finally {
+    commentSending.value = false;
+  }
+}
+function stopCommentPolling() {
+  if (commentsTimer) clearInterval(commentsTimer);
+  commentsTimer = undefined;
+  comments.value = [];
+}
+watch(() => [live.value?.id, live.value?.status] as const, ([id, liveStatus]) => {
+  stopCommentPolling();
+  commentError.value = '';
+  if (id && liveStatus === 'LIVE') {
+    void refreshComments();
+    commentsTimer = setInterval(() => void refreshComments(), 2500);
+  }
+});
 watch([localStream, remoteStream, video], async () => {
   await nextTick();
   if (video.value) {
@@ -112,10 +205,14 @@ onIonViewWillEnter(() => {
   muted.value = true;
   void enter(isCreate.value ? undefined : String(route.params.liveId));
 });
-onIonViewWillLeave(dispose);
+onIonViewWillLeave(() => {
+  stopCommentPolling();
+  dispose();
+});
 window.addEventListener('pagehide', dispose);
 onBeforeUnmount(() => {
   dispose();
+  stopCommentPolling();
   window.removeEventListener('pagehide', dispose);
 });
 </script>
@@ -238,5 +335,89 @@ onBeforeUnmount(() => {
   color: #ff8292;
   margin: 0;
   line-height: 1.5;
+}
+.live-comments {
+  border: 1px solid var(--gora-line);
+  border-radius: 16px;
+  background: var(--gora-surface);
+  overflow: hidden;
+}
+.live-comments__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--gora-line);
+}
+.live-comments__header h2 {
+  margin: 0;
+  font-size: 1rem;
+}
+.live-comments__header span,
+.live-comments__meta time {
+  color: var(--gora-muted);
+  font-size: 0.78rem;
+}
+.live-comments__list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-height: 340px;
+  overflow-y: auto;
+  padding: 16px;
+}
+.live-comments__item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.live-comments__body {
+  min-width: 0;
+  flex: 1;
+}
+.live-comments__meta {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.live-comments__meta strong {
+  font-size: 0.88rem;
+}
+.live-comments__body p {
+  margin: 3px 0 0;
+  overflow-wrap: anywhere;
+  line-height: 1.45;
+}
+.live-comments__empty {
+  padding: 14px 16px;
+  margin: 0;
+  color: var(--gora-muted);
+}
+.live-comments__form {
+  display: flex;
+  gap: 8px;
+  padding: 12px;
+  border-top: 1px solid var(--gora-line);
+}
+.live-comments__form input {
+  min-width: 0;
+  flex: 1;
+  padding: 12px 14px;
+  border-radius: 999px;
+}
+.live-page .live-comments__send {
+  padding: 10px 16px;
+  border-radius: 999px;
+  background: var(--ion-color-primary);
+  color: #101214;
+}
+@media (max-width: 520px) {
+  .live-comments__form {
+    position: sticky;
+    bottom: 0;
+    background: var(--gora-surface);
+    padding-bottom: max(12px, env(safe-area-inset-bottom));
+  }
 }
 </style>

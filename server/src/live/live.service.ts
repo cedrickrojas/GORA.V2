@@ -151,6 +151,47 @@ export class LiveService {
     return this.present(await this.access(userId, id));
   }
 
+  async comments(userId: string, id: string) {
+    await this.access(userId, id);
+    const rows = await this.prisma.liveComment.findMany({
+      where: { liveStreamId: id },
+      include: { user: { select: AUTHOR_SELECT } },
+      orderBy: { createdAt: 'desc' },
+      take: 100,
+    });
+    return rows.reverse().map((row) => ({
+      id: row.id,
+      content: row.content,
+      createdAt: row.createdAt,
+      author: {
+        id: row.user.id,
+        username: row.user.username,
+        displayName: formatDisplayName(row.user),
+        avatarUrl: row.user.profileImageUrl,
+      },
+    }));
+  }
+
+  async comment(userId: string, id: string, content: string) {
+    const live = await this.access(userId, id);
+    if (live.status !== 'LIVE') throw new GoneException('This live has ended.');
+    const row = await this.prisma.liveComment.create({
+      data: { liveStreamId: id, userId, content },
+      include: { user: { select: AUTHOR_SELECT } },
+    });
+    return {
+      id: row.id,
+      content: row.content,
+      createdAt: row.createdAt,
+      author: {
+        id: row.user.id,
+        username: row.user.username,
+        displayName: formatDisplayName(row.user),
+        avatarUrl: row.user.profileImageUrl,
+      },
+    };
+  }
+
   async start(userId: string, title: string) {
     await this.expire();
     try {

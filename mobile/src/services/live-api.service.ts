@@ -16,6 +16,12 @@ export interface LivePeer {
   offer: string | null;
   answer: string | null;
 }
+export interface LiveComment {
+  id: string;
+  content: string;
+  createdAt: string;
+  author: UserSummary;
+}
 export const liveApi = {
   mine: async (token: string) => (await apiRequest<{ live: LiveStreamInfo | null }>('/live/mine', { token })).live,
   list: (token: string) => apiRequest<LiveStreamInfo[]>('/live', { token }),
@@ -24,6 +30,9 @@ export const liveApi = {
     apiRequest<LiveStreamInfo>('/live', { token, method: 'POST', body: { title } }),
   get: (token: string, id: string) => apiRequest<LiveStreamInfo>(`/live/${id}`, { token }),
   end: (token: string, id: string) => apiRequest(`/live/${id}`, { token, method: 'DELETE' }),
+  comments: (token: string, id: string) => apiRequest<LiveComment[]>(`/live/${id}/comments`, { token }),
+  comment: (token: string, id: string, content: string) =>
+    apiRequest<LiveComment>(`/live/${id}/comments`, { token, method: 'POST', body: { content } }),
   peers: (token: string, id: string) => apiRequest<LivePeer[]>(`/live/${id}/peers`, { token }),
   join: (token: string, id: string) => apiRequest<{ id: string }>(`/live/${id}/viewers`, { token, method: 'POST' }),
   poll: (token: string, id: string, peer: string) => apiRequest<LivePeer>(`/live/${id}/viewers/${peer}`, { token }),

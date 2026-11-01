@@ -16,3 +16,12 @@ export class LiveDescriptionDto {
   @Matches(/^v=0\r?\n/)
   sdp!: string;
 }
+
+export class LiveCommentDto {
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === 'string' ? value.trim() : value,
+  )
+  @IsString()
+  @Length(1, 500)
+  content!: string;
+}

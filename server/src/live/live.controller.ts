@@ -13,7 +13,7 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import type { CurrentUser as Viewer } from '../users/user.types';
 import { LiveService } from './live.service';
-import { LiveDescriptionDto, StartLiveDto } from './live.dto';
+import { LiveCommentDto, LiveDescriptionDto, StartLiveDto } from './live.dto';
 
 @Controller('live')
 @UseGuards(JwtAuthGuard)
@@ -31,6 +31,19 @@ export class LiveController {
   }
   @Post() start(@CurrentUser() viewer: Viewer, @Body() dto: StartLiveDto) {
     return this.live.start(viewer.id, dto.title);
+  }
+  @Get(':id/comments') comments(
+    @CurrentUser() viewer: Viewer,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.live.comments(viewer.id, id);
+  }
+  @Post(':id/comments') comment(
+    @CurrentUser() viewer: Viewer,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: LiveCommentDto,
+  ) {
+    return this.live.comment(viewer.id, id, dto.content);
   }
   @Get(':id') get(
     @CurrentUser() viewer: Viewer,

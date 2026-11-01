@@ -52,6 +52,7 @@ model User {
   joinRequests            JoinRequest[]
   hostedLiveStreams       LiveStream[]
   liveViews               LiveViewer[]
+  liveComments            LiveComment[]
   sentMessages            Message[]
   messageReactions        MessageReaction[]
   receivedMessageRequests MessageRequest[]          @relation("MessageRequestReceiver")
@@ -912,6 +913,7 @@ model LiveStream {
   game         Game?            @relation(fields: [gameId], references: [id])
   host         User             @relation(fields: [hostId], references: [id])
   viewers      LiveViewer[]
+  comments      LiveComment[]
 
   @@unique([hostId], map: "LiveStream_one_active_host", where: raw("(status = 'LIVE'::\"LiveStreamStatus\")"))
   @@index([hostId])
@@ -933,6 +935,18 @@ model LiveViewer {
 
   @@index([liveStreamId, leftAt])
   @@index([userId])
+}
+
+model LiveComment {
+  id           String     @id @default(uuid()) @db.Uuid
+  liveStreamId String     @db.Uuid
+  userId       String     @db.Uuid
+  content      String     @db.VarChar(500)
+  createdAt    DateTime   @default(now())
+  liveStream   LiveStream @relation(fields: [liveStreamId], references: [id], onDelete: Cascade)
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([liveStreamId, createdAt])
 }
 
 model Report {
