@@ -23,9 +23,9 @@
                 >{{ number(overview.pendingReports) }}</span
               >
               <span
-                v-if="item.id === 'inbox' && overview?.pendingHelpMessages"
+                v-if="item.id === 'inbox' && unreadAdminHelpRequests > 0"
                 class="nav-count"
-                >{{ number(overview.pendingHelpMessages) }}</span
+                >{{ number(unreadAdminHelpRequests) }}</span
               >
             </button>
           </nav>
@@ -819,7 +819,7 @@ const sections = [
 type Section = (typeof sections)[number]['id'];
 const auth = useAuthStore();
 const notificationsStore = useNotificationsStore();
-const { unreadCount: unreadNotifications } = storeToRefs(notificationsStore);
+const { unreadCount: unreadNotifications, unreadAdminHelpRequestCount: unreadAdminHelpRequests } = storeToRefs(notificationsStore);
 const route = useRoute();
 const router = useRouter();
 const isLoggingOut = ref(false);
@@ -1028,6 +1028,13 @@ function clearData() {
   sports.value = null;
   audit.value = null;
 }
+async function markAdminInboxNotificationsRead(): Promise<void> {
+  if (auth.currentUser?.role !== 'SUPER_ADMIN') return;
+  const loaded = await notificationsStore.load(true);
+  if (loaded && section.value === 'inbox') {
+    await notificationsStore.markAdminHelpRequestsRead();
+  }
+}
 async function load() {
   const token = auth.accessToken;
   if (!token || auth.currentUser?.role !== 'SUPER_ADMIN') {
@@ -1094,6 +1101,7 @@ async function load() {
 watch(section, () => {
   page.value = 1;
   notice.value = '';
+  if (section.value === 'inbox') void markAdminInboxNotificationsRead();
   void load();
 });
 watch(page, () => {
@@ -1110,7 +1118,8 @@ watch(
 );
 onIonViewWillEnter(() => {
   void load();
-  void notificationsStore.load(true);
+  if (section.value === 'inbox') void markAdminInboxNotificationsRead();
+  else void notificationsStore.load(true);
   if (notificationPoll === null) {
     notificationPoll = window.setInterval(() => {
       if (document.visibilityState === 'visible') void notificationsStore.load(true);

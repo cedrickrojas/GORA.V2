@@ -54,6 +54,7 @@ export interface NotificationsPage {
   items: AppNotification[];
   unreadCount: number;
   unreadHelpRequestCount: number;
+  unreadAdminHelpRequestCount: number;
   hasMore: boolean;
   nextOffset: number;
 }

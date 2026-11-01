@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '../generated/prisma/client';
 import type { NotificationType } from '../generated/prisma/enums';
 import { friendshipWithViewer } from '../posts/post-visibility';
@@ -101,7 +101,7 @@ export class NotificationsService {
 
   async list(userId: string, { limit, offset }: ListNotificationsDto) {
     const where = await this.visibleTo(userId);
-    const [rows, unreadCount, unreadHelpRequestCount, total] = await this.prisma.$transaction([
+    const [rows, unreadCount, unreadHelpRequestCount, unreadAdminHelpRequestCount, total] = await this.prisma.$transaction([
       this.prisma.notification.findMany({
         where,
         select: SELECT,
@@ -114,6 +114,9 @@ export class NotificationsService {
       }),
       this.prisma.notification.count({
         where: { AND: [where, { type: 'HELP_REQUEST_UPDATED', isRead: false }] },
+      }),
+      this.prisma.notification.count({
+        where: { AND: [where, { type: 'HELP_REQUEST_RECEIVED', isRead: false }] },
       }),
       this.prisma.notification.count({ where }),
     ]);
@@ -167,6 +170,7 @@ export class NotificationsService {
       }),
       unreadCount,
       unreadHelpRequestCount,
+      unreadAdminHelpRequestCount,
       hasMore: offset + rows.length < total,
       nextOffset: offset + rows.length,
     };
@@ -187,7 +191,10 @@ export class NotificationsService {
       const unreadHelpRequestCount = await tx.notification.count({
         where: { AND: [visibleTo, { type: 'HELP_REQUEST_UPDATED', isRead: false }] },
       });
-      return { id, read: true, unreadCount, unreadHelpRequestCount };
+      const unreadAdminHelpRequestCount = await tx.notification.count({
+        where: { AND: [visibleTo, { type: 'HELP_REQUEST_RECEIVED', isRead: false }] },
+      });
+      return { id, read: true, unreadCount, unreadHelpRequestCount, unreadAdminHelpRequestCount };
     });
   }
 
@@ -201,7 +208,7 @@ export class NotificationsService {
       const unreadCount = await tx.notification.count({
         where: { AND: [visibleTo, { isRead: false }] },
       });
-      return { updated: updated.count, unreadCount, unreadHelpRequestCount: 0 };
+      return { updated: updated.count, unreadCount, unreadHelpRequestCount: 0, unreadAdminHelpRequestCount: 0 };
     });
   }
 
@@ -220,7 +227,34 @@ export class NotificationsService {
       const unreadHelpRequestCount = await tx.notification.count({
         where: { AND: [visibleTo, { type: 'HELP_REQUEST_UPDATED', isRead: false }] },
       });
-      return { updated: updated.count, unreadCount, unreadHelpRequestCount };
+      const unreadAdminHelpRequestCount = await tx.notification.count({
+        where: { AND: [visibleTo, { type: 'HELP_REQUEST_RECEIVED', isRead: false }] },
+      });
+      return { updated: updated.count, unreadCount, unreadHelpRequestCount, unreadAdminHelpRequestCount };
+    });
+  }
+
+  async markAdminHelpRequestsRead(userId: string) {
+    return this.prisma.$transaction(async (tx) => {
+      const admin = await tx.user.findUnique({ where: { id: userId }, select: { role: true, isActive: true } });
+      if (!admin || !admin.isActive || admin.role !== 'SUPER_ADMIN') {
+        throw new ForbiddenException('Super admin access is required.');
+      }
+      const visibleTo = await this.visibleTo(userId);
+      const updated = await tx.notification.updateMany({
+        where: { AND: [visibleTo, { type: 'HELP_REQUEST_RECEIVED', isRead: false }] },
+        data: { isRead: true },
+      });
+      const unreadCount = await tx.notification.count({
+        where: { AND: [visibleTo, { isRead: false }] },
+      });
+      const unreadAdminHelpRequestCount = await tx.notification.count({
+        where: { AND: [visibleTo, { type: 'HELP_REQUEST_RECEIVED', isRead: false }] },
+      });
+      const unreadHelpRequestCount = await tx.notification.count({
+        where: { AND: [visibleTo, { type: 'HELP_REQUEST_UPDATED', isRead: false }] },
+      });
+      return { updated: updated.count, unreadCount, unreadHelpRequestCount, unreadAdminHelpRequestCount };
     });
   }
 }

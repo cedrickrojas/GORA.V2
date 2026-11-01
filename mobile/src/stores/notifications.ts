@@ -3,6 +3,7 @@ import { ref, watch } from "vue";
 import {
   fetchNotifications,
   markAllNotificationsRead,
+  markAdminHelpRequestNotificationsRead,
   markHelpRequestNotificationsRead,
   markNotificationRead,
 } from "@/services/notification.service";
@@ -16,6 +17,7 @@ export const useNotificationsStore = defineStore("notifications", () => {
   const isLoaded = ref(false);
   const unreadCount = ref(0);
   const unreadHelpRequestCount = ref(0);
+  const unreadAdminHelpRequestCount = ref(0);
   const isLoading = ref(false);
   const error = ref<string | null>(null);
   const hasMore = ref(false);
@@ -38,6 +40,7 @@ export const useNotificationsStore = defineStore("notifications", () => {
     items.value = [];
     unreadCount.value = 0;
     unreadHelpRequestCount.value = 0;
+    unreadAdminHelpRequestCount.value = 0;
     nextOffset = 0;
     isLoaded.value = false;
     isLoading.value = false;
@@ -79,6 +82,7 @@ export const useNotificationsStore = defineStore("notifications", () => {
         ];
         unreadCount.value = page.unreadCount;
         unreadHelpRequestCount.value = page.unreadHelpRequestCount;
+        unreadAdminHelpRequestCount.value = page.unreadAdminHelpRequestCount;
         hasMore.value = page.hasMore;
         nextOffset = page.nextOffset;
         isLoaded.value = true;
@@ -119,6 +123,7 @@ export const useNotificationsStore = defineStore("notifications", () => {
       );
       unreadCount.value = result.unreadCount;
       unreadHelpRequestCount.value = result.unreadHelpRequestCount;
+      unreadAdminHelpRequestCount.value = result.unreadAdminHelpRequestCount;
       return true;
     } catch (caught) {
       if (generation === account) {
@@ -143,6 +148,7 @@ export const useNotificationsStore = defineStore("notifications", () => {
       for (const item of items.value) item.read = true;
       unreadCount.value = result.unreadCount;
       unreadHelpRequestCount.value = result.unreadHelpRequestCount;
+      unreadAdminHelpRequestCount.value = result.unreadAdminHelpRequestCount;
       return true;
     } catch (caught) {
       if (generation === account) {
@@ -169,6 +175,34 @@ export const useNotificationsStore = defineStore("notifications", () => {
       );
       unreadCount.value = result.unreadCount;
       unreadHelpRequestCount.value = result.unreadHelpRequestCount;
+      unreadAdminHelpRequestCount.value = result.unreadAdminHelpRequestCount;
+      return true;
+    } catch (caught) {
+      if (generation === account) {
+        if (isUnauthorized(caught)) await auth.logout();
+        else error.value = describeApiError(caught);
+      }
+      return false;
+    } finally {
+      if (generation === account) isMarkingAll.value = false;
+    }
+  }
+  async function markAdminHelpRequestsRead(): Promise<boolean> {
+    const token = auth.accessToken;
+    if (!token || readingId.value || isMarkingAll.value) return false;
+    const account = generation;
+    isMarkingAll.value = true;
+    error.value = null;
+    try {
+      const result = await markAdminHelpRequestNotificationsRead(token);
+      if (generation !== account) return false;
+      revision++;
+      items.value = items.value.map((item) =>
+        item.type === 'HELP_REQUEST_RECEIVED' ? { ...item, read: true } : item,
+      );
+      unreadCount.value = result.unreadCount;
+      unreadHelpRequestCount.value = result.unreadHelpRequestCount;
+      unreadAdminHelpRequestCount.value = result.unreadAdminHelpRequestCount;
       return true;
     } catch (caught) {
       if (generation === account) {
@@ -185,6 +219,7 @@ export const useNotificationsStore = defineStore("notifications", () => {
     isLoaded,
     unreadCount,
     unreadHelpRequestCount,
+    unreadAdminHelpRequestCount,
     isLoading,
     error,
     hasMore,
@@ -195,6 +230,7 @@ export const useNotificationsStore = defineStore("notifications", () => {
     markRead,
     markAllRead,
     markHelpRequestsRead,
+    markAdminHelpRequestsRead,
     reset,
   };
 });
