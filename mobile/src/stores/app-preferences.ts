@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
+import { setAppLanguage } from '@/i18n';
 
 export type DisplayMode = 'dark' | 'light';
 export type AppLanguage = 'en' | 'fil';
@@ -29,7 +30,7 @@ function readPreferences(): AppPreferences {
 
 function applyPreferences(preferences: AppPreferences): void {
   document.documentElement.classList.toggle('gora-theme-light', preferences.displayMode === 'light');
-  document.documentElement.lang = preferences.language;
+  setAppLanguage(preferences.language);
   document.querySelector('meta[name="theme-color"]')?.setAttribute(
     'content',
     preferences.displayMode === 'light' ? '#f4f6f8' : '#101113',

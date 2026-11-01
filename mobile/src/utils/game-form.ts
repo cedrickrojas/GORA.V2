@@ -335,7 +335,7 @@ export function formatGameDay(date: string, today = deviceMoment().date): string
   const [year, month, day] = date.split('-').map(Number);
   const sameYear = date.slice(0, 4) === today.slice(0, 4);
 
-  return new Intl.DateTimeFormat('en-US', {
+  return new Intl.DateTimeFormat(document.documentElement.lang === 'fil' ? 'fil-PH' : 'en-US', {
     timeZone: 'UTC',
     weekday: 'long',
     month: 'long',

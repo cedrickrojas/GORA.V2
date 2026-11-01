@@ -18,7 +18,7 @@ export function formatDiscoveryDay(date: string, today = deviceMoment().date): s
   }
 
   const [year, month, day] = date.split('-').map(Number);
-  return new Intl.DateTimeFormat('en-US', {
+  return new Intl.DateTimeFormat(document.documentElement.lang === 'fil' ? 'fil-PH' : 'en-US', {
     timeZone: 'UTC',
     weekday: 'short',
     month: 'short',

@@ -36,20 +36,21 @@ export function formatDuration(totalSeconds: number): string {
 }
 
 export function formatStartTime(startsAtMs: number, nowMs: number): string {
-  const time = new Intl.DateTimeFormat('en', { hour: 'numeric', minute: '2-digit' }).format(startsAtMs);
+  const locale = document.documentElement.lang === 'fil' ? 'fil-PH' : 'en';
+  const time = new Intl.DateTimeFormat(locale, { hour: 'numeric', minute: '2-digit' }).format(startsAtMs);
   const startDay = new Date(startsAtMs).setHours(0, 0, 0, 0);
   const today = new Date(nowMs).setHours(0, 0, 0, 0);
   const dayDiff = Math.round((startDay - today) / DAY_MS);
 
   if (dayDiff === 0) {
-    return `Today, ${time}`;
+    return locale === 'fil-PH' ? `Ngayon, ${time}` : `Today, ${time}`;
   }
 
   if (dayDiff === 1) {
-    return `Tomorrow, ${time}`;
+    return locale === 'fil-PH' ? `Bukas, ${time}` : `Tomorrow, ${time}`;
   }
 
-  const day = new Intl.DateTimeFormat('en', { weekday: 'short', month: 'short', day: 'numeric' }).format(startsAtMs);
+  const day = new Intl.DateTimeFormat(locale, { weekday: 'short', month: 'short', day: 'numeric' }).format(startsAtMs);
 
   return `${day}, ${time}`;
 }
@@ -59,5 +60,6 @@ export function formatDistanceKm(distanceKm: number): string {
 }
 
 export function formatCompactNumber(value: number): string {
-  return new Intl.NumberFormat('en', { notation: 'compact' }).format(value);
+  const locale = document.documentElement.lang === 'fil' ? 'fil-PH' : 'en';
+  return new Intl.NumberFormat(locale, { notation: 'compact' }).format(value);
 }
