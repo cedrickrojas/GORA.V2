@@ -26,7 +26,7 @@
           Nothing in {{ sport.name }} matches “{{ query.trim() }}”.
         </p>
 
-        <section v-if="!isSearching || visibleGameCount > 0 || mapLoading" class="sport__section">
+        <section v-if="view === 'MAP' || !isSearching || visibleGameCount > 0 || mapLoading" class="sport__section">
           <SectionHeader title="Games">
             <span class="sport__meta">{{ visibleGameCount }} {{ visibleGameCount === 1 ? 'game' : 'games' }} · {{ distanceLabel }}</span>
           </SectionHeader>
@@ -83,21 +83,7 @@
           </template>
         </section>
 
-        <section v-if="players.length" class="sport__section">
-          <SectionHeader title="Players" />
-          <ul class="sport__list">
-            <PlayerRow v-for="player in players" :key="player.id" :player="player" />
-          </ul>
-        </section>
-
-        <section v-if="reels.length" class="sport__section">
-          <SectionHeader title="Reels" />
-          <div class="sport__reels">
-            <ReelThumb v-for="reel in reels" :key="reel.id" :reel="reel" />
-          </div>
-        </section>
-
-        <section v-if="!isSearching || clubs.length" class="sport__section">
+        <section v-if="view === 'LIST' && (!isSearching || clubs.length)" class="sport__section">
           <SectionHeader title="Available Clubs">
             <span class="sport__meta">{{ clubs.length }} {{ clubs.length === 1 ? 'club' : 'clubs' }}</span>
           </SectionHeader>
@@ -107,19 +93,29 @@
           </ul>
         </section>
 
-        <section v-if="!isSearching || posts.length" class="sport__section">
-          <SectionHeader title="Posts">
-            <span class="sport__meta">{{ posts.length }} {{ posts.length === 1 ? 'post' : 'posts' }}</span>
+        <section v-if="view === 'LIST'" class="sport__section">
+          <SectionHeader title="People You May Know">
+            <span class="sport__meta">{{ peopleYouMayKnow.length }} {{ peopleYouMayKnow.length === 1 ? 'person' : 'people' }}</span>
           </SectionHeader>
-          <p v-if="posts.length === 0" class="sport__empty">
-            No {{ sport.name.toLowerCase() }} posts yet.
-            <router-link to="/create/post">Share the first one</router-link>
+          <p v-if="!auth.isAuthenticated" class="sport__empty">Sign in to see people you may know.</p>
+          <p v-else-if="!peopleYouMayKnow.length" class="sport__empty">No new people to suggest right now.</p>
+          <ul v-else class="sport__list">
+            <PlayerRow v-for="player in peopleYouMayKnow" :key="player.id" :player="player" />
+          </ul>
+        </section>
+
+        <section v-if="view === 'LIST' && (!isSearching || contentFeed.length)" class="sport__section">
+          <SectionHeader title="Posts">
+            <span class="sport__meta">{{ contentFeed.length }} {{ contentFeed.length === 1 ? 'post' : 'posts' }}</span>
+          </SectionHeader>
+          <p v-if="contentFeed.length === 0" class="sport__empty">
+            No {{ sport.name.toLowerCase() }} posts yet. <router-link to="/create/post">Share the first one</router-link>
           </p>
           <div v-else class="sport__stack">
-            <PostCard
-              v-for="post in posts"
-              :key="post.id"
-              :post="post"
+            <FeedEntry
+              v-for="item in contentFeed"
+              :key="item.id"
+              :item="item"
               :now-ms="now"
               @like="likePost"
               @comment="commentOnPost"
@@ -152,10 +148,9 @@ import SegmentTabs from '@/components/common/SegmentTabs.vue';
 import JoinRequestModal from '@/components/games/JoinRequestModal.vue';
 import DiscoveredGameCard from '@/components/map/DiscoveredGameCard.vue';
 import PlayerRow from '@/components/discover/PlayerRow.vue';
-import PostCard from '@/components/feed/PostCard.vue';
+import FeedEntry from '@/components/feed/FeedEntry.vue';
 import GameDiscoveryMap from '@/components/map/GameDiscoveryMap.vue';
 import AppHeader from '@/components/layout/AppHeader.vue';
-import ReelThumb from '@/components/reels/ReelThumb.vue';
 import { useDiscoveryJoin } from '@/composables/useDiscoveryJoin';
 import { useNow } from '@/composables/useNow';
 import { usePostActions } from '@/composables/usePostActions';
@@ -164,16 +159,21 @@ import { useClubsStore } from '@/stores/clubs';
 import { useAuthStore } from '@/stores/auth';
 import { useDiscoveryStore } from '@/stores/discovery';
 import { useFiltersStore } from '@/stores/filters';
+import { useFriendsStore } from '@/stores/friends';
 import { useGamesStore } from '@/stores/games';
 import { usePostsStore } from '@/stores/posts';
 import { useReelsStore } from '@/stores/reels';
 import { useSportsStore } from '@/stores/sports';
 import { discoverGames } from '@/services/games-api.service';
+import { getFriendSuggestions } from '@/services/friends-api.service';
 import { createAuthorizedCall } from '@/stores/authorized';
 import type { DiscoveredGame } from '@/types/discovery';
+import type { HomeFeedItem } from '@/types/feed';
+import type { PlayerSummary } from '@/types/player';
 import { describeApiError } from '@/utils/api-errors';
 import { getClubJoinState } from '@/utils/clubs';
-import { isWithinDistance, matchesSport } from '@/utils/filters';
+import { matchesSport, NO_FILTERS } from '@/utils/filters';
+import { buildHomeFeed } from '@/utils/feed';
 import { DISCOVERY_DATES, buildDiscoveryQuery, type DiscoveryDate } from '@/utils/map-discovery';
 import { formatDistanceFilter, matchesSearchQuery } from '@/utils/search';
 import { getSportImage, toSportSlug } from '@/utils/sports';
@@ -192,6 +192,7 @@ const router = useRouter();
 const pageSlug = String(route.params.sport ?? '');
 const catalog = useCatalogStore();
 const clubsStore = useClubsStore();
+const friendsStore = useFriendsStore();
 const gamesStore = useGamesStore();
 const postsStore = usePostsStore();
 const reelsStore = useReelsStore();
@@ -207,6 +208,7 @@ const date = ref<DiscoveryDate>('ALL');
 const view = ref<SportView>('MAP');
 const query = ref('');
 const mapGames = ref<DiscoveredGame[]>([]);
+const suggestions = ref<PlayerSummary[]>([]);
 const mapLoading = ref(false);
 const mapError = ref<string | null>(null);
 const selectedMapGameId = ref<string | null>(null);
@@ -308,14 +310,6 @@ watch(view, (selectedView) => {
 
 const games = sportMapGames;
 
-const players = computed(() =>
-  catalog.players.filter(
-    (player) =>
-      matchesSport(player.primarySport, sportName.value) &&
-      isWithinDistance(player.distanceKm, filters.maxDistanceKm) &&
-      matches(player.displayName, player.username, player.city),
-  ),
-);
 const clubs = computed(() =>
   clubsStore.feedClubs
     .filter((club) => matchesSport([...(club.sport ? [club.sport] : []), ...club.additionalSports.map(({ name }) => name)], sportName.value))
@@ -324,46 +318,79 @@ const clubs = computed(() =>
     .sort((a, b) => b.memberCount - a.memberCount)
     .slice(0, 10),
 );
-const reels = computed(() =>
-  reelsStore.feedReels.filter(
-    (reel) =>
-      matchesSport(reel.sport, sportName.value) &&
-      matches(reel.caption, reel.author.displayName, reel.locationName),
-  ),
+const peopleYouMayKnow = computed(() => {
+  const unavailableIds = new Set([
+    ...friendsStore.friends.map(({ id }) => id),
+    ...friendsStore.requests.map(({ player }) => player.id),
+  ]);
+  return suggestions.value
+    .filter((person) => !unavailableIds.has(person.id))
+    .filter((person) => matches(person.displayName, person.username, person.city))
+    .slice(0, 8);
+});
+const contentFeed = computed<HomeFeedItem[]>(() =>
+  buildHomeFeed(
+    {
+      posts: postsStore.visiblePosts,
+      games: [],
+      serverGames: gamesStore.listedGames,
+      reels: reelsStore.feedReels,
+      activities: [],
+    },
+    NO_FILTERS,
+    { reels: Number.POSITIVE_INFINITY },
+  ).filter((item) => {
+    if (item.type === 'POST') {
+      return matchesSport(item.post.sport, sportName.value) && matches(item.post.body, item.post.author.displayName, item.post.location?.name ?? '');
+    }
+    if (item.type === 'SERVER_GAME') {
+      return matchesSport(item.game.sport.name, sportName.value) && matches(item.game.title, item.game.description ?? '', item.game.locationName, item.game.host.displayName);
+    }
+    if (item.type === 'REEL') {
+      return matchesSport(item.reel.sport, sportName.value) && matches(item.reel.caption, item.reel.author.displayName, item.reel.locationName);
+    }
+    return false;
+  }),
 );
-/** Every post about the sport the viewer may see, newest first; no date narrowing. */
-const posts = computed(() =>
-  postsStore.visiblePosts
-    .filter(
-      (post) =>
-        matchesSport(post.sport, sportName.value) &&
-        matches(post.body, post.author.displayName, post.location?.name ?? ''),
-    )
-    .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt)),
-);
-const resultCount = computed(
-  () =>
-    visibleGameCount.value +
-    players.value.length +
-    clubs.value.length +
-    reels.value.length +
-    posts.value.length,
-);
+const resultCount = computed(() => view.value === 'MAP'
+  ? visibleGameCount.value
+  : visibleGameCount.value + clubs.value.length + peopleYouMayKnow.value.length + contentFeed.value.length);
 
 const pageLoaded = ref(false);
 onMounted(() => void loadSportPage());
 onIonViewWillEnter(() => {
-  if (pageLoaded.value) void Promise.all([refreshSportMap(), clubsStore.refreshFeedClubs()]);
+  if (pageLoaded.value) void Promise.all([
+    refreshSportMap(),
+    clubsStore.refreshFeedClubs(),
+    gamesStore.refreshFeedGames(),
+    postsStore.refresh(),
+    reelsStore.refresh(),
+    friendsStore.refresh(),
+    loadSuggestions(),
+  ]);
 });
+
+async function loadSuggestions(): Promise<void> {
+  if (!auth.accessToken) {
+    suggestions.value = [];
+    return;
+  }
+  try {
+    suggestions.value = await authorized(getFriendSuggestions);
+  } catch {
+    suggestions.value = [];
+  }
+}
 
 async function loadSportPage(): Promise<void> {
   await auth.initialize();
-  await Promise.all([catalog.load(), discovery.initLocation()]);
+  await Promise.all([catalog.load(), discovery.initLocation(), friendsStore.load()]);
   await Promise.all([
     clubsStore.load(),
     gamesStore.load(),
     postsStore.load(),
     reelsStore.load(),
+    loadSuggestions(),
   ]);
   await refreshSportMap();
   pageLoaded.value = true;

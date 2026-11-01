@@ -156,6 +156,7 @@ model Game {
   gameDate        DateTime          @db.Date
   startTime       DateTime
   endTime         DateTime?
+  registrationClosesAt DateTime?
   locationName    String
   latitude        Float?
   longitude       Float?

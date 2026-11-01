@@ -10,6 +10,27 @@ export interface FriendsSnapshot {
 }
 
 export const getFriends = (token: string) => apiRequest<FriendsSnapshot>('/friends', { token });
+export async function getFriendSuggestions(token: string): Promise<PlayerSummary[]> {
+  const users = await apiRequest<
+    {
+      id: string;
+      username: string;
+      firstName: string;
+      lastName: string;
+      profileImageUrl: string | null;
+      city: string | null;
+    }[]
+  >('/friends/suggestions', { token });
+  return users.map((user) => ({
+    ...toUserSummary(user),
+    city: user.city ?? '',
+    primarySport: '',
+    distanceKm: 0,
+    followers: 0,
+    gamesCompleted: 0,
+    featured: false,
+  }));
+}
 export const sendFriendRequest = (token: string, username: string) =>
   apiRequest<FriendsSnapshot>(`/friends/requests/${encodeURIComponent(username)}`, { method: 'POST', token });
 export const acceptFriendRequest = (token: string, id: string) =>

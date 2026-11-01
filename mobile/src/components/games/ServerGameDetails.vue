@@ -32,6 +32,7 @@
 
     <section class="server-game__facts" aria-label="When and where">
       <p>{{ game.autoAccept ? 'Auto Accept: join instantly while slots are available.' : 'Manual Accept: the host reviews join requests.' }}</p>
+      <p>Registration closes: {{ game.registrationClosesAt ? formatRegistrationDeadline(game.registrationClosesAt) : 'when the game starts' }}</p>
       <p><span aria-hidden="true">📅</span> {{ formatGameDay(game.gameDate) }}</p>
       <p><span aria-hidden="true">⏰</span> {{ formatGameTimeRange(game.startTime, game.endTime) }}</p>
       <router-link
@@ -182,7 +183,7 @@
       </template>
       <p v-else-if="action.kind === 'declined'" class="server-game__declined" role="status">Request declined</p>
       <button
-        v-else-if="action.kind === 'closed' && (game.status === 'FULL' || game.status === 'ACTIVE')"
+        v-else-if="action.kind === 'closed'"
         type="button"
         class="server-game__primary"
         disabled
@@ -222,6 +223,7 @@ import type { ApiGame } from '@/types/game';
 import type { RosterPlayer } from '@/types/game-player';
 import {
   formatGameDay,
+  formatRegistrationDeadline,
   formatGameTimeRange,
   gameClubSummary,
   gameHostSummary,

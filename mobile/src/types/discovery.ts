@@ -16,6 +16,7 @@ export interface DiscoveredGame {
   gameDate: string;
   startTime: string;
   endTime: string | null;
+  registrationClosesAt: string | null;
   locationName: string;
   latitude: number | null;
   longitude: number | null;

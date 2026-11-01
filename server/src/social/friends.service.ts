@@ -58,6 +58,22 @@ export class FriendsService {
     });
   }
 
+  suggestions(viewerId: string) {
+    return this.prisma.user.findMany({
+      where: {
+        isActive: true,
+        id: { not: viewerId },
+        NOT: [
+          { sentFriendships: { some: { receiverId: viewerId } } },
+          { receivedFriendships: { some: { requesterId: viewerId } } },
+        ],
+      },
+      select: PERSON_SELECT,
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      take: 12,
+    });
+  }
+
   async list(viewerId: string) {
     const rows = await this.prisma.friendship.findMany({
       where: {

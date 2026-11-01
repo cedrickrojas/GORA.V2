@@ -117,6 +117,7 @@ function fromApiGame(game: ApiGame): DiscoveredGame {
     gameDate: game.gameDate,
     startTime: game.startTime,
     endTime: game.endTime,
+    registrationClosesAt: game.registrationClosesAt,
     locationName: game.locationName,
     latitude: game.latitude,
     longitude: game.longitude,

@@ -22,7 +22,7 @@ import {
   withCapacityGuard,
   type GameFacts,
 } from './game-roster';
-import { formatGameDate, hasGameStarted, localMoment, toGameDate } from './game-schedule';
+import { formatGameDate, formatGameLocalDateTime, hasGameStarted, localMoment, toGameDate } from './game-schedule';
 import { visibleGamesWhere } from './game-visibility';
 import { GAME_NOT_FOUND_MESSAGE } from './games.service';
 import type {
@@ -126,6 +126,12 @@ export class JoinRequestsService {
             throw new ForbiddenException(JOIN_REQUEST_OWN_GAME_MESSAGE);
           }
           this.assertJoinable(game);
+          if (game.registrationClosesAt) {
+            const now = localMoment(this.timeZone);
+            if (formatGameLocalDateTime(game.registrationClosesAt) <= `${now.date}T${now.time}`) {
+              throw new ConflictException('Registration for this game is closed.');
+            }
+          }
 
           const participant = await tx.gameParticipant.findFirst({
             where: { gameId, userId, status: ACTIVE_PLAYER_STATUS },

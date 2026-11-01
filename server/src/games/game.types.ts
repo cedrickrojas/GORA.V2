@@ -56,6 +56,8 @@ export interface GameView {
   gameDate: string;
   startTime: string;
   endTime: string | null;
+  /** Venue-local cutoff, formatted YYYY-MM-DDTHH:mm; null means game start. */
+  registrationClosesAt: string | null;
   locationName: string;
   latitude: number | null;
   longitude: number | null;
@@ -85,6 +87,7 @@ export interface GameCardView {
   gameDate: string;
   startTime: string;
   endTime: string | null;
+  registrationClosesAt: string | null;
   locationName: string;
   latitude: number | null;
   longitude: number | null;

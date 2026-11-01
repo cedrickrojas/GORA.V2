@@ -22,6 +22,7 @@ export const GAME_FACTS_SELECT = {
   autoAccept: true,
   gameDate: true,
   startTime: true,
+  registrationClosesAt: true,
 } as const satisfies Prisma.GameSelect;
 
 export type GameFacts = Prisma.GameGetPayload<{

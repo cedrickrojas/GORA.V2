@@ -2,7 +2,7 @@ import type { Prisma } from '../generated/prisma/client';
 import { formatDisplayName } from '../users/display-name';
 import { AUTHOR_SELECT } from '../users/user.types';
 import { ACTIVE_PLAYER_STATUS, summarizeGameCapacity } from './game-capacity';
-import { formatGameDate, formatGameTime } from './game-schedule';
+import { formatGameDate, formatGameLocalDateTime, formatGameTime } from './game-schedule';
 import type { GameCardView } from './game.types';
 
 /**
@@ -20,6 +20,7 @@ export function gameCardSelect(viewerId: string) {
     gameDate: true,
     startTime: true,
     endTime: true,
+    registrationClosesAt: true,
     locationName: true,
     latitude: true,
     longitude: true,
@@ -65,6 +66,7 @@ export function toGameCard(row: GameCardRow, viewerId: string): GameCardView {
     gameDate: formatGameDate(row.gameDate),
     startTime: formatGameTime(row.startTime),
     endTime: row.endTime ? formatGameTime(row.endTime) : null,
+    registrationClosesAt: row.registrationClosesAt ? formatGameLocalDateTime(row.registrationClosesAt) : null,
     locationName: row.locationName,
     latitude: row.latitude,
     longitude: row.longitude,

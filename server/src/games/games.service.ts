@@ -26,6 +26,7 @@ import {
 import { ACTIVE_PLAYER_STATUS, summarizeGameCapacity } from './game-capacity';
 import {
   formatGameDate,
+  formatGameLocalDateTime,
   formatGameTime,
   localMoment,
   scheduleProblem,
@@ -59,6 +60,7 @@ const GAME_BASE_SELECT = {
   gameDate: true,
   startTime: true,
   endTime: true,
+  registrationClosesAt: true,
   locationName: true,
   latitude: true,
   longitude: true,
@@ -121,6 +123,7 @@ export class GamesService {
     const longitude = dto.longitude ?? null;
     assertCoordinates(latitude, longitude);
     this.assertSchedule(dto);
+    this.assertRegistrationDeadline(dto.registrationClosesAt ?? null, dto, true);
     await this.assertActiveSport(dto.sportId);
 
     const clubId = dto.clubId ?? null;
@@ -142,6 +145,9 @@ export class GamesService {
           gameDate: toGameDate(dto.gameDate),
           startTime: toGameDateTime(dto.gameDate, dto.startTime),
           endTime: toGameDateTime(dto.gameDate, dto.endTime),
+          registrationClosesAt: dto.registrationClosesAt
+            ? toGameDateTime(dto.registrationClosesAt.slice(0, 10), dto.registrationClosesAt.slice(11, 16))
+            : null,
           locationName: dto.locationName,
           latitude,
           longitude,
@@ -338,6 +344,24 @@ export class GamesService {
       if (game.status === 'CANCELLED') data.status = 'OPEN';
     }
 
+    const scheduleChanged = dto.gameDate !== undefined || dto.startTime !== undefined || dto.endTime !== undefined;
+    if (dto.registrationClosesAt !== undefined || scheduleChanged) {
+      const registrationSchedule: GameSchedule = {
+        gameDate: dto.gameDate ?? formatGameDate(game.gameDate),
+        startTime: dto.startTime ?? formatGameTime(game.startTime),
+        endTime: dto.endTime ?? (game.endTime ? formatGameTime(game.endTime) : ''),
+      };
+      const deadline = dto.registrationClosesAt !== undefined
+        ? dto.registrationClosesAt
+        : game.registrationClosesAt ? formatGameLocalDateTime(game.registrationClosesAt) : null;
+      this.assertRegistrationDeadline(deadline, registrationSchedule, false);
+      if (dto.registrationClosesAt !== undefined) {
+        data.registrationClosesAt = dto.registrationClosesAt
+          ? toGameDateTime(dto.registrationClosesAt.slice(0, 10), dto.registrationClosesAt.slice(11, 16))
+          : null;
+      }
+    }
+
     if (Object.keys(data).length === 0) {
       return toGameView(game, viewerId);
     }
@@ -463,6 +487,21 @@ export class GamesService {
     }
   }
 
+  private assertRegistrationDeadline(
+    deadline: string | null,
+    schedule: Pick<GameSchedule, 'gameDate' | 'startTime'>,
+    requireFuture: boolean,
+  ): void {
+    if (!deadline) return;
+    if (deadline > `${schedule.gameDate}T${schedule.startTime}`) {
+      throw new BadRequestException('Registration must close by the game start time.');
+    }
+    const now = localMoment(this.timeZone);
+    if (requireFuture && deadline <= `${now.date}T${now.time}`) {
+      throw new BadRequestException('Registration close must be in the future.');
+    }
+  }
+
   private async assertActiveSport(sportId: string): Promise<void> {
     const sport = await this.prisma.sport.findFirst({
       where: { id: sportId, isActive: true },
@@ -579,6 +618,7 @@ function toGameView(game: GameRow, viewerId: string): GameView {
     gameDate: formatGameDate(game.gameDate),
     startTime: formatGameTime(game.startTime),
     endTime: game.endTime ? formatGameTime(game.endTime) : null,
+    registrationClosesAt: game.registrationClosesAt ? formatGameLocalDateTime(game.registrationClosesAt) : null,
     locationName: game.locationName,
     latitude: game.latitude,
     longitude: game.longitude,

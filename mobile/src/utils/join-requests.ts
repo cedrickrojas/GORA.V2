@@ -2,6 +2,7 @@ import type { ApiGame, GameStatus } from '@/types/game';
 import type { MyParticipation, RosterPlayer } from '@/types/game-player';
 import type { HostJoinRequest, JoinRequest, JoinRequestStatus } from '@/types/join-request';
 import type { UserSummary } from '@/types/user';
+import { deviceMoment } from '@/utils/game-form';
 
 /** Mirrors the server limit so the counter matches what it accepts. */
 export const JOIN_REQUEST_MESSAGE_MAX_LENGTH = 300;
@@ -34,7 +35,7 @@ export type JoinRequestAction =
   | { kind: 'closed'; label: string };
 
 export function joinRequestAction(
-  game: Pick<ApiGame, 'isHost' | 'isPlayer' | 'status'>,
+  game: Pick<ApiGame, 'isHost' | 'isPlayer' | 'status'> & { registrationClosesAt?: string | null },
   mine: Pick<JoinRequest, 'status'> | null,
   participation: Pick<MyParticipation, 'status'> | null = null,
 ): JoinRequestAction {
@@ -55,6 +56,11 @@ export function joinRequestAction(
 
   if (mine?.status === 'REJECTED') {
     return { kind: 'declined' };
+  }
+
+  const now = deviceMoment();
+  if (game.registrationClosesAt && game.registrationClosesAt <= `${now.date}T${now.time}`) {
+    return { kind: 'closed', label: 'Registration closed' };
   }
 
   // No request, a cancelled one, or an accepted one whose player left or was removed.

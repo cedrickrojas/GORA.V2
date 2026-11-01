@@ -19,6 +19,7 @@ import { ACTIVE_PLAYER_STATUS, summarizeGameCapacity } from './game-capacity';
 import {
   addDays,
   formatGameDate,
+  formatGameLocalDateTime,
   formatGameTime,
   localMoment,
   toGameDate,
@@ -55,6 +56,7 @@ function discoverySelect(viewerId: string) {
     gameDate: true,
     startTime: true,
     endTime: true,
+    registrationClosesAt: true,
     locationName: true,
     latitude: true,
     longitude: true,
@@ -281,6 +283,7 @@ function toDiscoveredGame(
     gameDate: formatGameDate(row.gameDate),
     startTime: formatGameTime(row.startTime),
     endTime: row.endTime ? formatGameTime(row.endTime) : null,
+    registrationClosesAt: row.registrationClosesAt ? formatGameLocalDateTime(row.registrationClosesAt) : null,
     locationName: row.locationName,
     latitude: row.latitude,
     longitude: row.longitude,

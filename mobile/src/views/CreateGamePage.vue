@@ -146,6 +146,18 @@
             </div>
           </div>
           <p class="create-game__hint">Local time at the venue.</p>
+          <div class="create-game__field" @focusout="touch('registrationClosesAt')">
+            <label class="create-game__label" for="game-registration-close">Registration closes (optional)</label>
+            <input
+              id="game-registration-close"
+              v-model="form.registrationClosesAt"
+              type="datetime-local"
+              class="create-game__input"
+              :max="form.gameDate && form.startTime ? `${form.gameDate}T${form.startTime}` : undefined"
+            />
+            <p v-if="shown('registrationClosesAt')" class="create-game__error">{{ errors.registrationClosesAt }}</p>
+            <p v-else class="create-game__hint">Leave blank to accept join requests until the game starts.</p>
+          </div>
         </section>
 
         <section v-if="activeStep === 3" class="create-game__step" :aria-label="currentStep.title">
@@ -220,6 +232,7 @@
             </div>
             <p>{{ formatGameDay(form.gameDate) }}</p>
             <p>{{ formatGameTimeRange(form.startTime, form.endTime) }} &middot; Local time at the venue</p>
+            <p>Registration closes: {{ form.registrationClosesAt ? formatRegistrationDeadline(form.registrationClosesAt) : 'When the game starts' }}</p>
           </article>
           <article class="create-game__review-card">
             <div class="create-game__review-heading">
@@ -301,6 +314,7 @@ import {
   diffGameInput,
   emptyGameForm,
   formatGameDay,
+  formatRegistrationDeadline,
   formatGameTimeRange,
   gameToForm,
   toCreateGameInput,
@@ -344,7 +358,7 @@ const GAME_STEPS: readonly { title: string; hint: string; fields: readonly GameF
   {
     title: 'Schedule',
     hint: 'Choose the game date and local start and end times.',
-    fields: ['gameDate', 'startTime', 'endTime'],
+    fields: ['gameDate', 'startTime', 'endTime', 'registrationClosesAt'],
   },
   {
     title: 'Location',

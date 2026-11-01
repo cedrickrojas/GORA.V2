@@ -533,7 +533,7 @@
                     </button>
                   </article>
                 </div>
-                <section v-if="selectedSport" class="panel sport-breakdown" :aria-label="`${selectedSport.name} analytics`">
+                <section v-if="selectedSport" ref="sportBreakdownEl" class="panel sport-breakdown" :aria-label="`${selectedSport.name} analytics`" tabindex="-1">
                   <div class="sport-breakdown__heading">
                     <div>
                       <span class="eyebrow">SPORT BREAKDOWN</span>
@@ -845,6 +845,7 @@ const error = ref('');
 const notice = ref('');
 const accessDenied = ref(false);
 const selectedSportId = ref<string | null>(null);
+const sportBreakdownEl = ref<HTMLElement | null>(null);
 let generation = 0;
 let notificationPoll: number | null = null;
 const reportStatuses: ReportStatus[] = [
@@ -1172,8 +1173,12 @@ function confirmSport(sport: AdminSport) {
     run: (token) => adminApi.updateSport(token, sport.id, !sport.isActive),
   });
 }
-function selectSport(sportId: string) {
+async function selectSport(sportId: string) {
   selectedSportId.value = selectedSportId.value === sportId ? null : sportId;
+  if (!selectedSportId.value) return;
+  await nextTick();
+  sportBreakdownEl.value?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  sportBreakdownEl.value?.focus({ preventScroll: true });
 }
 function addSport() {
   sportName.value = '';

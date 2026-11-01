@@ -46,6 +46,7 @@ export const GAME_STATUSES = [
 ] as const satisfies readonly GameStatus[];
 
 const whenPresent = () => ValidateIf((_, value) => value !== undefined);
+const GAME_LOCAL_DATE_TIME_PATTERN = /^\d{4}-\d{2}-\d{2}T([01]\d|2[0-3]):[0-5]\d$/;
 
 function IsGameDate(options?: ValidationOptions): PropertyDecorator {
   return (target: object, propertyName: string | symbol): void => {
@@ -57,6 +58,23 @@ function IsGameDate(options?: ValidationOptions): PropertyDecorator {
       validator: {
         validate(value: unknown): boolean {
           return typeof value === 'string' && isCalendarDate(value);
+        },
+      },
+    });
+  };
+}
+
+function IsGameLocalDateTime(options?: ValidationOptions): PropertyDecorator {
+  return (target: object, propertyName: string | symbol): void => {
+    registerDecorator({
+      name: 'isGameLocalDateTime',
+      target: target.constructor,
+      propertyName: String(propertyName),
+      options,
+      validator: {
+        validate(value: unknown): boolean {
+          if (typeof value !== 'string' || !GAME_LOCAL_DATE_TIME_PATTERN.test(value)) return false;
+          return isCalendarDate(value.slice(0, 10));
         },
       },
     });
@@ -178,6 +196,12 @@ export class CreateGameDto {
   @TimeRules('End time')
   endTime!: string;
 
+  @whenPresent()
+  @IsOptional()
+  @Transform(trim)
+  @IsGameLocalDateTime({ message: 'Registration close must include a valid local date and time.' })
+  registrationClosesAt?: string | null;
+
   @LocationRules()
   locationName!: string;
 
@@ -226,6 +250,12 @@ export class UpdateGameDto {
   @whenPresent()
   @TimeRules('End time')
   endTime?: string;
+
+  @whenPresent()
+  @IsOptional()
+  @Transform(trim)
+  @IsGameLocalDateTime({ message: 'Registration close must include a valid local date and time.' })
+  registrationClosesAt?: string | null;
 
   @whenPresent()
   @LocationRules()

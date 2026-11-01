@@ -61,6 +61,11 @@ export function formatGameTime(value: Date): string {
   return value.toISOString().slice(11, 16);
 }
 
+/** Formats a stored venue-local timestamp as YYYY-MM-DDTHH:mm for datetime-local inputs. */
+export function formatGameLocalDateTime(value: Date): string {
+  return `${formatGameDate(value)}T${formatGameTime(value)}`;
+}
+
 export function addDays(date: string, days: number): string {
   const start = toGameDate(date);
   start.setUTCDate(start.getUTCDate() + days);

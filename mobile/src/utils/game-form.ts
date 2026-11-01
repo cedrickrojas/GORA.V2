@@ -51,6 +51,7 @@ export interface GameForm {
   gameDate: string;
   startTime: string;
   endTime: string;
+  registrationClosesAt: string;
   locationName: string;
   latitude: number | string;
   longitude: number | string;
@@ -83,6 +84,7 @@ export function emptyGameForm(): GameForm {
     gameDate: '',
     startTime: '',
     endTime: '',
+    registrationClosesAt: '',
     locationName: '',
     latitude: '',
     longitude: '',
@@ -100,6 +102,7 @@ export function gameToForm(game: ApiGame): GameForm {
     gameDate: game.gameDate,
     startTime: game.startTime,
     endTime: game.endTime ?? '',
+    registrationClosesAt: game.registrationClosesAt ?? '',
     locationName: game.locationName,
     latitude: game.latitude ?? '',
     longitude: game.longitude ?? '',
@@ -187,7 +190,25 @@ export function validateGameForm(form: GameForm, now: LocalMoment, original?: Ap
   }
 
   Object.assign(errors, scheduleErrors(form, now, original));
+  Object.assign(errors, registrationDeadlineErrors(form, now, original));
   Object.assign(errors, coordinateErrors(form));
+  return errors;
+}
+
+function registrationDeadlineErrors(form: GameForm, now: LocalMoment, original?: ApiGame | null): GameFormErrors {
+  const errors: GameFormErrors = {};
+  const value = form.registrationClosesAt;
+  if (!value) return errors;
+  if (!/^\d{4}-\d{2}-\d{2}T([01]\d|2[0-3]):[0-5]\d$/.test(value) || !isCalendarDate(value.slice(0, 10))) {
+    errors.registrationClosesAt = 'Choose a valid registration close date and time.';
+    return errors;
+  }
+  if (!isCalendarDate(form.gameDate) || !TIME_PATTERN.test(form.startTime)) return errors;
+  if (value > `${form.gameDate}T${form.startTime}`) {
+    errors.registrationClosesAt = 'Registration must close by the game start time.';
+  } else if (!original && value <= `${now.date}T${now.time}`) {
+    errors.registrationClosesAt = 'Registration close must be in the future.';
+  }
   return errors;
 }
 
@@ -268,6 +289,7 @@ export function toCreateGameInput(form: GameForm): CreateGameInput {
     gameDate: form.gameDate,
     startTime: form.startTime,
     endTime: form.endTime,
+    registrationClosesAt: form.registrationClosesAt || null,
     locationName: form.locationName.trim(),
     latitude: parseCoordinate(form.latitude),
     longitude: parseCoordinate(form.longitude),
@@ -286,6 +308,9 @@ export function diffGameInput(game: ApiGame, input: CreateGameInput): UpdateGame
   if (input.description !== current.description) changes.description = input.description;
   if (input.requiredPlayers !== current.requiredPlayers) changes.requiredPlayers = input.requiredPlayers;
   if (input.locationName !== current.locationName) changes.locationName = input.locationName;
+  if (input.registrationClosesAt !== current.registrationClosesAt) {
+    changes.registrationClosesAt = input.registrationClosesAt;
+  }
 
   if (input.latitude !== current.latitude || input.longitude !== current.longitude) {
     changes.latitude = input.latitude;
@@ -330,6 +355,11 @@ export function formatClockTime(time: string): string {
 
 export function formatGameTimeRange(startTime: string, endTime: string | null): string {
   return endTime ? `${formatClockTime(startTime)} – ${formatClockTime(endTime)}` : formatClockTime(startTime);
+}
+
+export function formatRegistrationDeadline(value: string): string {
+  const [date, time] = value.split('T');
+  return `${formatGameDay(date)} · ${formatClockTime(time)}`;
 }
 
 export function isUpcomingGame(game: Pick<ApiGame, 'status' | 'gameDate'>, today: string): boolean {

@@ -20,6 +20,11 @@ export class FriendsController {
     return this.friends.search(viewer.id, query.q ?? '');
   }
 
+  @Get('suggestions')
+  suggestions(@CurrentUser() viewer: Viewer) {
+    return this.friends.suggestions(viewer.id);
+  }
+
   @Post('requests/:username')
   send(@CurrentUser() viewer: Viewer, @Param('username') username: string) {
     return this.friends.send(viewer.id, username);

@@ -43,6 +43,10 @@
         {{ formatGameTimeRange(game.startTime, game.endTime) }}
       </p>
       <p class="game-preview__meta">
+        <ion-icon :icon="timeOutline" aria-hidden="true" />
+        Registration closes {{ game.registrationClosesAt ? formatRegistrationDeadline(game.registrationClosesAt) : 'when the game starts' }}
+      </p>
+      <p class="game-preview__meta">
         <ion-icon :icon="locationOutline" aria-hidden="true" />
         {{ game.locationName }}
       </p>
@@ -99,7 +103,7 @@ import {
 } from 'ionicons/icons';
 import SportIcon from '@/components/sports/SportIcon.vue';
 import type { ApiGame } from '@/types/game';
-import { formatGameDay, formatGameTimeRange } from '@/utils/game-form';
+import { formatGameDay, formatGameTimeRange, formatRegistrationDeadline } from '@/utils/game-form';
 import { getSportVisual } from '@/utils/sports';
 import GameStatusBadge from './GameStatusBadge.vue';
 
