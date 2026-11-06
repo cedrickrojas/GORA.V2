@@ -1020,6 +1020,7 @@ enum GameStatus {
 }
 
 enum GoraPointReason {
+  CLUB_ACCEPTED
   ACCOUNT_CREATED
   DAILY_LOGIN
   GAME_CREATED

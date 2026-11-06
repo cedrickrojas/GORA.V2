@@ -11,6 +11,7 @@ import { Prisma } from '../generated/prisma/client';
 import type { ClubMemberRole } from '../generated/prisma/client';
 import { readClubMaxMembersLimit } from '../config/env.validation';
 import { PrismaService } from '../prisma/prisma.service';
+import { GoraPointsService } from '../gora-points/gora-points.service';
 import { formatDisplayName } from '../users/display-name';
 import { AUTHOR_SELECT } from '../users/user.types';
 import { friendshipWithViewer } from '../posts/post-visibility';
@@ -131,6 +132,7 @@ export class ClubsService {
   constructor(
     private readonly prisma: PrismaService,
     config: ConfigService,
+    private readonly points: GoraPointsService,
   ) {
     this.maxMembersLimit = readClubMaxMembersLimit(
       config.get<unknown>('CLUB_MAX_MEMBERS_LIMIT'),
@@ -481,6 +483,9 @@ export class ClubsService {
           select: { id: true },
         });
 
+        // The club ID survives leaving/removal, so rejoining cannot farm points.
+        await this.points.awardInTransaction(tx, viewerId, 'CLUB_ACCEPTED', clubId, 1);
+
         if (invited) {
           await tx.clubInvite.update({
             where: { id: invite.id },
@@ -610,6 +615,8 @@ export class ClubsService {
             user: { select: AUTHOR_SELECT },
           },
         });
+
+        await this.points.awardInTransaction(tx, userId, 'CLUB_ACCEPTED', clubId, 1);
 
         return {
           user: toPerson(member.user),

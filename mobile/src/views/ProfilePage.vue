@@ -337,6 +337,8 @@ async function confirmRemoveSport(sport: UserSportEntry): Promise<void> {
 }
 
 onIonViewWillEnter(() => {
+  // Club acceptance can add points while this profile page is cached.
+  if (!profileStore.loading) void loadProfile();
   void clubsStore.load();
   void gamesStore.fetchMyGames();
 

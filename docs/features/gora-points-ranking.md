@@ -33,3 +33,20 @@ From `mobile`: `npm run test:unit -- tests/unit/gora-ranking.spec.ts`
 The API tests use temporary accounts in the configured development database and
 remove them afterward. They cover real SQL sorting, tied ranks, pagination,
 blocked/inactive/admin exclusions, private fields, input validation and fresh scores.
+
+## Club acceptance points
+
+Starting with migration `20261106110000_club_accepted_points`, a player earns
+**+1 GORA Point** on their first accepted membership in each club. Owner/admin
+approval, accepting an invitation, and automatic acceptance in an open club all
+qualify. Pending, rejected, cancelled, full-club and unauthorized requests do not.
+The automatically created club owner membership does not qualify.
+
+Membership activation and the points ledger/balance update commit in the same
+transaction. The ledger uses `CLUB_ACCEPTED` and the club ID as its unique source;
+retries, concurrent approvals, leaving, removal and rejoining cannot award twice.
+Existing memberships are not backfilled. Profile and ranking APIs read the updated
+balance.
+
+From `server`, verify with:
+`npm run test:e2e -- --runInBand --testPathPatterns=club-points`
