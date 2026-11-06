@@ -1,3 +1,4 @@
+import { getApiBaseUrl } from '@/services/api-config';
 import type {
   Club,
   ClubApiInvite,
@@ -53,6 +54,7 @@ function toPerson(person: ClubApiPerson): UserSummary {
 
 /** A server club (GET /clubs/:id) in the shape every club screen uses. */
 export function toClub(view: ClubApiView): Club {
+  const photo = (url: string | null) => url?.startsWith('/') ? new URL(url, getApiBaseUrl() || window.location.origin).href : url;
   return {
     id: view.id,
     slug: view.username,
@@ -62,8 +64,8 @@ export function toClub(view: ClubApiView): Club {
     additionalSports: view.additionalSports,
     description: view.description,
     about: view.about,
-    profileImageUrl: view.profileImageUrl,
-    coverImageUrl: view.coverImageUrl,
+    profileImageUrl: photo(view.profileImageUrl),
+    coverImageUrl: photo(view.coverImageUrl),
     country: view.location.country,
     city: view.location.city,
     barangay: view.location.barangay,

@@ -286,6 +286,16 @@ export class CreateClubDto {
   @OptionalText('About the club', CLUB_ABOUT_MAX_LENGTH)
   about?: string | null;
 
+  @IsOptional()
+  @IsString({ message: 'Choose a valid profile photo.' })
+  @MaxLength(350000, { message: 'Profile photo is too large. Choose a smaller image.' })
+  profilePhoto?: string | null;
+
+  @IsOptional()
+  @IsString({ message: 'Choose a valid cover photo.' })
+  @MaxLength(350000, { message: 'Cover photo is too large. Choose a smaller image.' })
+  coverPhoto?: string | null;
+
   @OptionalUrl('Profile photo')
   profileImageUrl?: string | null;
 
@@ -390,6 +400,16 @@ export class UpdateClubDto {
 
   @OptionalText('About the club', CLUB_ABOUT_MAX_LENGTH)
   about?: string | null;
+
+  @IsOptional()
+  @IsString({ message: 'Choose a valid profile photo.' })
+  @MaxLength(350000, { message: 'Profile photo is too large. Choose a smaller image.' })
+  profilePhoto?: string | null;
+
+  @IsOptional()
+  @IsString({ message: 'Choose a valid cover photo.' })
+  @MaxLength(350000, { message: 'Cover photo is too large. Choose a smaller image.' })
+  coverPhoto?: string | null;
 
   @OptionalUrl('Profile photo')
   profileImageUrl?: string | null;

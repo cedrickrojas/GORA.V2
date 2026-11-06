@@ -48,6 +48,7 @@
           :errors="errors"
           :sport-options="sportsStore.activeSports"
           :show-all="submitted || attemptedSteps.has(activeStep)"
+          @photos-busy="photosBusy = $event"
           suggest-username
         />
 
@@ -63,7 +64,7 @@
           <article v-for="(summary, index) in reviewSections" :key="summary.title" class="create-club__review-card">
             <div class="create-club__review-heading">
               <h3>{{ summary.title }}</h3>
-              <button type="button" :disabled="isSaving" :aria-label="`Edit ${summary.title}`" @click="goToStep(index)">
+              <button type="button" :disabled="isSaving || photosBusy" :aria-label="`Edit ${summary.title}`" @click="goToStep(index)">
                 Edit
               </button>
             </div>
@@ -81,12 +82,12 @@
           v-if="activeStep > 0"
           type="button"
           class="create-club__back"
-          :disabled="isSaving"
+          :disabled="isSaving || photosBusy"
           @click="goToStep(activeStep - 1)"
         >
           Back
         </button>
-        <button type="submit" form="create-club-form" class="create-club__submit" :disabled="isSaving">
+        <button type="submit" form="create-club-form" class="create-club__submit" :disabled="isSaving || photosBusy">
           {{ isReview ? (isSaving ? 'Creating...' : 'Create Club') : 'Next' }}
         </button>
       </div>
@@ -124,6 +125,7 @@ const sportsStore = useSportsStore();
 const form = ref<ClubForm>(emptyClubForm());
 const submitted = ref(false);
 const isSaving = ref(false);
+const photosBusy = ref(false);
 const serverError = ref<string | null>(null);
 const sportsError = ref<string | null>(null);
 const created = ref<Club | null>(null);
@@ -218,8 +220,8 @@ const reviewSections = computed(() => {
     {
       title: 'Photos & About',
       lines: optionalLines([
-        value.profileImageUrl ? `Profile photo: ${value.profileImageUrl}` : '',
-        value.coverImageUrl ? `Cover photo: ${value.coverImageUrl}` : '',
+        value.profileImageUrl ? 'Profile photo selected' : '',
+        value.coverImageUrl ? 'Cover photo selected' : '',
         value.about,
       ]),
     },
@@ -272,7 +274,7 @@ const reviewSections = computed(() => {
 });
 
 async function goToStep(index: number): Promise<void> {
-  if (isSaving.value || index < 0 || index >= CLUB_STEPS.length) return;
+  if (isSaving.value || photosBusy.value || index < 0 || index >= CLUB_STEPS.length) return;
   activeStep.value = index;
   stepMessage.value = null;
   await nextTick();
@@ -288,7 +290,7 @@ async function focusFirstError(): Promise<void> {
 }
 
 async function advance(): Promise<void> {
-  if (isSaving.value) return;
+  if (isSaving.value || photosBusy.value) return;
   serverError.value = null;
   if (isReview.value) {
     await submit();
@@ -307,7 +309,7 @@ async function submit(): Promise<void> {
   submitted.value = true;
   serverError.value = null;
 
-  if (isSaving.value) return;
+  if (isSaving.value || photosBusy.value) return;
   if (hasErrors.value) {
     const invalidStep = CLUB_STEPS.findIndex((step) => step.fields.some((field) => errors.value[field]));
     if (invalidStep >= 0) {

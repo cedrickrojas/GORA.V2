@@ -273,6 +273,7 @@ model UserFollow {
 }
 
 model Club {
+  photos ClubPhoto[]
   id                String             @id @default(uuid()) @db.Uuid
   ownerId           String             @db.Uuid
   name              String
@@ -324,6 +325,19 @@ model Club {
   @@index([isActive, isPublic])
   @@index([latitude, longitude])
   @@index([name])
+}
+
+model ClubPhoto {
+  clubId String @db.Uuid
+  kind String @db.VarChar(7)
+  revision String @db.Uuid
+  data Bytes
+  contentType String @db.VarChar(20)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  club Club @relation(fields: [clubId], references: [id], onDelete: Cascade)
+
+  @@id([clubId, kind])
 }
 
 model ClubMember {

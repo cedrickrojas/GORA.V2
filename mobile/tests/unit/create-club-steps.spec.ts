@@ -24,6 +24,7 @@ let wrapper: VueWrapper | undefined;
 const createdClub = buildMockClubs(Date.now())[0]!;
 
 beforeEach(() => {
+  setActivePinia(createPinia());
   vi.stubGlobal(
     'fetch',
     vi.fn(
@@ -160,13 +161,14 @@ describe('Create Club steps', () => {
     expect(router.currentRoute.value.path).toBe(`/clubs/${createdClub.id}`);
   });
 
-  test('blocks invalid optional photos, coordinate pairs, capacity, schedules, and contact links in their sections', async () => {
+  test('reports unsupported photos and blocks invalid coordinates, capacity, schedules, and links', async () => {
     const { page, create } = await open();
     await details(page);
-    await page.get('#club-photo').setValue('broken');
-    await next(page);
-    expect(page.text()).toContain('Profile photo must be a valid http(s) URL.');
-    await page.get('#club-photo').setValue('');
+    const picker = page.get('[aria-label="Choose club profile photo"]');
+    Object.defineProperty(picker.element, 'files', { configurable: true, value: [new File(['bad'], 'bad.svg', { type: 'image/svg+xml' })] });
+    await picker.trigger('change');
+    await flushPromises();
+    expect(page.text()).toContain('Choose a JPEG, PNG or WebP photo.');
     await next(page);
     await next(page);
     expect(page.text()).toContain('Choose a primary sport.');
@@ -231,12 +233,30 @@ describe('Create Club steps', () => {
     expect(page.find('.club-created').exists()).toBe(true);
   });
 
+  test('generates editable descriptions and preserves manual text as details change', async () => {
+    const { page } = await open();
+    await page.get('#club-name').setValue('Manila Hoops');
+    await flushPromises();
+    expect((page.get('#club-description').element as HTMLInputElement).value).toContain('Manila Hoops');
+    await page.get('#club-description').setValue('Our own description.');
+    await next(page);
+    await page.get('#club-about').setValue('Our own about text.');
+    await next(page);
+    await page.get('#club-sport').setValue(SPORT_ID);
+    await next(page);
+    await page.get('#club-city').setValue('Pasig');
+    await flushPromises();
+    await back(page); await back(page);
+    expect((page.get('#club-about').element as HTMLTextAreaElement).value).toBe('Our own about text.');
+    await back(page);
+    expect((page.get('#club-description').element as HTMLInputElement).value).toBe('Our own description.');
+  });
+
   test('keeps every section available by default in the shared Manage Club fields', () => {
     const form = emptyClubForm();
     wrapper = mount(ClubFormFields, { props: { modelValue: form, errors: validateClubForm(form), sportOptions: [] } });
     for (const id of [
       'club-name',
-      'club-photo',
       'club-sport',
       'club-city',
       'club-max',
@@ -245,5 +265,7 @@ describe('Create Club steps', () => {
     ]) {
       expect(wrapper.get(`#${id}`).isVisible()).toBe(true);
     }
+    expect(wrapper.findAll('input[type="file"]')).toHaveLength(2);
+    expect(wrapper.text()).not.toContain('Profile photo URL');
   });
 });

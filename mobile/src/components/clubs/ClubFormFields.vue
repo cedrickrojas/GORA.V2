@@ -47,6 +47,8 @@
           :maxlength="CLUB_DESCRIPTION_MAX"
           placeholder="Weekend volleyball for every level in Manila."
         />
+        <button type="button" class="club-form__generate" @click="generateText('description')">Generate description</button>
+        <p class="club-form__hint">Generated from your club details. You can edit it anytime.</p>
         <p v-if="shown('description')" class="club-form__error">{{ errors.description }}</p>
       </div>
     </section>
@@ -54,28 +56,13 @@
     <section v-if="section === 'all' || section === 'photos'" class="club-form__section">
       <h2 class="club-form__heading">Photos &amp; about</h2>
 
-      <div class="club-form__field" @focusout="touch('profileImageUrl')">
-        <label class="club-form__label" for="club-photo">Profile photo URL</label>
-        <input
-          id="club-photo"
-          v-model="form.profileImageUrl"
-          class="club-form__input"
-          inputmode="url"
-          placeholder="https://…"
-        />
-        <p v-if="shown('profileImageUrl')" class="club-form__error">{{ errors.profileImageUrl }}</p>
+      <div class="club-form__field">
+        <ClubPhotoPicker v-model="form.profileImageUrl" kind="profile" title="Profile photo" @preparing="photoState('profile', $event)" />
+        <p v-if="errors.profileImageUrl" class="club-form__error">{{ errors.profileImageUrl }}</p>
       </div>
-
-      <div class="club-form__field" @focusout="touch('coverImageUrl')">
-        <label class="club-form__label" for="club-cover">Cover photo URL</label>
-        <input
-          id="club-cover"
-          v-model="form.coverImageUrl"
-          class="club-form__input"
-          inputmode="url"
-          placeholder="https://…"
-        />
-        <p v-if="shown('coverImageUrl')" class="club-form__error">{{ errors.coverImageUrl }}</p>
+      <div class="club-form__field">
+        <ClubPhotoPicker v-model="form.coverImageUrl" kind="cover" title="Cover photo" @preparing="photoState('cover', $event)" />
+        <p v-if="errors.coverImageUrl" class="club-form__error">{{ errors.coverImageUrl }}</p>
       </div>
 
       <div class="club-form__field" @focusout="touch('about')">
@@ -88,6 +75,7 @@
           :maxlength="CLUB_ABOUT_MAX"
           placeholder="Who the club is for, how you play, what to bring…"
         />
+        <button type="button" class="club-form__generate" @click="generateText('about')">Generate about text</button>
         <p v-if="shown('about')" class="club-form__error">{{ errors.about }}</p>
       </div>
     </section>
@@ -372,6 +360,9 @@ import { computed, ref, watch } from 'vue';
 import { IonIcon } from '@ionic/vue';
 import { closeOutline } from 'ionicons/icons';
 import SegmentTabs from '@/components/common/SegmentTabs.vue';
+import ClubPhotoPicker from './ClubPhotoPicker.vue';
+import { applyGeneratedClubDescription, generateClubDescription, type ClubDescriptionDraft } from '@/utils/club-description';
+import { useAppPreferencesStore } from '@/stores/app-preferences';
 import type { ClubForm } from '@/types/club';
 import type { SportOption } from '@/types/profile';
 import {
@@ -428,6 +419,23 @@ const props = withDefaults(
   }>(),
   { section: 'all', showAll: false, suggestUsername: false, currentMembers: 0, limit: CLUB_MAX_MEMBERS_LIMIT },
 );
+
+const emit = defineEmits<{ 'photos-busy': [busy: boolean] }>();
+const preferences = useAppPreferencesStore();
+const photoPreparation = new Set<string>();
+function photoState(kind: string, busy: boolean): void {
+  if (busy) photoPreparation.add(kind); else photoPreparation.delete(kind);
+  emit('photos-busy', photoPreparation.size > 0);
+}
+let generated: ClubDescriptionDraft | null = null;
+const descriptionDraft = computed(() => generateClubDescription(form.value, props.sportOptions.find(sport => sport.id === form.value.primarySportId)?.name ?? '', preferences.language));
+watch(descriptionDraft, draft => {
+  if (form.value.name.trim().length >= 2) generated = applyGeneratedClubDescription(form.value, draft, generated);
+}, { immediate: true });
+function generateText(field: 'description' | 'about'): void {
+  form.value[field] = descriptionDraft.value[field];
+  generated = { ...(generated ?? descriptionDraft.value), [field]: descriptionDraft.value[field] };
+}
 
 const touched = ref(new Set<ClubFormField>());
 const usernameEdited = ref(!props.suggestUsername);
@@ -517,6 +525,7 @@ function removeTag(tag: string): void {
 </script>
 
 <style scoped>
+.club-form__generate { align-self: flex-start; min-height: 44px; padding: 8px 0; border: 0; background: transparent; color: var(--ion-color-primary); cursor: pointer; font: inherit; font-size: .78rem; font-weight: 700; }
 .club-form {
   display: flex;
   flex-direction: column;

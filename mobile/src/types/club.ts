@@ -147,8 +147,10 @@ export interface ClubCreateInput {
   username: string;
   description: string;
   about: string | null;
-  profileImageUrl: string | null;
-  coverImageUrl: string | null;
+  profileImageUrl?: string | null;
+  coverImageUrl?: string | null;
+  profilePhoto?: string | null;
+  coverPhoto?: string | null;
   primarySportId: string;
   additionalSportIds: string[];
   country: string | null;

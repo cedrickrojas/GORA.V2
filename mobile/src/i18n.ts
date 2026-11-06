@@ -1,6 +1,21 @@
 import type { AppLanguage } from '@/stores/app-preferences';
 
 const FILIPINO: Record<string, string> = {
+  "Profile photo": "Larawan ng profile",
+  "Cover photo": "Larawan ng cover",
+  "Upload profile photo": "Mag-upload ng larawan ng profile",
+  "Upload cover photo": "Mag-upload ng larawan ng cover",
+  "Change profile photo": "Palitan ang larawan ng profile",
+  "Change cover photo": "Palitan ang larawan ng cover",
+  "Choose club profile photo": "Pumili ng larawan ng profile ng club",
+  "Choose club cover photo": "Pumili ng larawan ng cover ng club",
+  "Preparing photo...": "Inihahanda ang larawan...",
+  "Generate description": "Gumawa ng description",
+  "Generate about text": "Gumawa ng teksto tungkol sa club",
+  "Generated from your club details. You can edit it anytime.": "Ginawa mula sa detalye ng club. Maaari mo itong i-edit anumang oras.",
+  "JPEG, PNG or WebP, up to 20 MB. Photos are resized before saving.": "JPEG, PNG o WebP, hanggang 20 MB. Inaayos ang laki ng larawan bago i-save.",
+  "Profile photo selected": "Napili na ang larawan ng profile",
+  "Cover photo selected": "Napili na ang larawan ng cover",
   'Home': 'Tahanan',
   'Search': 'Maghanap',
   'Discover': 'Tuklasin',

@@ -12,6 +12,7 @@ import type { ClubMemberRole } from '../generated/prisma/client';
 import { readClubMaxMembersLimit } from '../config/env.validation';
 import { PrismaService } from '../prisma/prisma.service';
 import { GoraPointsService } from '../gora-points/gora-points.service';
+import { ClubPhotosService } from './club-photos.service';
 import { formatDisplayName } from '../users/display-name';
 import { AUTHOR_SELECT } from '../users/user.types';
 import { friendshipWithViewer } from '../posts/post-visibility';
@@ -133,6 +134,7 @@ export class ClubsService {
     private readonly prisma: PrismaService,
     config: ConfigService,
     private readonly points: GoraPointsService,
+    private readonly photos: ClubPhotosService,
   ) {
     this.maxMembersLimit = readClubMaxMembersLimit(
       config.get<unknown>('CLUB_MAX_MEMBERS_LIMIT'),
@@ -201,6 +203,8 @@ export class ClubsService {
           },
           select: { id: true },
         });
+
+        await this.photos.apply(tx, club.id, dto);
 
         const ownerMembership = await tx.clubMember.findUnique({
           where: { clubId_userId: { clubId: club.id, userId: viewerId } },
@@ -401,6 +405,7 @@ export class ClubsService {
             },
             select: { id: true },
           });
+          await this.photos.apply(tx, clubId, dto);
         }, TRANSACTION_OPTIONS),
       ),
     );

@@ -30,10 +30,11 @@
               :sport-options="sportsStore.activeSports"
               :show-all="submitted"
               :current-members="club.memberCount"
+              @photos-busy="photosBusy = $event"
             />
             <p v-if="saveError" class="manage__alert" role="alert">{{ saveError }}</p>
             <p v-else-if="submitted && hasErrors" class="manage__alert" role="alert">Fix the highlighted fields to save.</p>
-            <button type="submit" class="manage__primary" :disabled="saving || !dirty">
+            <button type="submit" class="manage__primary" :disabled="saving || photosBusy || !dirty">
               {{ saving ? 'Saving…' : 'Save Changes' }}
             </button>
           </form>
@@ -147,6 +148,7 @@ const tab = ref<ManageTab>('REQUESTS');
 const form = ref<ClubForm>(emptyClubForm());
 const original = ref<ClubForm>(emptyClubForm());
 const submitted = ref(false);
+const photosBusy = ref(false);
 const saving = ref(false);
 const saveError = ref<string | null>(null);
 const requests = ref<ClubJoinRequest[]>([]);
@@ -248,7 +250,7 @@ async function save(): Promise<void> {
   submitted.value = true;
   saveError.value = null;
 
-  if (hasErrors.value || !club.value) {
+  if (saving.value || photosBusy.value || hasErrors.value || !club.value) {
     return;
   }
 

@@ -221,7 +221,8 @@ export function validateClubForm(form: ClubForm, context: ClubFormContext = {}):
     ['websiteUrl', 'Website'],
   ] as const) {
     const value = form[field].trim();
-    set(field, value && !isHttpUrl(value) ? `${label} must be a valid http(s) URL.` : null);
+    const uploaded = field !== 'websiteUrl' && (/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/]+={0,2}$/.test(value) && value.length <= 350000 || isStoredClubPhoto(value));
+    set(field, value && !uploaded && !isHttpUrl(value) ? field === 'websiteUrl' ? `${label} must be a valid http(s) URL.` : 'Choose a valid JPEG, PNG or WebP photo.' : null);
   }
 
   set('primarySportId', form.primarySportId ? null : 'Choose a primary sport.');
@@ -295,6 +296,19 @@ export function validateClubForm(form: ClubForm, context: ClubFormContext = {}):
 
 const optional = (value: string): string | null => value.trim() || null;
 
+export function isStoredClubPhoto(value: string): boolean {
+  try { return /^\/api\/v1\/clubs\/[0-9a-f-]{36}\/photos\/(profile|cover)\/[0-9a-f-]{36}$/.test(new URL(value, 'https://gora.local').pathname); }
+  catch { return false; }
+}
+
+function clubPhotoInput(value: string, kind: 'profile' | 'cover'): Partial<ClubCreateInput> {
+  const photo = kind === 'profile' ? 'profilePhoto' : 'coverPhoto';
+  const url = kind === 'profile' ? 'profileImageUrl' : 'coverImageUrl';
+  if (value.startsWith('data:image/')) return { [photo]: value };
+  if (isStoredClubPhoto(value)) return {};
+  return value.trim() ? { [url]: value.trim() } : { [photo]: null, [url]: null };
+}
+
 /** The request body for POST /clubs; call only when validateClubForm returned no errors. */
 export function toClubCreateInput(form: ClubForm): ClubCreateInput {
   const lat = form.latitude.trim();
@@ -305,8 +319,8 @@ export function toClubCreateInput(form: ClubForm): ClubCreateInput {
     username: normalizeClubUsername(form.username),
     description: form.description.trim(),
     about: optional(form.about),
-    profileImageUrl: optional(form.profileImageUrl),
-    coverImageUrl: optional(form.coverImageUrl),
+    ...clubPhotoInput(form.profileImageUrl, 'profile'),
+    ...clubPhotoInput(form.coverImageUrl, 'cover'),
     primarySportId: form.primarySportId,
     additionalSportIds: form.additionalSportIds.filter((id) => id !== form.primarySportId),
     country: optional(form.country),

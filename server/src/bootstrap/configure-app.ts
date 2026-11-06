@@ -12,6 +12,8 @@ export function configureApp(app: INestApplication): void {
   // Ten optimized photos fit below Vercel's 4.5 MB request limit. Other routes
   // retain Nest's default JSON limit. Photos and their post save atomically.
   app.use(`/${API_GLOBAL_PREFIX}/posts`, json({ limit: '4mb' }));
+  // Two optimized club photos (256 KiB each), saved atomically with club details.
+  app.use(`/${API_GLOBAL_PREFIX}/clubs`, json({ limit: '1mb' }));
   app.use(`/${API_GLOBAL_PREFIX}/profiles/me/cover`, json({ limit: '400kb' }));
   app.use(`/${API_GLOBAL_PREFIX}/profiles/me/photo`, json({ limit: '400kb' }));
   app.use(`/${API_GLOBAL_PREFIX}/chat/direct`, json({ limit: '2mb' }));
