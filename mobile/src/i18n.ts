@@ -1,6 +1,10 @@
 import type { AppLanguage } from '@/stores/app-preferences';
 
 const FILIPINO: Record<string, string> = {
+  "Suggested club rules": "Mga mungkahing patakaran ng club",
+  "Suggested club tags": "Mga mungkahing tag ng club",
+  "Tap a suggestion to add it. You can edit the wording below.": "I-tap ang mungkahi para idagdag. Maaari mong i-edit ang teksto sa ibaba.",
+  "Tap tags that describe your club, or add your own.": "I-tap ang mga tag na angkop sa club, o magdagdag ng sarili mong tag.",
   "Profile photo": "Larawan ng profile",
   "Cover photo": "Larawan ng cover",
   "Upload profile photo": "Mag-upload ng larawan ng profile",

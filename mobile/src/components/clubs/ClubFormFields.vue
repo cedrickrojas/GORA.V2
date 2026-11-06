@@ -242,6 +242,22 @@
     <!-- Rules -->
     <section v-if="section === 'all' || section === 'rules'" class="club-form__section">
       <h2 class="club-form__heading">Club rules</h2>
+      <p class="club-form__hint">Tap a suggestion to add it. You can edit the wording below.</p>
+      <div class="club-form__chips" role="group" aria-label="Suggested club rules">
+        <button
+          v-for="rule in RULE_SUGGESTIONS"
+          :key="rule.en"
+          type="button"
+          class="club-form__chip club-form__suggestion"
+          :class="{ 'club-form__chip--on': hasSuggestedRule(rule) }"
+          :aria-pressed="hasSuggestedRule(rule)"
+          :disabled="hasSuggestedRule(rule) || !canAddSuggestedRule"
+          @click="addSuggestedRule(rule)"
+        >
+          {{ preferences.language === 'fil' ? rule.fil : rule.en }}
+          <ion-icon v-if="hasSuggestedRule(rule)" :icon="checkmarkOutline" aria-hidden="true" />
+        </button>
+      </div>
       <ol v-if="form.rules.length" class="club-form__rules">
         <li v-for="(_, index) in form.rules" :key="index" class="club-form__rule">
           <span class="club-form__rule-number">{{ index + 1 }}.</span>
@@ -276,6 +292,22 @@
     <!-- Tags -->
     <section v-if="section === 'all' || section === 'rules'" class="club-form__section">
       <h2 class="club-form__heading">Tags</h2>
+      <p class="club-form__hint">Tap tags that describe your club, or add your own.</p>
+      <div class="club-form__chips" role="group" aria-label="Suggested club tags">
+        <button
+          v-for="tag in suggestedTags"
+          :key="tag"
+          type="button"
+          class="club-form__chip club-form__suggestion"
+          :class="{ 'club-form__chip--on': form.tags.includes(tag) }"
+          :aria-pressed="form.tags.includes(tag)"
+          :disabled="form.tags.includes(tag) || form.tags.length >= CLUB_TAGS_MAX"
+          @click="addSuggestedTag(tag)"
+        >
+          #{{ tag }}
+          <ion-icon v-if="form.tags.includes(tag)" :icon="checkmarkOutline" aria-hidden="true" />
+        </button>
+      </div>
       <div class="club-form__tag-entry">
         <input
           v-model="tagDraft"
@@ -358,7 +390,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import { IonIcon } from '@ionic/vue';
-import { closeOutline } from 'ionicons/icons';
+import { checkmarkOutline, closeOutline } from 'ionicons/icons';
 import SegmentTabs from '@/components/common/SegmentTabs.vue';
 import ClubPhotoPicker from './ClubPhotoPicker.vue';
 import { applyGeneratedClubDescription, generateClubDescription, type ClubDescriptionDraft } from '@/utils/club-description';
@@ -492,6 +524,38 @@ function toggleAdditional(sportId: string): void {
   }
 }
 
+const RULE_SUGGESTIONS = [
+  { en: 'Be on time', fil: 'Dumating sa tamang oras' },
+  { en: 'Respect every member', fil: 'Igalang ang bawat miyembro' },
+  { en: 'Play fair and show good sportsmanship', fil: 'Maglaro nang patas at may respeto' },
+  { en: 'Keep the venue clean', fil: 'Panatilihing malinis ang lugar' },
+  { en: 'Let the club know if you cannot attend', fil: 'Ipaalam sa club kung hindi makakadalo' },
+  { en: 'Put safety first', fil: 'Unahin ang kaligtasan' },
+] as const;
+type RuleSuggestion = (typeof RULE_SUGGESTIONS)[number];
+const normalizedRule = (value: string) => value.trim().replace(/\s+/g, ' ').replace(/[.!]+$/, '').toLowerCase();
+const canAddSuggestedRule = computed(() => form.value.rules.length < CLUB_RULES_MAX || form.value.rules.some(rule => !rule.trim()));
+function hasSuggestedRule(suggestion: RuleSuggestion): boolean {
+  return form.value.rules.some(rule => normalizedRule(rule) === normalizedRule(suggestion.en) || normalizedRule(rule) === normalizedRule(suggestion.fil));
+}
+function addSuggestedRule(suggestion: RuleSuggestion): void {
+  if (hasSuggestedRule(suggestion) || !canAddSuggestedRule.value) return;
+  const text = preferences.language === 'fil' ? suggestion.fil : suggestion.en;
+  const blank = form.value.rules.findIndex(rule => !rule.trim());
+  if (blank >= 0) form.value.rules = form.value.rules.map((rule, index) => index === blank ? text : rule);
+  else form.value.rules = [...form.value.rules, text];
+}
+const suggestedTags = computed(() => {
+  const sport = props.sportOptions.find(option => option.id === form.value.primarySportId)?.name ?? '';
+  const values = [sport, form.value.city, 'weekendgames', 'friendlygames', 'training', 'casualgames', 'competitive', 'sportscommunity'];
+  return [...new Set(values.map(value => normalizeClubTag(value).slice(0, 30)).filter(value => value.length >= 2))];
+});
+function addSuggestedTag(tag: string): void {
+  if (form.value.tags.includes(tag) || form.value.tags.length >= CLUB_TAGS_MAX) return;
+  form.value.tags = [...form.value.tags, tag];
+  tagMessage.value = null;
+}
+
 function removeRule(index: number): void {
   form.value.rules = form.value.rules.filter((_, position) => position !== index);
 }
@@ -520,11 +584,17 @@ function addTag(): void {
 }
 
 function removeTag(tag: string): void {
+  tagMessage.value = null;
   form.value.tags = form.value.tags.filter((candidate) => candidate !== tag);
 }
 </script>
 
 <style scoped>
+.club-form__suggestion { display: inline-flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 44px; max-width: 100%; border-radius: 8px; line-height: 1.4; text-align: left; white-space: normal; }
+.club-form__suggestion:disabled { cursor: default; }
+.club-form__suggestion:disabled:not(.club-form__chip--on) { opacity: .45; }
+.club-form__suggestion ion-icon { flex-shrink: 0; font-size: 16px; }
+
 .club-form__generate { align-self: flex-start; min-height: 44px; padding: 8px 0; border: 0; background: transparent; color: var(--ion-color-primary); cursor: pointer; font: inherit; font-size: .78rem; font-weight: 700; }
 .club-form {
   display: flex;
