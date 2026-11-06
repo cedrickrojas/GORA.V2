@@ -65,7 +65,7 @@ export const ACTIVITY_DAY_LABELS: Record<ClubActivityDay, string> = {
 };
 
 export type ClubFormSection =
-  'identity' | 'photos' | 'sports' | 'location' | 'membership' | 'rules' | 'schedule' | 'contact';
+  'identity' | 'photos' | 'sports' | 'location' | 'membership' | 'rules' | 'schedule';
 
 export type ClubFormField = keyof ClubForm | 'location';
 export type ClubFormErrors = Partial<Record<ClubFormField, string>>;

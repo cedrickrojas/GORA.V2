@@ -184,12 +184,6 @@ const CLUB_STEPS: readonly {
     section: 'schedule',
     fields: ['activityDay', 'activityStartTime', 'activityEndTime', 'trainingSchedule'],
   },
-  {
-    title: 'Contact',
-    hint: 'Add optional contact details and social links.',
-    section: 'contact',
-    fields: ['contactEmail', 'websiteUrl', 'facebookUrl', 'instagramUrl', 'tiktokUrl'],
-  },
   { title: 'Review', hint: 'Check your club before creating it. You can edit any section.', fields: [] },
 ];
 const currentStep = computed(() => CLUB_STEPS[activeStep.value]);
@@ -258,16 +252,6 @@ const reviewSections = computed(() => {
         value.activityDay ? ACTIVITY_DAY_LABELS[value.activityDay] : '',
         [value.activityStartTime, value.activityEndTime].filter(Boolean).join(' - '),
         value.trainingSchedule,
-      ]),
-    },
-    {
-      title: 'Contact',
-      lines: optionalLines([
-        value.contactEmail,
-        value.websiteUrl,
-        value.facebookUrl,
-        value.instagramUrl,
-        value.tiktokUrl,
       ]),
     },
   ];

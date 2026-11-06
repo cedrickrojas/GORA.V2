@@ -233,7 +233,7 @@
           {{
             form.isPublic
               ? 'Anyone can see the club and its posts.'
-              : 'Only members see posts, rules, schedule, and contact links.'
+              : 'Only members see posts, rules, and schedule.'
           }}
         </p>
       </div>
@@ -368,22 +368,6 @@
       <p class="club-form__hint">For information only. Games are still created separately.</p>
     </section>
 
-    <!-- Contact -->
-    <section v-if="section === 'all' || section === 'contact'" class="club-form__section">
-      <h2 class="club-form__heading">Contact</h2>
-      <div v-for="field in CONTACT_FIELDS" :key="field.key" class="club-form__field" @focusout="touch(field.key)">
-        <label class="club-form__label" :for="`club-${field.key}`">{{ field.label }}</label>
-        <input
-          :id="`club-${field.key}`"
-          v-model="form[field.key]"
-          class="club-form__input"
-          :inputmode="field.key === 'contactEmail' ? 'email' : 'url'"
-          :placeholder="field.placeholder"
-        />
-        <p v-if="shown(field.key)" class="club-form__error">{{ errors[field.key] }}</p>
-      </div>
-      <p class="club-form__hint">The email is shown to active members only.</p>
-    </section>
   </div>
 </template>
 
@@ -419,19 +403,10 @@ import {
 } from '@/utils/club-form';
 
 type Privacy = 'PUBLIC' | 'PRIVATE';
-type ContactKey = 'contactEmail' | 'websiteUrl' | 'facebookUrl' | 'instagramUrl' | 'tiktokUrl';
 
 const PRIVACY_OPTIONS: { id: Privacy; label: string }[] = [
   { id: 'PUBLIC', label: 'Public' },
   { id: 'PRIVATE', label: 'Private' },
-];
-
-const CONTACT_FIELDS: { key: ContactKey; label: string; placeholder: string }[] = [
-  { key: 'contactEmail', label: 'Email', placeholder: 'club@example.com' },
-  { key: 'websiteUrl', label: 'Website', placeholder: 'https://…' },
-  { key: 'facebookUrl', label: 'Facebook', placeholder: 'https://facebook.com/yourclub' },
-  { key: 'instagramUrl', label: 'Instagram', placeholder: 'https://instagram.com/yourclub' },
-  { key: 'tiktokUrl', label: 'TikTok', placeholder: 'https://tiktok.com/@yourclub' },
 ];
 
 const form = defineModel<ClubForm>({ required: true });

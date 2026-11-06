@@ -82,7 +82,7 @@ async function location(page: VueWrapper) {
 }
 async function review(page: VueWrapper) {
   await location(page);
-  for (let step = 3; step < 8; step++) await next(page);
+  for (let step = 3; step < 7; step++) await next(page);
 }
 
 describe('Create Club steps', () => {
@@ -128,15 +128,13 @@ describe('Create Club steps', () => {
     await page.get('#club-start').setValue('17:00');
     await page.get('#club-end').setValue('19:00');
     await next(page);
-    await page.get('#club-contactEmail').setValue('club@example.com');
-    await next(page);
     expect(page.get('.create-club__step-title').text()).toBe('Review');
     expect(page.get('.create-club__review').text()).toContain('Beginners are welcome.');
     expect(create).not.toHaveBeenCalled();
     await page.get('[aria-label="Edit Club Details"]').trigger('click');
     await page.get('#club-name').setValue('Saturday Basketball');
     expect((page.get('#club-username').element as HTMLInputElement).value).toBe('our-court');
-    for (let step = 0; step < 8; step++) await next(page);
+    for (let step = 0; step < 7; step++) await next(page);
     await next(page);
     expect(create).toHaveBeenCalledExactlyOnceWith(
       expect.objectContaining({
@@ -152,7 +150,6 @@ describe('Create Club steps', () => {
         tags: ['weekend'],
         activityStartTime: '17:00',
         activityEndTime: '19:00',
-        contactEmail: 'club@example.com',
       }),
     );
     expect(page.find('.create-club__actions').exists()).toBe(false);
@@ -161,7 +158,7 @@ describe('Create Club steps', () => {
     expect(router.currentRoute.value.path).toBe(`/clubs/${createdClub.id}`);
   });
 
-  test('reports unsupported photos and blocks invalid coordinates, capacity, schedules, and links', async () => {
+  test('reports unsupported photos and blocks invalid coordinates, capacity, and schedules', async () => {
     const { page, create } = await open();
     await details(page);
     const picker = page.get('[aria-label="Choose club profile photo"]');
@@ -191,9 +188,10 @@ describe('Create Club steps', () => {
     expect(page.text()).toContain('End time must be after the start time.');
     await page.get('#club-end').setValue('20:00');
     await next(page);
-    await page.get('#club-contactEmail').setValue('bad');
-    await next(page);
-    expect(page.text()).toContain('Contact email must be a valid email address.');
+    expect(page.get('.create-club__step-title').text()).toBe('Review');
+    expect(page.get('.create-club__step-count').text()).toBe('Step 8 of 8');
+    expect(page.find('[aria-label="Edit Contact"]').exists()).toBe(false);
+    expect(page.find('#club-contactEmail').exists()).toBe(false);
     expect(create).not.toHaveBeenCalled();
   });
 
@@ -206,7 +204,7 @@ describe('Create Club steps', () => {
     expect(page.get('.create-club__step-title').text()).toBe('Review');
     await page.get('[aria-label="Edit Club Details"]').trigger('click');
     await page.get('#club-username').setValue('new-court');
-    for (let step = 0; step < 8; step++) await next(page);
+    for (let step = 0; step < 7; step++) await next(page);
     await next(page);
     expect(create).toHaveBeenCalledTimes(2);
     expect(create).toHaveBeenLastCalledWith(expect.objectContaining({ username: 'new-court' }));
@@ -261,10 +259,11 @@ describe('Create Club steps', () => {
       'club-city',
       'club-max',
       'club-start',
-      'club-contactEmail',
     ]) {
       expect(wrapper.get(`#${id}`).isVisible()).toBe(true);
     }
+    expect(wrapper.find('#club-contactEmail').exists()).toBe(false);
+    expect(wrapper.find('#club-websiteUrl').exists()).toBe(false);
     expect(wrapper.findAll('input[type="file"]')).toHaveLength(2);
     expect(wrapper.text()).not.toContain('Profile photo URL');
   });
