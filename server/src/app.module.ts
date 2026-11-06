@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { AdminModule } from './admin/admin.module';
+import { GoraPointsModule } from './gora-points/gora-points.module';
 import { AuthModule } from './auth/auth.module';
 import { ClubsModule } from './clubs/clubs.module';
 import { AppConfigModule } from './config/app-config.module';
@@ -21,6 +22,7 @@ import { CloudMediaModule } from './common/media/cloud-media.module';
 @Module({
   imports: [
     AdminModule,
+    GoraPointsModule,
     AppConfigModule,
     PrismaModule,
     HealthModule,

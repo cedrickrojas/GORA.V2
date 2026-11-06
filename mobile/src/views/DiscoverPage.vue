@@ -68,6 +68,8 @@
         </template>
 
         <template v-else>
+          <GoraPointsRanking />
+
           <section class="discover__section">
             <SectionHeader title="Popular Players" />
             <ul class="discover__rail">
@@ -180,6 +182,7 @@ import SectionHeader from '@/components/common/SectionHeader.vue';
 import SegmentTabs from '@/components/common/SegmentTabs.vue';
 import UserAvatar from '@/components/common/UserAvatar.vue';
 import NearbyGamesSection from '@/components/discover/NearbyGamesSection.vue';
+import GoraPointsRanking from '@/components/discover/GoraPointsRanking.vue';
 import SportTile from '@/components/discover/SportTile.vue';
 import FeedEntry from '@/components/feed/FeedEntry.vue';
 import PostCard from '@/components/feed/PostCard.vue';
@@ -196,6 +199,7 @@ import { useFiltersStore } from '@/stores/filters';
 import { useFollowsStore } from '@/stores/follows';
 import { useFriendsStore } from '@/stores/friends';
 import { useGamesStore } from '@/stores/games';
+import { useGoraRankingStore } from '@/stores/gora-ranking';
 import { usePostsStore } from '@/stores/posts';
 import { useReelsStore } from '@/stores/reels';
 import { useSessionStore } from '@/stores/session';
@@ -220,6 +224,7 @@ const clubsStore = useClubsStore();
 const friendsStore = useFriendsStore();
 const followsStore = useFollowsStore();
 const filters = useFiltersStore();
+const ranking = useGoraRankingStore();
 const { joinGame } = useJoinGame();
 const { likePost, commentOnPost, sharePost } = usePostActions();
 const now = useNow();
@@ -319,6 +324,7 @@ onIonViewWillEnter(() => {
 async function loadDiscoverData(): Promise<void> {
   await session.load();
   await Promise.all([
+    ranking.load(),
     catalog.load(),
     gamesStore.load(),
     reelsStore.load(),
@@ -333,6 +339,7 @@ async function refreshDiscoverData(): Promise<void> {
   if (!discoverDataLoaded) return;
   await session.load();
   await Promise.all([
+    ranking.load(true),
     catalog.refreshSports(),
     gamesStore.refreshFeedGames(),
     reelsStore.refresh(),
