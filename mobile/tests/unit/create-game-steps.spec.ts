@@ -5,11 +5,15 @@ import { createMemoryHistory, createRouter } from 'vue-router';
 import { useAuthStore } from '@/stores/auth';
 import { useClubsStore } from '@/stores/clubs';
 import type { ApiGame } from '@/types/game';
+import GameDateField from '@/components/games/GameDateField.vue';
 import CreateGamePage from '@/views/CreateGamePage.vue';
 
 vi.mock('@ionic/vue', async () => {
   const { onMounted } = await import('vue');
   return {
+    IonIcon: { template: '<span />' },
+    IonModal: { props: ['isOpen'], template: '<div v-if="isOpen"><slot /></div>' },
+    IonDatetime: { name: 'IonDatetime', props: ['value', 'min', 'max'], template: '<div />' },
     IonPage: { template: '<div><slot /></div>' },
     IonContent: { template: '<main><slot /></main>' },
     IonFooter: { template: '<footer><slot /></footer>' },
@@ -113,11 +117,17 @@ async function details(page: VueWrapper) {
   await page.get('#game-description').setValue('Friendly games');
   await next(page);
 }
+async function chooseDate(page: VueWrapper, date: string) {
+  const field = page.getComponent(GameDateField);
+  await field.get('button').trigger('click');
+  field.getComponent({ name: 'IonDatetime' }).vm.$emit('ionChange', { detail: { value: date } });
+  await flushPromises();
+}
 async function toLocation(page: VueWrapper) {
   await details(page);
   await page.get('#game-players').setValue(8);
   await next(page);
-  await page.get('#game-date').setValue('2026-11-02');
+  await chooseDate(page, '2026-11-02');
   await page.get('#game-start').setValue('18:00');
   await page.get('#game-end').setValue('20:00');
   await next(page);
@@ -155,7 +165,7 @@ describe('Create Game steps', () => {
     await page.get('#game-players').setValue(8);
     await page.get('#game-acceptance').setValue('true');
     await next(page);
-    await page.get('#game-date').setValue('2026-11-02');
+    await chooseDate(page, '2026-11-02');
     await page.get('#game-start').setValue('18:00');
     await page.get('#game-end').setValue('20:00');
     await next(page);
@@ -179,6 +189,7 @@ describe('Create Game steps', () => {
       autoAccept: true,
       requiredPlayers: 8,
       gameDate: '2026-11-02',
+      registrationClosesAt: null,
       startTime: '18:00',
       endTime: '20:00',
       locationName: 'BGC Court',
@@ -196,7 +207,7 @@ describe('Create Game steps', () => {
     await details(page);
     await page.get('#game-players').setValue(8);
     await next(page);
-    await page.get('#game-date').setValue('2026-11-02');
+    await chooseDate(page, '2026-11-02');
     await page.get('#game-start').setValue('18:00');
     await page.get('#game-end').setValue('17:00');
     await next(page);

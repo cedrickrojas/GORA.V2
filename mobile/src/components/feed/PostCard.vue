@@ -746,4 +746,8 @@ const hiddenMediaCount = computed(() => availableMedia.value.length - visibleMed
   clip: rect(0 0 0 0);
   white-space: nowrap;
 }
+.post-card__photo video {
+  object-fit: contain;
+  background: #000;
+}
 </style>

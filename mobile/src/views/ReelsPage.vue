@@ -47,6 +47,7 @@
             v-for="reel in visibleReels"
             :key="reel.id"
             :reel="reel"
+            :enabled="pageActive"
             :data-reel-id="reel.id"
             :is-following="followsStore.isFollowing(reel.author.id)"
             :can-follow="canFollow(session.me?.id ?? null, reel.author.id)"
@@ -64,7 +65,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { IonContent, IonIcon, IonPage, onIonViewWillEnter } from '@ionic/vue';
+import { IonContent, IonIcon, IonPage, onIonViewWillEnter, onIonViewWillLeave } from '@ionic/vue';
 import { peopleOutline, radioOutline } from 'ionicons/icons';
 import ReelSlide from '@/components/reels/ReelSlide.vue';
 import ReelCommentsModal from '@/components/reels/ReelCommentsModal.vue';
@@ -87,6 +88,9 @@ const router = useRouter();
 const route = useRoute();
 const followsStore = useFollowsStore();
 const session = useSessionStore();
+
+const pageActive = ref(true);
+onIonViewWillLeave(() => { pageActive.value = false; });
 
 const activeTab = ref<ReelsTab>(DEFAULT_REELS_TAB);
 const commentsOpen = ref(false);
@@ -132,6 +136,7 @@ onMounted(async () => {
   snapshotFollowing();
 });
 onIonViewWillEnter(() => {
+  pageActive.value = true;
   if (reelsStore.isLoaded) void reelsStore.refresh();
 });
 async function likeReel(id: string): Promise<void> {

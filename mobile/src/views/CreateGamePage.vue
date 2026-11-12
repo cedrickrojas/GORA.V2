@@ -1,8 +1,8 @@
 <template>
-  <ion-page>
+  <ion-page class="create-game-page">
     <SubPageHeader :title="pageTitle" :back-href="editId ? `/games/${editId}` : '/create'" />
 
-    <ion-content ref="contentRef">
+    <ion-content ref="contentRef" class="create-game__content" :scroll-y="true">
       <section v-if="created" class="game-created" aria-live="polite">
         <p class="game-created__badge">GAME CREATED!</p>
         <p class="game-created__note">
@@ -129,7 +129,7 @@
         <section v-if="activeStep === 2" class="create-game__step" :aria-label="currentStep.title">
           <div class="create-game__field" @focusout="touch('gameDate')">
             <label class="create-game__label" for="game-date">Date *</label>
-            <input id="game-date" v-model="form.gameDate" type="date" class="create-game__input" :min="today" />
+            <GameDateField id="game-date" v-model="form.gameDate" :min="today" :max="latestGameDate" />
             <p v-if="shown('gameDate')" class="create-game__error">{{ errors.gameDate }}</p>
           </div>
 
@@ -293,6 +293,7 @@
 import { computed, nextTick, onMounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { IonContent, IonFooter, IonPage, onIonViewDidLeave, onIonViewWillEnter } from '@ionic/vue';
+import GameDateField from '@/components/games/GameDateField.vue';
 import GamePreviewCard from '@/components/games/GamePreviewCard.vue';
 import LocationPickerModal from '@/components/feed/LocationPickerModal.vue';
 import SubPageHeader from '@/components/layout/SubPageHeader.vue';
@@ -308,6 +309,8 @@ import {
   GAME_LOCATION_MAX,
   GAME_PLAYERS_MAX,
   GAME_TITLE_MAX,
+  GAME_MAX_DAYS_AHEAD,
+  addDays,
   type GameForm,
   type GameFormField,
   deviceMoment,
@@ -337,6 +340,7 @@ const sportsError = ref<string | null>(null);
 const created = ref<ApiGame | null>(null);
 const validationMoment = ref(deviceMoment());
 const today = computed(() => validationMoment.value.date);
+const latestGameDate = computed(() => addDays(today.value, GAME_MAX_DAYS_AHEAD));
 const activeStep = ref(0);
 const stepMessage = ref<string | null>(null);
 const formRef = ref<HTMLFormElement | null>(null);
@@ -552,6 +556,16 @@ onMounted(() => {
 </script>
 
 <style scoped>
+.create-game__content {
+  flex: 1 1 0;
+  min-height: 0;
+}
+.create-game__content::part(scroll) {
+  overscroll-behavior-y: contain;
+  touch-action: pan-y;
+}
+.create-game-page > ion-footer { flex-shrink: 0; }
+
 .create-game {
   display: flex;
   flex-direction: column;
@@ -687,6 +701,8 @@ onMounted(() => {
 
 .create-game__input {
   width: 100%;
+  min-width: 0;
+  min-height: 48px;
   padding: 11px 12px;
   border: 1px solid var(--gora-line-strong);
   border-radius: 12px;

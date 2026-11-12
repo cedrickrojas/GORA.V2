@@ -368,7 +368,13 @@ export const useReelsStore = defineStore('reels', () => {
     const pending = likingReelIds.value;
     pending.add(reelId);
     try {
-      replaceReel(await authorized((token) => setReelLike(token, reelId, !reel.likedByViewer)));
+      const updated = await authorized((token) => setReelLike(token, reelId, !reel.likedByViewer));
+      // Preserve the current playback URL and position when a reaction changes.
+      const current = feedReels.value.find((candidate) => candidate.id === reelId);
+      if (current) {
+        current.likedByViewer = updated.likedByViewer;
+        current.likes = updated.likeCount;
+      }
       return null;
     } catch (caught) {
       return describeContentError(caught, REEL_UNAVAILABLE_MESSAGE);

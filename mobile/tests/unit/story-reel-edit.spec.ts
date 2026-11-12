@@ -293,17 +293,19 @@ describe('reels stored in the database', () => {
 
   test('signed-in feeds contain saved media, and reel reactions use the API', async () => {
     const calls = fakeApi({
-      [`PUT /reels/${MY_REEL}/like`]: () => jsonResponse(200, apiReel({ likedByViewer: true, likeCount: 4 })),
+      [`PUT /reels/${MY_REEL}/like`]: () => jsonResponse(200, apiReel({ likedByViewer: true, likeCount: 4, videoUrl: 'https://cdn.example.test/reel.mp4?renewed=1' })),
     });
     const reels = useReelsStore();
     const stories = useStoriesStore();
     await Promise.all([reels.load(), stories.load()]);
-    expect(reels.reels.length).toBeGreaterThan(0);
+    expect(reels.feedReels.length).toBeGreaterThan(0);
     expect(reels.feedReels.every((item) => item.fromServer)).toBe(true);
     const rail = stories.getFeedAt(Date.now());
     expect(rail.others.every((group) => group.stories.every((item) => item.fromServer))).toBe(true);
     expect(await reels.toggleLike(MY_REEL)).toBeNull();
     expect(reels.myReels[0].likedByViewer).toBe(true);
+    expect(reels.myReels[0].likes).toBe(4);
+    expect(reels.myReels[0].videoUrl).toBe('https://cdn.example.test/reel.mp4');
     expect(calls).toContainEqual({ method: 'PUT', path: `/reels/${MY_REEL}/like`, body: undefined });
   });
 
