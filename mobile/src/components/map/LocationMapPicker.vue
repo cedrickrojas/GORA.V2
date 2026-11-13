@@ -1,6 +1,8 @@
 <template>
   <div class="location-map-picker">
-    <p class="location-map-picker__hint">Tap the map or drag the pin to choose a location.</p>
+    <p class="location-map-picker__hint">
+      {{ point ? 'Tap the map or drag the pin to change the location.' : 'Tap the map, or move it and choose Use map center.' }}
+    </p>
     <GoogleLocationMapPicker
       v-if="provider.id === 'google'"
       :center="center"
@@ -8,7 +10,10 @@
       @select="emit('select', $event)"
     />
     <template v-else>
-      <div ref="container" class="location-map-picker__canvas" aria-label="Choose a location on the map" />
+      <div class="location-map-picker__frame">
+        <div ref="container" class="location-map-picker__canvas" aria-label="Choose a location on the map" />
+        <span v-if="!point" class="location-map-picker__crosshair" aria-hidden="true" />
+      </div>
       <p v-if="tilesUnavailable" class="location-map-picker__error" role="status">
         Street tiles could not load. Check your connection or choose a place from the list.
       </p>
@@ -152,6 +157,23 @@ onBeforeUnmount(() => {
   background: #dce2df;
   color: #202322;
   touch-action: none;
+}
+.location-map-picker__frame {
+  position: relative;
+}
+.location-map-picker__crosshair {
+  position: absolute;
+  z-index: 500;
+  top: 50%;
+  left: 50%;
+  width: 20px;
+  height: 20px;
+  border: 3px solid #fff;
+  border-radius: 50%;
+  background: var(--ion-color-primary);
+  box-shadow: 0 0 0 2px var(--ion-color-primary), 0 2px 6px #0006;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
 }
 .location-map-picker__canvas:focus-visible {
   outline: 2px solid var(--ion-color-primary);

@@ -1,3 +1,5 @@
+import { Capacitor } from '@capacitor/core';
+import { Geolocation as NativeGeolocation } from '@capacitor/geolocation';
 import { isValidPoint, type MapPoint } from '@/utils/location-map';
 
 /**
@@ -37,7 +39,7 @@ function roundCoordinate(value: number, decimals = COORDINATE_DECIMALS): number 
 }
 
 export function isLocationAvailable(): boolean {
-  return geolocation() !== null;
+  return Capacitor.isNativePlatform() || geolocation() !== null;
 }
 
 /**
@@ -45,6 +47,15 @@ export function isLocationAvailable(): boolean {
  * "prompt", so the app waits for the user to tap before asking.
  */
 export async function checkPermission(): Promise<LocationPermissionState> {
+  if (Capacitor.isNativePlatform()) {
+    try {
+      const status = await NativeGeolocation.checkPermissions();
+      if (status.location === 'granted' || status.coarseLocation === 'granted') return 'granted';
+      return status.location === 'denied' ? 'denied' : 'prompt';
+    } catch {
+      return 'unsupported';
+    }
+  }
   if (!isLocationAvailable()) {
     return 'unsupported';
   }
@@ -62,9 +73,10 @@ export function getCurrentLocation(
   timeoutMs = LOCATION_TIMEOUT_MS,
   options: { precise?: boolean } = {},
 ): Promise<LocationResult> {
+  const native = Capacitor.isNativePlatform();
   const provider = geolocation();
 
-  if (!provider) {
+  if (!native && !provider) {
     return Promise.resolve({ ok: false, reason: 'UNSUPPORTED' });
   }
 
@@ -78,21 +90,49 @@ export function getCurrentLocation(
     };
     // Some browsers leave a permission prompt pending beyond their native timeout.
     const deadline = setTimeout(() => finish({ ok: false, reason: 'TIMEOUT' }), timeoutMs);
+    const acceptPosition = (position: { coords: { latitude: number; longitude: number } }) => {
+      const point = {
+        latitude: roundCoordinate(position.coords.latitude, options.precise ? 6 : COORDINATE_DECIMALS),
+        longitude: roundCoordinate(position.coords.longitude, options.precise ? 6 : COORDINATE_DECIMALS),
+      };
+      finish(isValidPoint(point) ? { ok: true, point } : { ok: false, reason: 'UNAVAILABLE' });
+    };
+    const positionOptions = {
+      enableHighAccuracy: options.precise === true,
+      timeout: timeoutMs,
+      maximumAge: options.precise ? 0 : 5 * 60_000,
+    };
+    if (native) {
+      void (async () => {
+        try {
+          let status = await NativeGeolocation.checkPermissions();
+          if (settled) return;
+          if (status.location !== 'granted' && status.coarseLocation !== 'granted') {
+            status = await NativeGeolocation.requestPermissions({
+              permissions: [options.precise ? 'location' : 'coarseLocation'],
+            });
+          }
+          if (settled) return;
+          if (status.location !== 'granted' && status.coarseLocation !== 'granted') {
+            finish({ ok: false, reason: 'DENIED' });
+            return;
+          }
+          acceptPosition(await NativeGeolocation.getCurrentPosition(positionOptions));
+        } catch (error) {
+          const code = (error as { code?: string } | null)?.code;
+          const reason = code === 'OS-PLUG-GLOC-0003' || code === 'OS-PLUG-GLOC-0008'
+            ? 'DENIED'
+            : code === 'OS-PLUG-GLOC-0010' ? 'TIMEOUT' : 'UNAVAILABLE';
+          finish({ ok: false, reason });
+        }
+      })();
+      return;
+    }
     try {
-      provider.getCurrentPosition(
-        (position) => {
-          const point = {
-            latitude: roundCoordinate(position.coords.latitude, options.precise ? 6 : COORDINATE_DECIMALS),
-            longitude: roundCoordinate(position.coords.longitude, options.precise ? 6 : COORDINATE_DECIMALS),
-          };
-          finish(isValidPoint(point) ? { ok: true, point } : { ok: false, reason: 'UNAVAILABLE' });
-        },
+      provider!.getCurrentPosition(
+        acceptPosition,
         (error) => finish({ ok: false, reason: POSITION_ERROR_REASONS[error.code] ?? 'UNAVAILABLE' }),
-        {
-          enableHighAccuracy: options.precise === true,
-          timeout: timeoutMs,
-          maximumAge: options.precise ? 0 : 5 * 60_000,
-        },
+        positionOptions,
       );
     } catch {
       finish({ ok: false, reason: 'UNAVAILABLE' });

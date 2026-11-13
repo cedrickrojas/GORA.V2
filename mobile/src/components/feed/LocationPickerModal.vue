@@ -3,12 +3,13 @@
     :is-open="isOpen"
     :initial-breakpoint="0.75"
     :breakpoints="[0, 0.75, 1]"
+    :expand-to-scroll="false"
     class="location-picker-modal"
     @will-dismiss="cancelLocating"
     @did-dismiss="emit('close')"
   >
     <ion-content class="location-picker-content">
-      <form class="location-picker" @submit.prevent="confirm">
+      <form :id="formId" class="location-picker" @submit.prevent="confirm">
         <div class="location-picker__heading">
           <h2 class="location-picker__title"><ion-icon :icon="locationOutline" aria-hidden="true" /> Add location</h2>
           <button type="button" class="location-picker__cancel" @click="close">Cancel</button>
@@ -32,7 +33,7 @@
         </div>
         <p v-if="error" class="location-picker__error" role="alert">{{ error }}</p>
         <p v-if="isLocating" class="location-picker__status" role="status">
-          Allow location access if your browser asks.
+          Allow location access when prompted.
         </p>
         <LocationMapPicker v-if="showMap && isOpen" :center="mapCenter" :point="selected" @select="choosePoint" />
         <ul v-else class="location-picker__list" role="radiogroup" aria-label="Locations">
@@ -67,18 +68,20 @@
           />
           <small>{{ selected.latitude.toFixed(6) }}, {{ selected.longitude.toFixed(6) }}</small>
         </div>
-        <p class="location-picker__status">This location will be attached to your post when you confirm.</p>
-        <button type="submit" class="location-picker__confirm" :disabled="!canConfirm || isLocating">
-          Confirm location
-        </button>
       </form>
     </ion-content>
+    <ion-footer class="location-picker__footer ion-no-border">
+        <p class="location-picker__status">This location will be saved with your {{ purpose }} when you confirm.</p>
+        <button :form="formId" type="submit" class="location-picker__confirm" :disabled="!canConfirm || isLocating">
+          Confirm location
+        </button>
+    </ion-footer>
   </ion-modal>
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import { IonContent, IonIcon, IonModal } from '@ionic/vue';
+import { computed, onBeforeUnmount, onMounted, ref, useId, watch } from 'vue';
+import { IonContent, IonFooter, IonIcon, IonModal } from '@ionic/vue';
 import { locationOutline, mapOutline, navigateOutline } from 'ionicons/icons';
 import LocationMapPicker from '@/components/map/LocationMapPicker.vue';
 import { getCurrentLocation } from '@/services/location.service';
@@ -89,7 +92,10 @@ import { isValidPoint, type MapPoint } from '@/utils/location-map';
 import { LOCATION_PICKER_CENTER, describeLocationPickerFailure } from '@/utils/location-picker';
 import { LOCATION_NAME_MAX_LENGTH, validatePostLocation } from '@/utils/post-details';
 
-const props = defineProps<{ isOpen: boolean; current: PostLocation | null }>();
+const props = withDefaults(defineProps<{ isOpen: boolean; current: PostLocation | null; purpose?: 'post' | 'game' }>(), {
+  purpose: 'post',
+});
+const formId = `location-picker-${useId()}`;
 const emit = defineEmits<{ close: []; confirm: [location: PostLocation] }>();
 const catalog = useCatalogStore();
 const auth = useAuthStore();
@@ -189,6 +195,7 @@ async function useCurrentLocation(): Promise<void> {
     const result = await getCurrentLocation(undefined, { precise: true });
     if (version !== requestVersion || !props.isOpen) return;
     if (!result.ok) {
+      selectOnMap();
       error.value = describeLocationPickerFailure(result.reason);
       return;
     }
@@ -197,7 +204,10 @@ async function useCurrentLocation(): Promise<void> {
     mapCenter.value = result.point;
     showMap.value = true;
   } catch {
-    if (version === requestVersion && props.isOpen) error.value = describeLocationPickerFailure('UNAVAILABLE');
+    if (version === requestVersion && props.isOpen) {
+      selectOnMap();
+      error.value = describeLocationPickerFailure('UNAVAILABLE');
+    }
   } finally {
     if (version === requestVersion) isLocating.value = false;
   }
@@ -372,6 +382,7 @@ onMounted(() => {
 }
 
 .location-picker__confirm {
+  width: 100%;
   padding: 13px;
   border: 0;
   border-radius: 999px;
@@ -380,6 +391,15 @@ onMounted(() => {
   cursor: pointer;
   font: inherit;
   font-weight: 700;
+}
+
+.location-picker__footer {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px 18px calc(16px + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--gora-line-strong);
+  background: var(--gora-surface);
 }
 
 .location-picker__confirm:disabled {

@@ -281,6 +281,7 @@
       </div>
     </ion-footer>
     <LocationPickerModal
+      purpose="game"
       :is-open="locationPickerOpen"
       :current="selectedGameLocation"
       @close="locationPickerOpen = false"

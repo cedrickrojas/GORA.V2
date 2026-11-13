@@ -55,6 +55,18 @@ but cannot compile or sign an iOS app.
 
 ## Camera, microphone, and verification
 
+Location actions use `@capacitor/geolocation` in the bundled app and browser
+geolocation on the web. Android declares coarse and fine location permissions;
+iOS includes the required location usage descriptions. Location permission is
+requested only after a location action. Approximate location is accepted, and a
+denied or unavailable reading opens the map for manual selection. The map center
+is saved only after the user selects it and confirms. Rebuild and reinstall the
+native app after syncing so the plugin and permissions are included.
+
+The Android launcher uses the supplied artwork in `mobile/resources/android-icon.png`.
+Run `mobile/scripts/generate-android-icons.ps1` in PowerShell to regenerate the
+standard, round, and adaptive launcher icons for all five screen densities.
+
 Go Live and video calls request camera + microphone through `getUserMedia`; voice
 calls request microphone only. Capacitor's built-in WebView bridge requests Android
 runtime permissions. Android declares `CAMERA`, `RECORD_AUDIO`, and

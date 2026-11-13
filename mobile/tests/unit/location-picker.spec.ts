@@ -26,6 +26,7 @@ function open(current: PostLocation | null = null) {
       stubs: {
         IonModal: { template: '<div><slot /></div>' },
         IonContent: { template: '<div><slot /></div>' },
+        IonFooter: { template: '<footer><slot /></footer>' },
         IonIcon: true,
         LocationMapPicker: mapStub,
       },
@@ -71,6 +72,29 @@ describe('post location picker', () => {
     await wrapper.find('#post-location-name').setValue('  My court  ');
     await submit();
     expect(wrapper.emitted('confirm')).toEqual([[{ name: 'My court', ...point }]]);
+  });
+
+  test('a denied request opens the map and allows manual confirmation without another device request', async () => {
+    reading.mockResolvedValue({ ok: false, reason: 'DENIED' });
+    open();
+    await click('Use current location');
+    await flushPromises();
+    expect(wrapper.findComponent(mapStub).exists()).toBe(true);
+    expect(wrapper.find('.location-picker__confirm').attributes('disabled')).toBeDefined();
+    wrapper.findComponent(mapStub).vm.$emit('select', point);
+    await flushPromises();
+    expect(wrapper.find('[role=alert]').exists()).toBe(false);
+    expect(wrapper.find('.location-picker__confirm').attributes('disabled')).toBeUndefined();
+    await submit();
+    expect(wrapper.emitted('confirm')).toEqual([[{ name: 'Selected location', ...point }]]);
+    expect(reading).toHaveBeenCalledTimes(1);
+  });
+
+  test('uses game wording and keeps the submit button connected to the form in the footer', async () => {
+    open(saved);
+    await wrapper.setProps({ purpose: 'game' });
+    expect(wrapper.find('footer').text()).toContain('your game');
+    expect(wrapper.find('footer button').attributes('form')).toBe(wrapper.find('form').attributes('id'));
   });
 
   test('accepts map points, rejects invalid coordinates and saves a custom name', async () => {

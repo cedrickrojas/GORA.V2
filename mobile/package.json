@@ -21,6 +21,7 @@
   "dependencies": {
     "@capacitor/android": "^8.6.0",
     "@capacitor/core": "^8.6.0",
+    "@capacitor/geolocation": "^8.2.4",
     "@capacitor/ios": "^8.6.0",
     "@ionic/vue": "^9.0.0",
     "@ionic/vue-router": "^9.0.0",

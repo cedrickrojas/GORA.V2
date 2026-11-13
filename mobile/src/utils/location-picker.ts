@@ -1,3 +1,4 @@
+import { Capacitor } from '@capacitor/core';
 import type { LocationFailure } from '@/services/location.service';
 import type { MapPoint } from './location-map';
 
@@ -7,7 +8,7 @@ export const LOCATION_PICKER_CENTER: MapPoint = { latitude: 14.5995, longitude: 
 export function describeLocationPickerFailure(reason: LocationFailure): string {
   switch (reason) {
     case 'DENIED':
-      return 'Location permission was denied. Allow location access in your browser settings, or select a place on the map.';
+      return `Location access is off. Select a place on the map, or allow location in your ${Capacitor.isNativePlatform() ? 'device app' : 'browser'} settings to use your current location.`;
     case 'TIMEOUT':
       return 'Finding your location took too long. Try again, or select a place on the map.';
     case 'UNSUPPORTED':
