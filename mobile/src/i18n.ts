@@ -1,6 +1,8 @@
 import type { AppLanguage } from '@/stores/app-preferences';
 
 const FILIPINO: Record<string, string> = {
+  'No internet connection': 'Walang koneksyon sa internet',
+  'Pull to refresh': 'Hilahin pababa para mag-refresh',
   "Only members see posts, rules, and schedule.": "Mga miyembro lang ang makakakita ng mga post, patakaran, at iskedyul.",
   "Suggested club rules": "Mga mungkahing patakaran ng club",
   "Suggested club tags": "Mga mungkahing tag ng club",

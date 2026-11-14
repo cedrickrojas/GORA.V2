@@ -39,6 +39,7 @@ export function useGameShare() {
       }
 
       const alert = await alertController.create({
+        cssClass: 'gora-share-alert',
         header: 'Share to messages',
         subHeader: 'Choose a conversation',
         inputs: conversations.slice(0, 20).map((conversation, index) => ({
@@ -71,6 +72,7 @@ export function useGameShare() {
     }
 
     const sheet = await actionSheetController.create({
+      cssClass: 'gora-share-sheet',
       header: 'Share game',
       buttons: [
         { text: 'Share as post', icon: createOutline, handler: () => void shareAsPost() },

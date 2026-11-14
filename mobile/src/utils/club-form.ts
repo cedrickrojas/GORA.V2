@@ -88,7 +88,7 @@ export function emptyClubForm(): ClubForm {
     latitude: '',
     longitude: '',
     maxMembers: '50',
-    membershipType: 'OPEN',
+    membershipType: 'APPROVAL_REQUIRED',
     isPublic: true,
     rules: [],
     tags: [],

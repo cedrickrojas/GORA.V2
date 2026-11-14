@@ -693,6 +693,13 @@ const hiddenMediaCount = computed(() => availableMedia.value.length - visibleMed
   inset: 0;
   width: 100%;
   height: 100%;
+}
+
+.post-card__photo img {
+  object-fit: contain;
+}
+
+.post-card__photo video {
   object-fit: cover;
 }
 

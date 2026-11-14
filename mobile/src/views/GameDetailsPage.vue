@@ -234,7 +234,9 @@ onMounted(async () => {
 
 <style scoped>
 .game {
-  padding-bottom: 24px;
+  max-width: 920px;
+  margin: 0 auto;
+  padding: 0 0 32px;
 }
 
 ion-content.game-details-content {
@@ -255,7 +257,26 @@ ion-header.game-details-header ion-toolbar {
 
 .game__hero {
   position: relative;
-  padding: 20px 16px 18px;
+  min-height: 220px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-end;
+  padding: 24px 20px;
+  overflow: hidden;
+  isolation: isolate;
+  background-image: linear-gradient(180deg, rgb(0 0 0 / 8%), rgb(0 0 0 / 62%));
+}
+
+.game__hero::after {
+  position: absolute;
+  z-index: -1;
+  inset: auto -15% -150px 30%;
+  height: 230px;
+  border-radius: 50%;
+  background: rgb(255 255 255 / 10%);
+  content: '';
+  filter: blur(2px);
 }
 
 .game__share {
@@ -289,9 +310,13 @@ ion-header.game-details-header ion-toolbar {
 }
 
 .game__title {
-  margin: 12px 0 8px;
-  font-size: 1.35rem;
+  max-width: min(100%, 720px);
+  margin: 14px 0 10px;
+  font-size: clamp(1.8rem, 7vw, 3rem);
   font-weight: 800;
+  line-height: 1.05;
+  letter-spacing: -0.025em;
+  overflow-wrap: anywhere;
 }
 
 .game__meta {
@@ -319,10 +344,11 @@ ion-header.game-details-header ion-toolbar {
 
 .game__capacity {
   margin: 16px;
-  padding: 14px 16px;
+  padding: 18px;
   border: 1px solid var(--gora-line);
-  border-radius: 16px;
+  border-radius: 20px;
   background: var(--gora-surface);
+  box-shadow: var(--gora-shadow);
 }
 
 .game__count {
@@ -365,7 +391,11 @@ ion-header.game-details-header ion-toolbar {
 }
 
 .game__section {
-  padding: 0 16px;
+  margin: 22px 16px 0;
+  padding: 18px;
+  border: 1px solid var(--gora-line);
+  border-radius: 18px;
+  background: var(--gora-surface);
 }
 
 .game__club {
@@ -423,6 +453,13 @@ ion-header.game-details-header ion-toolbar {
   border-bottom: 1px solid var(--gora-line);
 }
 
+.game__cta {
+  width: min(100%, 920px);
+  margin-inline: auto;
+  padding: 10px 16px calc(10px + env(safe-area-inset-bottom, 0px));
+  background: var(--ion-background-color);
+}
+
 .roster__number {
   width: 24px;
   color: var(--gora-muted);
@@ -457,6 +494,18 @@ ion-header.game-details-header ion-toolbar {
 .roster__tag--you {
   border-color: var(--gora-line-strong);
   color: var(--ion-text-color);
+}
+
+@media (min-width: 768px) {
+  .game__hero {
+    min-height: 300px;
+    padding: 34px 38px;
+  }
+
+  .game__capacity,
+  .game__section {
+    margin-inline: 24px;
+  }
 }
 
 .game__cta {
@@ -509,7 +558,7 @@ ion-header.game-details-header ion-toolbar {
     width: 100%;
     max-width: var(--gora-column, 680px);
     margin-inline: auto;
-    padding: 8px 16px 12px;
+    padding: 8px 16px calc(12px + env(safe-area-inset-bottom, 0px));
     background: transparent;
   }
 
@@ -546,7 +595,7 @@ ion-header.game-details-header ion-toolbar {
 
   .game__section {
     grid-column: 1;
-    padding: 0 4px;
+    padding: 20px 24px;
   }
 }
 </style>

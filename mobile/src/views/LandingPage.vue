@@ -1673,6 +1673,7 @@ h2 {
 }
 .site-header {
   background: #101113;
+  padding-top: env(safe-area-inset-top, 0px);
 }
 .header-inner {
   height: 104px;

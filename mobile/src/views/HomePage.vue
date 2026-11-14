@@ -3,6 +3,9 @@
     <AppHeader />
 
     <ion-content :fullscreen="true">
+      <ion-refresher slot="fixed" @ion-refresh="handlePullRefresh">
+        <ion-refresher-content pulling-text="Pull to refresh" refreshing-spinner="crescent" />
+      </ion-refresher>
       <StoryRail
         :viewer="storiesStore.viewer"
         :own="storyFeed.own"
@@ -113,7 +116,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
-import { IonContent, IonIcon, IonPage, onIonViewWillEnter, onIonViewDidLeave } from '@ionic/vue';
+import { IonContent, IonIcon, IonPage, IonRefresher, IonRefresherContent, onIonViewWillEnter, onIonViewDidLeave } from '@ionic/vue';
 import { imageOutline, peopleOutline, refreshOutline, newspaperOutline } from 'ionicons/icons';
 import UserAvatar from '@/components/common/UserAvatar.vue';
 import FeedEntry from '@/components/feed/FeedEntry.vue';
@@ -219,7 +222,16 @@ async function refreshFeed(): Promise<void> {
     gamesStore.refreshFeedGames(),
     clubsStore.refreshFeedClubs(),
   ]);
-  if (storiesStore.isLoaded) void storiesStore.refresh();
+  if (storiesStore.isLoaded) await storiesStore.refresh();
+}
+
+async function handlePullRefresh(event: CustomEvent): Promise<void> {
+  try {
+    await refreshFeed();
+    await Promise.all([reelsStore.refresh(), catalog.refreshSports()]);
+  } finally {
+    (event.target as HTMLIonRefresherElement).complete();
+  }
 }
 
 let refreshTimer: ReturnType<typeof setInterval> | undefined;

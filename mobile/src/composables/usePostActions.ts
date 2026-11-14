@@ -59,6 +59,7 @@ export function usePostActions() {
         return;
       }
       const alert = await alertController.create({
+        cssClass: 'gora-share-alert',
         header: 'Share to messages',
         subHeader: 'Choose a conversation',
         inputs: conversations.slice(0, 20).map((conversation, index) => ({
@@ -97,9 +98,9 @@ export function usePostActions() {
       }
     }
     const sheet = await actionSheetController.create({
+      cssClass: ['gora-sheet', 'gora-share-sheet'],
       header: 'Share post',
       subHeader: 'Only people in this post’s audience can open the link.',
-      cssClass: 'gora-sheet',
       buttons: [
         {
           text: 'Share to messages',

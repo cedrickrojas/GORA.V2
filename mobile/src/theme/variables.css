@@ -73,6 +73,37 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+ion-alert.gora-share-alert {
+  --background: var(--gora-surface);
+  --color: var(--ion-text-color);
+  --backdrop-opacity: 0.55;
+  --ion-color-step-550: var(--ion-text-color);
+  --ion-color-step-850: var(--ion-text-color);
+}
+
+ion-alert.gora-share-alert .alert-message,
+ion-alert.gora-share-alert .alert-radio-label,
+ion-alert.gora-share-alert .alert-checkbox-label {
+  color: var(--ion-text-color);
+}
+
+ion-alert.gora-share-alert .alert-radio-icon,
+ion-alert.gora-share-alert .alert-checkbox-icon {
+  border-color: var(--gora-muted);
+}
+
+ion-action-sheet.gora-share-sheet {
+  --background: var(--gora-surface);
+  --button-background: var(--gora-surface);
+  --button-background-selected: var(--gora-surface-hover);
+  --button-color: var(--ion-text-color);
+  --color: var(--ion-text-color);
+}
+
+ion-action-sheet.gora-share-sheet .action-sheet-title {
+  color: var(--gora-muted);
+}
+
 html.gora-theme-light body {
   background: var(--ion-background-color);
   color: var(--ion-text-color);

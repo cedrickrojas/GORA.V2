@@ -209,6 +209,10 @@ async function share(): Promise<void> {
     customViewerIds.value = [];
     void showNotice('Story added. It disappears after 24 hours.');
     await router.replace('/home');
+  } catch (caught) {
+    if (!controller.signal.aborted) {
+      error.value = caught instanceof Error ? caught.message : 'Story upload failed. Please try again.';
+    }
   } finally {
     if (uploadController === controller) {
       uploadController = null;
